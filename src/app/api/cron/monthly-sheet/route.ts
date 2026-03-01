@@ -26,8 +26,10 @@ export async function GET(req: Request) {
         const month = twNow.getMonth() + 1;
 
         // 確認今天是當月最後一天（避免 28-31 號都執行）
+        // 加 ?force=true 可跳過日期判斷（手動測試用）
+        const force = new URL(req.url).searchParams.get("force") === "true";
         const lastDayOfMonth = new Date(year, month, 0).getDate();
-        if (twNow.getDate() !== lastDayOfMonth) {
+        if (!force && twNow.getDate() !== lastDayOfMonth) {
             return NextResponse.json({ status: "skipped", reason: "Not last day of month" });
         }
 
