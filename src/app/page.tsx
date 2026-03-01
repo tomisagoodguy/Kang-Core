@@ -94,47 +94,48 @@ export default async function HomePage() {
                 />
             </div>
 
-            {/* Two Column Section */}
-            <div className="dashboard-cols">
-                {/* Accounting */}
-                <div>
-                    <div className="dashboard-section-title">
-                        <span>💳</span> 最近記帳
-                        <Link href="/accounting" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.75rem" }}>
-                            查看全部 →
-                        </Link>
+            {/* Accounting Section */}
+            <div style={{ marginBottom: "40px" }}>
+                <div className="dashboard-section-title">
+                    <span>💳</span> 最近記帳
+                    <Link href="/accounting" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.875rem" }}>
+                        查看全部 →
+                    </Link>
+                </div>
+                {accountingEntries.length === 0 ? (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">📭</span>
+                        <p>還沒有記帳記錄，傳訊息給機器人吧！</p>
                     </div>
-                    {accountingEntries.length === 0 ? (
-                        <div className="empty-state">
-                            <span className="empty-state-icon">📭</span>
-                            <p>還沒有記帳記錄，傳訊息給機器人吧！</p>
-                        </div>
-                    ) : (
-                        accountingEntries.map((entry: any) => (
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                        {accountingEntries.map((entry: any) => (
                             <AccountingCard key={entry.id} entry={entry} />
-                        ))
-                    )}
-                </div>
-
-                {/* Archive */}
-                <div>
-                    <div className="dashboard-section-title">
-                        <span>📚</span> 最近存檔
-                        <Link href="/archive" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.75rem" }}>
-                            查看全部 →
-                        </Link>
+                        ))}
                     </div>
-                    {archiveEntries.length === 0 ? (
-                        <div className="empty-state">
-                            <span className="empty-state-icon">📭</span>
-                            <p>還沒有存檔記錄，傳連結或文章給機器人！</p>
-                        </div>
-                    ) : (
-                        archiveEntries.map((entry: any) => (
-                            <ArchiveCard key={entry.id} entry={entry} />
-                        ))
-                    )}
+                )}
+            </div>
+
+            {/* Archive Section */}
+            <div>
+                <div className="dashboard-section-title">
+                    <span>📚</span> 最近存檔
+                    <Link href="/archive" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.875rem" }}>
+                        查看全部 →
+                    </Link>
                 </div>
+                {archiveEntries.length === 0 ? (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">📭</span>
+                        <p>還沒有存檔記錄，傳連結或文章給機器人！</p>
+                    </div>
+                ) : (
+                    <div className="archive-grid">
+                        {archiveEntries.map((entry: any) => (
+                            <ArchiveCard key={entry.id} entry={entry} />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
