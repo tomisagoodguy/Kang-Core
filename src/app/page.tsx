@@ -1,65 +1,109 @@
-import Image from "next/image";
+import { StatCard } from "@/components/StatCard";
+import { AccountingCard } from "@/components/AccountingCard";
+import { ArchiveCard } from "@/components/ArchiveCard";
+import Link from "next/link";
 
-export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+async function getAccountingEntries(limit = 5) {
+    const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
+    const res = await fetch(`${baseUrl}/api/accounting?limit=${limit}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.entries ?? [];
+}
+
+async function getArchiveEntries(limit = 5) {
+    const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
+    const res = await fetch(`${baseUrl}/api/archive?limit=${limit}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.entries ?? [];
+}
+
+export default async function HomePage() {
+    const [accountingEntries, archiveEntries] = await Promise.all([
+        getAccountingEntries(5),
+        getArchiveEntries(5),
+    ]);
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const monthlyEntries = accountingEntries.filter((e: any) =>
+        e.date?.startsWith(currentMonth)
+    );
+    const monthlyTotal = monthlyEntries.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+
+    return (
+        <div className="page-container">
+            <h1 className="page-title">📊 儀表板</h1>
+            <p className="page-subtitle">透過 LINE Bot 傳訊息，讓 AI 幫你記錄生活的每一筆帳和知識。</p>
+
+            {/* Stat Cards */}
+            <div className="stat-grid">
+                <StatCard
+                    icon="💳"
+                    label="本月總支出"
+                    value={`$${monthlyTotal.toLocaleString()}`}
+                    color="var(--danger)"
+                />
+                <StatCard
+                    icon="📝"
+                    label="本月記帳筆數"
+                    value={monthlyEntries.length}
+                    color="var(--warning)"
+                />
+                <StatCard
+                    icon="📚"
+                    label="知識庫存檔"
+                    value={archiveEntries.length}
+                    color="var(--accent-light)"
+                />
+            </div>
+
+            {/* Two Column Section */}
+            <div className="dashboard-cols">
+                {/* Accounting */}
+                <div>
+                    <div className="dashboard-section-title">
+                        <span>💳</span> 最近記帳
+                        <Link href="/accounting" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.75rem" }}>
+                            查看全部 →
+                        </Link>
+                    </div>
+                    {accountingEntries.length === 0 ? (
+                        <div className="empty-state">
+                            <span className="empty-state-icon">📭</span>
+                            <p>還沒有記帳記錄，傳訊息給機器人吧！</p>
+                        </div>
+                    ) : (
+                        accountingEntries.map((entry: any) => (
+                            <AccountingCard key={entry.id} entry={entry} />
+                        ))
+                    )}
+                </div>
+
+                {/* Archive */}
+                <div>
+                    <div className="dashboard-section-title">
+                        <span>📚</span> 最近存檔
+                        <Link href="/archive" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.75rem" }}>
+                            查看全部 →
+                        </Link>
+                    </div>
+                    {archiveEntries.length === 0 ? (
+                        <div className="empty-state">
+                            <span className="empty-state-icon">📭</span>
+                            <p>還沒有存檔記錄，傳連結或文章給機器人！</p>
+                        </div>
+                    ) : (
+                        archiveEntries.map((entry: any) => (
+                            <ArchiveCard key={entry.id} entry={entry} />
+                        ))
+                    )}
+                </div>
+            </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    );
 }
