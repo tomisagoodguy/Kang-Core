@@ -4,12 +4,13 @@ import { Readable } from "stream";
 function getDriveClient() {
     // 使用個人的 OAuth2 憑證，配額算在你的個人帳號上，可上傳到 My Drive
     const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_OAUTH_CLIENT_ID,
-        process.env.GOOGLE_OAUTH_CLIENT_SECRET
+        process.env.GOOGLE_OAUTH_CLIENT_ID?.trim(),
+        process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim(),
+        "http://localhost"
     );
 
     oauth2Client.setCredentials({
-        refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
+        refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN?.trim(),
     });
 
     return google.drive({ version: "v3", auth: oauth2Client });
