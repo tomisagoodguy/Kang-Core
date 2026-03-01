@@ -52,7 +52,9 @@
 /* ═══════════════════════════════════════════════════════════
    Reset & Base
 ═══════════════════════════════════════════════════════════ */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -186,14 +188,45 @@ a {
   letter-spacing: 0.01em;
 }
 
-.tag-badge[data-tag="Food"] { background: rgba(245, 158, 11, 0.15); color: var(--tag-food); }
-.tag-badge[data-tag="Transport"] { background: rgba(59, 130, 246, 0.15); color: var(--tag-transport); }
-.tag-badge[data-tag="Entertainment"] { background: rgba(236, 72, 153, 0.15); color: var(--tag-entertainment); }
-.tag-badge[data-tag="Utilities"] { background: rgba(6, 182, 212, 0.15); color: var(--tag-utilities); }
-.tag-badge[data-tag="Shopping"] { background: rgba(139, 92, 246, 0.15); color: var(--tag-shopping); }
-.tag-badge[data-tag="Health"] { background: rgba(16, 185, 129, 0.15); color: var(--tag-health); }
-.tag-badge[data-tag="Education"] { background: rgba(249, 115, 22, 0.15); color: var(--tag-education); }
-.tag-badge[data-tag="Other"] { background: rgba(107, 114, 128, 0.15); color: var(--tag-other); }
+.tag-badge[data-tag="Food"] {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--tag-food);
+}
+
+.tag-badge[data-tag="Transport"] {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--tag-transport);
+}
+
+.tag-badge[data-tag="Entertainment"] {
+  background: rgba(236, 72, 153, 0.15);
+  color: var(--tag-entertainment);
+}
+
+.tag-badge[data-tag="Utilities"] {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--tag-utilities);
+}
+
+.tag-badge[data-tag="Shopping"] {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--tag-shopping);
+}
+
+.tag-badge[data-tag="Health"] {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--tag-health);
+}
+
+.tag-badge[data-tag="Education"] {
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--tag-education);
+}
+
+.tag-badge[data-tag="Other"] {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--tag-other);
+}
 
 /* ═══════════════════════════════════════════════════════════
    StatCard
@@ -262,33 +295,41 @@ a {
   letter-spacing: -0.02em;
 }
 
-.accounting-card-amount.high { color: var(--danger); }
-.accounting-card-amount.medium { color: var(--warning); }
-.accounting-card-amount.low { color: var(--success); }
+.accounting-card-amount.high {
+  color: var(--danger);
+}
+
+.accounting-card-amount.medium {
+  color: var(--warning);
+}
+
+.accounting-card-amount.low {
+  color: var(--success);
+}
 
 /* ═══════════════════════════════════════════════════════════
    ArchiveCard
 ═══════════════════════════════════════════════════════════ */
 .archive-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  /* 改為 2 欄排列，讓卡片有更大空間 */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
 }
 
 .archive-card {
-  padding: 20px 24px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   min-height: 180px;
 }
 
 .archive-card-title {
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.4;
-  /* 最多 2 行，但標題不截斷成單行 */
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -296,11 +337,10 @@ a {
 }
 
 .archive-card-summary {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--text-secondary);
-  line-height: 1.65;
+  line-height: 1.7;
   flex: 1;
-  /* 最多 5 行，讓使用者看到更多摘要內容 */
   display: -webkit-box;
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
