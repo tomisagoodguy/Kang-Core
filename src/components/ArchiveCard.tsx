@@ -15,9 +15,12 @@ interface ArchiveCardProps {
 }
 
 export function ArchiveCard({ entry }: ArchiveCardProps) {
-    const displayTitle = entry.title || (entry.url ? new URL(entry.url).hostname : "知識存檔");
-    const truncatedSummary =
-        entry.summary.length > 80 ? entry.summary.slice(0, 80) + "…" : entry.summary;
+    let displayTitle = entry.title || "知識存檔";
+    if (!entry.title && entry.url) {
+        try { displayTitle = new URL(entry.url).hostname; } catch { /* invalid URL */ }
+    }
+    // 不截斷摘要，由 CSS -webkit-line-clamp 控制顯示行數
+    const summary = entry.summary;
 
     return (
         <div className="glass-card archive-card">
@@ -41,7 +44,7 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
             <div className="archive-card-title" title={displayTitle}>
                 {displayTitle}
             </div>
-            <div className="archive-card-summary">{truncatedSummary}</div>
+            <div className="archive-card-summary">{summary}</div>
             <div className="archive-card-keywords">
                 {entry.keywords.slice(0, 4).map((kw) => (
                     <TagBadge key={kw} tag={kw} />
