@@ -1,11 +1,13 @@
 import { db } from "@/lib/firebase/admin";
 import { getTagEmoji } from "@/utils/tagEmoji";
+import { RAGService } from "./rag.service";
 
 interface QueryFilter {
-    queryType: "expense" | "archive" | "calendar";
+    queryType: "expense" | "archive" | "calendar" | "semantic_search";
     tag?: string;
     period?: string;
     limit?: number;
+    semanticQuery?: string;
 }
 
 interface QueryResult {
@@ -24,6 +26,9 @@ export async function executeQuery(filters: QueryFilter): Promise<QueryResult> {
     }
     if (filters.queryType === "calendar") {
         return queryCalendar(filters.period);
+    }
+    if (filters.queryType === "semantic_search" && filters.semanticQuery) {
+        return querySemantic(filters.semanticQuery, filters.limit ?? 3);
     }
     return { replyText: "❓ 不支援的查詢類型" };
 }
@@ -105,6 +110,27 @@ async function queryArchive(limit: number): Promise<QueryResult> {
     return {
         replyText: [
             `📦 最近 ${snapshot.size} 筆收藏`,
+            "━━━━━━━━━━━━",
+            ...lines,
+        ].join("\n"),
+    };
+}
+
+async function querySemantic(semanticQuery: string, limit: number): Promise<QueryResult> {
+    const results = await RAGService.search(semanticQuery, limit);
+    if (results.length === 0) {
+        return { replyText: `🔍 找不到與「${semanticQuery}」相關的筆記。` };
+    }
+
+    const lines = results.map((d, i) => {
+        const title = d.title || d.summary?.slice(0, 30) || "無標題";
+        const scorePct = Math.round(d.score * 100);
+        return `${i + 1}. [${scorePct}%] ${title}`;
+    });
+
+    return {
+        replyText: [
+            `🔍 關於「${semanticQuery}」的相關筆記`,
             "━━━━━━━━━━━━",
             ...lines,
         ].join("\n"),

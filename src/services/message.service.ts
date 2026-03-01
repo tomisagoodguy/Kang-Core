@@ -10,14 +10,31 @@ import { parseQuickCommand } from "./quickCommand";
 import { executeQuery } from "./queryEngine";
 import { ClassificationEngine } from "./classificationEngine";
 import { checkBudgetAlert } from "./budget.service";
+import { ArchiveTagEngine } from "./archiveTagEngine";
+import { SessionService } from "./session.service";
+import { getEmbedding } from "@/lib/gemini/embedding";
 
 export class MessageService {
+    /** 內部發送訊息並紀錄到短記憶 */
+    private async sendReply(userId: string, replyText: string): Promise<void> {
+        await lineService.pushText(userId, replyText);
+        SessionService.addMessage(userId, "assistant", replyText).catch(console.error);
+    }
+
     /** 處理文字訊息 */
     async handleTextMessage(userText: string, userId: string): Promise<void> {
+        // 先取得歷史對話
+        const history = await SessionService.getRecentHistory(userId);
+        const historyContext = history.length > 0
+            ? history.map(m => `[${m.role === 'user' ? 'User' : 'Assistant'}]: ${m.text}`).join('\n')
+            : undefined;
+
+        // 寫入 User 紀錄（背景執行不阻擋）
+        SessionService.addMessage(userId, "user", userText).catch(console.error);
         // 快速指令攔截（/記, /查, /待, /help）— 不走 Gemini
         const quickResult = await parseQuickCommand(userText, userId);
         if (quickResult.handled) {
-            await lineService.pushText(userId, quickResult.replyText!);
+            await this.sendReply(userId, quickResult.replyText!);
             if (!userText.trim().startsWith("/help") && !userText.trim().startsWith("/查")) {
                 await discordService.sendDiscordNotification(quickResult.replyText!);
             }
@@ -43,17 +60,17 @@ export class MessageService {
                 };
                 const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
 
-                await lineService.pushText(userId, replyText);
+                await this.sendReply(userId, replyText);
                 await db.collection("accounting").add(entry);
                 await discordService.sendDiscordNotification(replyText);
                 return;
             }
         }
 
-        const parsedData = await parseUserInput(userText);
+        const parsedData = await parseUserInput(userText, historyContext);
 
         if (parsedData.isError) {
-            await lineService.pushText(userId, `⚠️ 解析失敗：\n${parsedData.errorMessage}`);
+            await this.sendReply(userId, `⚠️ 解析失敗：\n${parsedData.errorMessage}`);
             return;
         }
 
@@ -67,7 +84,7 @@ export class MessageService {
             let replyText = `✅ 記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-            await lineService.pushText(userId, replyText);
+            await this.sendReply(userId, replyText);
             await db.collection("accounting").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
@@ -80,18 +97,32 @@ export class MessageService {
             checkBudgetAlert(userId, entry.amount, entry.date, entry.tag).catch(() => { /* 不影響主流程 */ });
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
-            const entry = {
+            const embeddingText = `${parsedData.archiveData.summary} ${parsedData.archiveData.keywords.join(", ")}`;
+            const embeddingArray = await getEmbedding(embeddingText).catch(e => {
+                console.error("[Embedding] Failed:", e);
+                return null;
+            });
+
+            const entry: any = {
                 ...parsedData.archiveData,
                 originalText: userText,
                 source: "line",
                 createdAt: new Date(),
             };
+            if (embeddingArray) {
+                entry.embedding = embeddingArray;
+            }
             let replyText = `📦 收納成功！\n📋 摘要: ${entry.summary}\n🏷️ 關鍵字: ${entry.keywords.join(", ")}`;
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-            await lineService.pushText(userId, replyText);
+            await this.sendReply(userId, replyText);
             await db.collection("archive").add(entry);
             await discordService.sendDiscordNotification(replyText);
+
+            // 學習新標籤
+            if (entry.keywords && entry.keywords.length > 0) {
+                await ArchiveTagEngine.learn(entry.keywords);
+            }
 
         } else if (parsedData.type === "calendar" && parsedData.calendarData) {
             const entry = {
@@ -120,23 +151,25 @@ export class MessageService {
 
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-            await lineService.pushText(userId, replyText);
+            await this.sendReply(userId, replyText);
             await db.collection("calendar").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
         } else if (parsedData.type === "query" && parsedData.queryData) {
             const queryResult = await executeQuery(parsedData.queryData);
-            await lineService.pushText(userId, queryResult.replyText);
+            await this.sendReply(userId, queryResult.replyText);
 
         } else {
-            await lineService.pushText(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n或「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
+            await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n或「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
         }
     }
 
     /** 處理圖片訊息（上傳 Drive + Gemini Vision 分析） */
     async handleImageMessage(messageId: string, userId: string): Promise<void> {
+        SessionService.addMessage(userId, "user", "[上傳了一張圖片]").catch(console.error);
+
         // 先回覆「處理中」讓使用者知道收到了
-        await lineService.pushText(userId, "🖼️ 收到圖片，分析中...");
+        await this.sendReply(userId, "🖼️ 收到圖片，分析中...");
 
         // 下載 LINE 圖片
         const imageBuffer = await lineService.getMessageContentBuffer(messageId);
@@ -152,7 +185,7 @@ export class MessageService {
         ]);
 
         if (parsedData.isError) {
-            await lineService.pushText(userId, `⚠️ 圖片分析失敗：${parsedData.errorMessage}\n📁 圖片已存到 Drive：${driveUrl}`);
+            await this.sendReply(userId, `⚠️ 圖片分析失敗：${parsedData.errorMessage}\n📁 圖片已存到 Drive：${driveUrl}`);
             return;
         }
 
@@ -165,7 +198,7 @@ export class MessageService {
             };
             const replyText = `✅ 收據記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}\n📁 圖片: 已存 Drive`;
 
-            await lineService.pushText(userId, replyText);
+            await this.sendReply(userId, replyText);
             await db.collection("accounting").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
@@ -175,26 +208,42 @@ export class MessageService {
             }
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
-            const entry = {
+            const embeddingText = `${parsedData.archiveData.summary} ${parsedData.archiveData.keywords.join(", ")}`;
+            const embeddingArray = await getEmbedding(embeddingText).catch(e => {
+                console.error("[Embedding] Failed:", e);
+                return null;
+            });
+
+            const entry: any = {
                 ...parsedData.archiveData,
                 imageUrl: driveUrl,
                 source: "line-image",
                 createdAt: new Date(),
             };
+            if (embeddingArray) {
+                entry.embedding = embeddingArray;
+            }
             const replyText = `📦 圖片收納成功！\n📋 摘要: ${entry.summary}\n🏷️ 關鍵字: ${entry.keywords.join(", ")}\n📁 圖片: 已存 Drive`;
 
-            await lineService.pushText(userId, replyText);
+            await this.sendReply(userId, replyText);
             await db.collection("archive").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
+            // 學習新標籤
+            if (entry.keywords && entry.keywords.length > 0) {
+                await ArchiveTagEngine.learn(entry.keywords);
+            }
+
         } else {
-            await lineService.pushText(userId, `❓ 無法辨識圖片內容\n📁 圖片已存 Drive：${driveUrl}`);
+            await this.sendReply(userId, `❓ 無法辨識圖片內容\n📁 圖片已存 Drive：${driveUrl}`);
         }
     }
 
     /** 處理檔案訊息（如 PDF、DOCX，上傳 Drive 並記錄到知識庫） */
     async handleFileMessage(messageId: string, fileName: string, userId: string): Promise<void> {
-        await lineService.pushText(userId, "📁 收到檔案，上傳至雲端硬碟中...");
+        SessionService.addMessage(userId, "user", `[上傳了檔案: ${fileName}]`).catch(console.error);
+
+        await this.sendReply(userId, "📁 收到檔案，上傳至雲端硬碟中...");
 
         try {
             const fileBuffer = await lineService.getMessageContentBuffer(messageId);
@@ -202,7 +251,13 @@ export class MessageService {
             // 上傳到 Drive，自動判斷 MIME type -> (使用預設或省略)
             const driveUrl = await driveService.uploadToDrive(fileName, "application/octet-stream", fileBuffer);
 
-            const entry = {
+            const embeddingText = `檔案: ${fileName} 此檔案由 LINE 機器人上傳，尚未提供詳細解析。`;
+            const embeddingArray = await getEmbedding(embeddingText).catch(e => {
+                console.error("[Embedding] Failed:", e);
+                return null;
+            });
+
+            const entry: any = {
                 title: fileName,
                 summary: "此檔案由 LINE 機器人上傳，尚未提供詳細解析。",
                 keywords: ["file", "document"],
@@ -210,16 +265,19 @@ export class MessageService {
                 source: "line-file",
                 createdAt: new Date(),
             };
+            if (embeddingArray) {
+                entry.embedding = embeddingArray;
+            }
 
             const replyText = `✅ 檔案儲存成功！\n📁 標題：${fileName}\n🔗 存檔位置：已存 Drive`;
 
             await db.collection("archive").add(entry);
-            await lineService.pushText(userId, replyText);
+            await this.sendReply(userId, replyText);
             await discordService.sendDiscordNotification(replyText);
 
         } catch (e: unknown) {
             console.error("handleFileMessage error:", e);
-            await lineService.pushText(userId, "⚠️ 檔案處理失敗，請稍後再試。");
+            await this.sendReply(userId, "⚠️ 檔案處理失敗，請稍後再試。");
         }
     }
 
@@ -263,7 +321,7 @@ export class MessageService {
             const error = err as Error;
             console.error(`[processEvent] userId=${userId}:`, error);
             try {
-                await lineService.pushText(userId, `⚠️ 處理失敗：${error?.message?.slice(0, 100) ?? "未知錯誤"}`);
+                await this.sendReply(userId, `⚠️ 處理失敗：${error?.message?.slice(0, 100) ?? "未知錯誤"}`);
             } catch {
                 // push message 失敗則靜默
             }

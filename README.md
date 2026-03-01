@@ -32,8 +32,8 @@
 
 * **情境**: 傳送一篇技術文章或娛樂影片的網址。
 * **處理**:
-    1. 抓取網頁 Meta (Title, Description, og:image)。
-    2. AI 根據抓到的標題與描述，自動進行分類與打標籤 (e.g., `["技術", "Next.js", "教學"]` 或 `["娛樂", "YouTube"]`)。
+  1. 抓取網頁 Meta (Title, Description, og:image)。
+  2. AI 根據抓到的標題與描述，自動進行分類與打標籤 (e.g., `["技術", "Next.js", "教學"]` 或 `["娛樂", "YouTube"]`)。
 * **儲存**: 寫入 Firestore `archives` 集合，將狀態標示為 `unread` (未讀)。
 * **應用**: 後台進入「待看清單」板塊，讀完後可點擊標記為已讀/歸檔。
 
@@ -90,3 +90,11 @@ interface ArchiveEntry {
 * **Styling**: Tailwind CSS
 * **State Management**: `zustand`
 * **Validation**: `zod`
+
+
+關注中:
+https://www.evanlin.com/
+
+https://github.com/kkdai/linebot-file
+
+https://www.ccclub.io/achievement

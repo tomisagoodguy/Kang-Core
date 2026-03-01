@@ -69,10 +69,11 @@ export const GeminiParseResultSchema = z.object({
         originalText: true,
     }).optional(),
     queryData: z.object({
-        queryType: z.enum(["expense", "archive", "calendar"]),
+        queryType: z.enum(["expense", "archive", "calendar", "semantic_search"]),
         tag: z.string().optional(),
         period: z.string().optional(),
         limit: z.number().optional(),
+        semanticQuery: z.string().optional(), // For RAG search
     }).optional(),
     explanation: z.string().optional(),
     isError: z.boolean().default(false),
