@@ -1,14 +1,28 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "@/lib/firebase/admin";
+import { safeExecute } from "@/lib/gemini/client";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function generateFinancialInsights(userId: string) {
     try {
-        // 1. Fetch recent expenses (last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const dateStr = thirtyDaysAgo.toISOString().split("T")[0];
+
+        // 1b. Check Persistent Cache (Firestore) - limit to 1 hour (3600s)
+        const oneHourAgo = new Date(Date.now() - 3600000);
+        const cachedSnapshot = await db.collection("insights")
+            .where("userId", "==", userId)
+            .where("createdAt", ">=", oneHourAgo)
+            .orderBy("createdAt", "desc")
+            .limit(1)
+            .get();
+
+        if (!cachedSnapshot.empty) {
+            console.log(`[Insight] Using cached result from Firestore`);
+            return cachedSnapshot.docs[0].data().content;
+        }
 
         const snapshot = await db.collection("accounting")
             .where("date", ">=", dateStr)
@@ -43,7 +57,7 @@ export async function generateFinancialInsights(userId: string) {
         `;
 
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(prompt);
+        const result = await safeExecute(() => model.generateContent(prompt));
         const responseText = result.response.text();
 
         // 3. Store insight in Firestore (optional cache)

@@ -94,6 +94,14 @@
 - [ ] 56. 建立 `/settings/rules` 管理頁面
 - [ ] 57. 低 confidence 規則高亮提示
 
+### C10: AI 配額優化與重試機制 (Limit-Proofing)
+
+- [x] 58. 建立 `src/lib/gemini/client.ts` — 實作指數退避重試 (429)
+- [x] 59. 整合 `safeExecute` 到 `parser.ts` 與 `vision.ts`
+- [x] 60. 實作 `insights.ts` 雲端持久性快取 — 1 小時內不重複調用
+- [x] 61. 擴充 `GEMMA_MODELS` 備援清單 — 使用 14,400 RPD 高配額模型
+- [x] 62. 在 LINE 中顯示具體的 Limit 錯誤提示
+
 ---
 
 ## 驗收

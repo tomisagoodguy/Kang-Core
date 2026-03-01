@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GeminiParseResult } from "@/models/schema";
+import { safeExecute } from "./client";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -67,7 +68,7 @@ export async function analyzeImage(
             const model = genAI.getGenerativeModel({ model: modelName });
 
             const base64Image = imageBuffer.toString("base64");
-            const result = await model.generateContent([
+            const result = await safeExecute(() => model.generateContent([
                 VISION_PROMPT(),
                 {
                     inlineData: {
@@ -75,7 +76,7 @@ export async function analyzeImage(
                         data: base64Image,
                     },
                 },
-            ]);
+            ]));
 
             const raw = result.response.text().trim();
 

@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, Schema, SchemaType } from "@google/generative-ai";
 import { GeminiParseResult } from "@/models/schema";
+import { safeExecute } from "./client";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const MOCK_AI = process.env.MOCK_AI === "true";
@@ -140,7 +141,7 @@ async function tryGeminiModel(modelName: string, text: string): Promise<GeminiPa
             responseSchema: outputSchema,
         },
     });
-    const result = await model.generateContent(text);
+    const result = await safeExecute(() => model.generateContent(text));
     const parsed = JSON.parse(result.response.text()) as GeminiParseResult;
     return { ...parsed, isError: false };
 }
@@ -148,7 +149,7 @@ async function tryGeminiModel(modelName: string, text: string): Promise<GeminiPa
 async function tryGemmaModel(modelName: string, text: string): Promise<GeminiParseResult> {
     const model = genAI.getGenerativeModel({ model: modelName });
     const prompt = `${SYSTEM_PROMPT()}\n\nUser input: "${text}"`;
-    const result = await model.generateContent(prompt);
+    const result = await safeExecute(() => model.generateContent(prompt));
     const raw = result.response.text().trim();
 
     // Extract JSON from response (Gemma might wrap it in markdown)
