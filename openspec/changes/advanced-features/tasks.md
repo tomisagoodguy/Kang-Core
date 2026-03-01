@@ -98,6 +98,6 @@
 
 ## 驗收
 
-- [ ] 58. 全部 `yarn build` 通過
-- [ ] 59. 全部推送 GitHub
-- [ ] 60. Vercel 環境變數 + Cron 設定完成
+- [x] 58. 全部 `yarn build` 通過
+- [x] 59. 全部推送 GitHub
+- [x] 60. Vercel 環境變數 + Cron 設定完成 (Gemini, LINE)
