@@ -84,14 +84,12 @@ export async function parseUserInput(text: string): Promise<GeminiParseResult> {
         }
     }
 
-    // 只使用支援 responseSchema 的 Gemini 模型（Gemma 不支援此功能）
-    // API model ID 必須對應 Google Generative AI REST API v1beta 的官方名稱
+    // 官方文件確認的 API model ID（https://ai.google.dev/gemini-api/docs/models）
     const FALLBACK_MODELS = [
-        "gemini-2.5-flash",       // 主力模型，20 RPD
-        "gemini-2.0-flash",       // 備援，0/0 但保留嘗試
-        "gemini-2.0-flash-lite",  // Gemini 2 Flash Lite
-        "gemini-1.5-flash",       // 老模型但穩定
-        "gemini-1.5-flash-8b",    // 更輕量版
+        "gemini-3-flash-preview",       // Gemini 3 Flash (Preview)，20 RPD
+        "gemini-2.5-flash-lite",        // Gemini 2.5 Flash-Lite (Stable)，20 RPD
+        "gemini-2.5-flash",             // Gemini 2.5 Flash (Stable)，已超限但留作備援
+        "gemini-2.5-flash-lite-preview-09-2025", // 明確指定 preview 版本
     ];
 
     let lastError: any = null;
