@@ -3,7 +3,6 @@ import { WebhookEvent, Client, WebhookRequestBody, TextMessage } from "@line/bot
 import { parseUserInput } from "@/lib/gemini/parser";
 import { db } from "@/lib/firebase/admin";
 
-// LINE Bot configuration - MUST be set in .env.local
 const client = new Client({
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || "",
     channelSecret: process.env.LINE_CHANNEL_SECRET || "",
@@ -22,56 +21,74 @@ export async function POST(req: Request) {
 
                 const textMessage = event.message as unknown as TextMessage;
                 const userText = textMessage.text;
-                const userId = event.source.userId; // useful later when scaling to multi-user / checking auth
+                const replyToken = event.replyToken;
 
-                // 1. Pass input to AI Parser
-                const parsedData = await parseUserInput(userText);
-
-                if (parsedData.isError) {
-                    // Send error message back
-                    await client.replyMessage(event.replyToken, {
-                        type: "text",
-                        text: `⚠️ 解析失敗：\n${parsedData.errorMessage}`,
-                    });
+                // Skip LINE verification pings (dummy replyToken)
+                if (replyToken === "00000000000000000000000000000000") {
                     return;
                 }
 
-                // 2. Save to Firestore
-                let replyMessageText = "";
+                try {
+                    // 1. Parse with AI
+                    const parsedData = await parseUserInput(userText);
 
-                if (parsedData.type === "accounting" && parsedData.accountingData) {
-                    const entry = {
-                        ...parsedData.accountingData,
-                        originalText: userText,
-                        source: "line",
-                        createdAt: new Date(),
-                    };
+                    if (parsedData.isError) {
+                        await client.replyMessage(replyToken, {
+                            type: "text",
+                            text: `⚠️ 解析失敗：\n${parsedData.errorMessage}`,
+                        });
+                        return;
+                    }
 
-                    const docRef = await db.collection("accounting").add(entry);
-                    replyMessageText = `✅ 記帳成功！\n💰 金額: ${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
-                    if (parsedData.explanation) replyMessageText += `\n👾 AI 解釋: ${parsedData.explanation}`;
+                    if (parsedData.type === "accounting" && parsedData.accountingData) {
+                        const entry = {
+                            ...parsedData.accountingData,
+                            originalText: userText,
+                            source: "line",
+                            createdAt: new Date(),
+                        };
 
-                } else if (parsedData.type === "archive" && parsedData.archiveData) {
-                    const entry = {
-                        ...parsedData.archiveData,
-                        originalText: userText,
-                        source: "line",
-                        createdAt: new Date(),
-                    };
+                        // 先回覆，再寫入 DB（避免 replyToken 過期）
+                        let replyText = `✅ 記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
+                        if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-                    const docRef = await db.collection("archives").add(entry);
-                    replyMessageText = `📦 收納成功！\n📋 摘要: ${entry.summary}\n🏷️ 關鍵字: ${entry.keywords.join(", ")}`;
-                    if (parsedData.explanation) replyMessageText += `\n👾 AI 解釋: ${parsedData.explanation}`;
+                        await client.replyMessage(replyToken, { type: "text", text: replyText });
+                        await db.collection("accounting").add(entry);
 
-                } else {
-                    replyMessageText = "❓ 無法解析您的意圖，請換個方式再說一次！";
+                    } else if (parsedData.type === "archive" && parsedData.archiveData) {
+                        const entry = {
+                            ...parsedData.archiveData,
+                            originalText: userText,
+                            source: "line",
+                            createdAt: new Date(),
+                        };
+
+                        let replyText = `📦 收納成功！\n📋 摘要: ${entry.summary}\n🏷️ 關鍵字: ${entry.keywords.join(", ")}`;
+                        if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
+
+                        await client.replyMessage(replyToken, { type: "text", text: replyText });
+                        // 統一使用 "archive"（舊版誤用 "archives"，已修正）
+                        await db.collection("archive").add(entry);
+
+                    } else {
+                        await client.replyMessage(replyToken, {
+                            type: "text",
+                            text: "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n或「這個連結很有趣 https://...」",
+                        });
+                    }
+
+                } catch (innerErr: any) {
+                    console.error("LINE event processing error:", innerErr);
+                    // Best-effort error reply
+                    try {
+                        await client.replyMessage(replyToken, {
+                            type: "text",
+                            text: `⚠️ 處理失敗，請稍後再試。\n${innerErr?.message?.slice(0, 100) ?? "未知錯誤"}`,
+                        });
+                    } catch {
+                        // reply token 已過期，忽略
+                    }
                 }
-
-                // 3. Inform user completion
-                await client.replyMessage(event.replyToken, {
-                    type: "text",
-                    text: replyMessageText,
-                });
             })
         );
 
