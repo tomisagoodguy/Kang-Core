@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { TagBadge } from "./TagBadge";
+import { EditModal } from "./EditModal";
+import { DeleteConfirm } from "./DeleteConfirm";
 
 interface AccountingEntry {
     id: string;
@@ -19,23 +20,16 @@ interface AccountingCardProps {
     entry: AccountingEntry;
 }
 
-export function AccountingCard({ entry }: AccountingCardProps) {
-    const router = useRouter();
-    const [isDeleting, setIsDeleting] = useState(false);
+const EDIT_FIELDS = [
+    { key: "amount", label: "金額", type: "number" as const },
+    { key: "tag", label: "標籤", type: "text" as const },
+    { key: "date", label: "日期", type: "date" as const },
+    { key: "description", label: "說明", type: "text" as const },
+];
 
-    const handleDelete = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!confirm("確定要刪除這筆記帳嗎？")) return;
-        setIsDeleting(true);
-        try {
-            await fetch(`/api/accounting/${entry.id}`, { method: "DELETE" });
-            router.refresh();
-        } catch (error) {
-            console.error(error);
-            alert("刪除失敗");
-            setIsDeleting(false);
-        }
-    };
+export function AccountingCard({ entry }: AccountingCardProps) {
+    const [editOpen, setEditOpen] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
 
     const amountClass =
         entry.amount >= 1000
@@ -47,47 +41,51 @@ export function AccountingCard({ entry }: AccountingCardProps) {
     const formattedAmount = entry.amount.toLocaleString();
 
     return (
-        <div className="glass-card accounting-card">
-            {entry.imageUrl && (
-                <a href={entry.imageUrl} target="_blank" rel="noopener noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={entry.imageUrl}
-                        alt="收據"
-                        style={{
-                            width: 56,
-                            height: 56,
-                            objectFit: "cover",
-                            borderRadius: 8,
-                            flexShrink: 0,
-                            border: "1px solid rgba(255,255,255,0.1)",
-                        }}
-                    />
-                </a>
-            )}
-            <span className="accounting-card-date">{entry.date}</span>
-            <span className="accounting-card-desc">
-                {entry.description || entry.originalText || "—"}
-            </span>
-            <TagBadge tag={entry.tag} />
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: "auto" }}>
-                <span className={amountClass} style={{ marginLeft: 0 }}>${formattedAmount}</span>
-                <button
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        opacity: isDeleting ? 0.5 : 0.8,
-                        filter: "grayscale(0.5)",
-                        transition: "all 0.2s"
-                    }}
-                    title="刪除這筆資料"
-                >
-                    🗑️
-                </button>
+        <>
+            <div className="glass-card accounting-card">
+                {entry.imageUrl && (
+                    <a href={entry.imageUrl} target="_blank" rel="noopener noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={entry.imageUrl}
+                            alt="收據"
+                            style={{
+                                width: 56,
+                                height: 56,
+                                objectFit: "cover",
+                                borderRadius: 8,
+                                flexShrink: 0,
+                                border: "1px solid rgba(255,255,255,0.1)",
+                            }}
+                        />
+                    </a>
+                )}
+                <span className="accounting-card-date">{entry.date}</span>
+                <span className="accounting-card-desc">
+                    {entry.description || entry.originalText || "—"}
+                </span>
+                <TagBadge tag={entry.tag} />
+                <span className={amountClass}>${formattedAmount}</span>
+                <div className="card-actions">
+                    <button className="card-action-btn" onClick={() => setEditOpen(true)}>✏️</button>
+                    <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)}>🗑️</button>
+                </div>
             </div>
-        </div>
+
+            <EditModal
+                isOpen={editOpen}
+                onClose={() => setEditOpen(false)}
+                entry={entry as unknown as Record<string, unknown>}
+                collection="accounting"
+                fields={EDIT_FIELDS}
+            />
+            <DeleteConfirm
+                isOpen={deleteOpen}
+                onClose={() => setDeleteOpen(false)}
+                entryId={entry.id}
+                collection="accounting"
+                label={entry.description || `$${formattedAmount}`}
+            />
+        </>
     );
 }

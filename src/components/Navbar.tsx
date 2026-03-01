@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
+import { signOut } from "@/lib/firebase/auth";
 
 const navLinks = [
     { href: "/", label: "首頁" },
@@ -11,6 +13,10 @@ const navLinks = [
 
 export function Navbar() {
     const pathname = usePathname();
+    const { user } = useAuth();
+
+    // 登入頁不顯示 Navbar
+    if (pathname === "/login") return null;
 
     return (
         <nav className="navbar">
@@ -27,6 +33,17 @@ export function Navbar() {
                         {link.label}
                     </Link>
                 ))}
+                {user && (
+                    <button
+                        className="navbar-logout"
+                        onClick={async () => {
+                            await signOut();
+                            window.location.href = "/login";
+                        }}
+                    >
+                        登出
+                    </button>
+                )}
             </div>
         </nav>
     );

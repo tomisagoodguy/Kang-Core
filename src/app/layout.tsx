@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { AuthProvider } from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
     title: "康 Core — AI 個人助理儀表板",
@@ -15,8 +16,10 @@ export default function RootLayout({
     return (
         <html lang="zh-Hant">
             <body>
-                <Navbar />
-                <main>{children}</main>
+                <AuthProvider>
+                    <Navbar />
+                    <main>{children}</main>
+                </AuthProvider>
             </body>
         </html>
     );
