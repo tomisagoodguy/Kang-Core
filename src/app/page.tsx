@@ -2,25 +2,57 @@ import { StatCard } from "@/components/StatCard";
 import { AccountingCard } from "@/components/AccountingCard";
 import { ArchiveCard } from "@/components/ArchiveCard";
 import Link from "next/link";
+import { db } from "@/lib/firebase/admin";
+import { Timestamp } from "firebase-admin/firestore";
 
 async function getAccountingEntries(limit = 5) {
-    const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/accounting?limit=${limit}`, { cache: "no-store" });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.entries ?? [];
+    try {
+        const snapshot = await db
+            .collection("accounting")
+            .orderBy("createdAt", "desc")
+            .limit(limit)
+            .get();
+
+        return snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt:
+                    data.createdAt instanceof Timestamp
+                        ? data.createdAt.toDate().toISOString()
+                        : null,
+            };
+        });
+    } catch (e) {
+        console.error("[HomePage] Failed to fetch accounting:", e);
+        return [];
+    }
 }
 
 async function getArchiveEntries(limit = 5) {
-    const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/archive?limit=${limit}`, { cache: "no-store" });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.entries ?? [];
+    try {
+        const snapshot = await db
+            .collection("archive")
+            .orderBy("createdAt", "desc")
+            .limit(limit)
+            .get();
+
+        return snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt:
+                    data.createdAt instanceof Timestamp
+                        ? data.createdAt.toDate().toISOString()
+                        : null,
+            };
+        });
+    } catch (e) {
+        console.error("[HomePage] Failed to fetch archive:", e);
+        return [];
+    }
 }
 
 export default async function HomePage() {

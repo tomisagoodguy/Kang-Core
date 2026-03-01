@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { WebhookEvent, Client, WebhookRequestBody, TextMessage } from "@line/bot-sdk";
 import { parseUserInput } from "@/lib/gemini/parser";
 import { db } from "@/lib/firebase/admin";
@@ -9,10 +10,10 @@ const client = new Client({
 });
 
 /**
- * 處理單一 LINE 事件（非同步，不阻塞 webhook 回應）
- * 使用 pushMessage 取代 replyMessage，因為 replyToken 可能在 AI 處理期間超時。
+ * 處理單一 LINE 事件。
+ * 使用 pushMessage 取代 replyMessage（不受 replyToken 時效限制）。
  */
-async function processEvent(event: WebhookEvent) {
+async function processEvent(event: WebhookEvent): Promise<void> {
     if (event.type !== "message" || event.message.type !== "text") return;
 
     const textMessage = event.message as unknown as TextMessage;
@@ -46,7 +47,6 @@ async function processEvent(event: WebhookEvent) {
             let replyText = `✅ 記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-            // 先回覆，再寫入 DB
             await client.pushMessage(userId, { type: "text", text: replyText });
             await db.collection("accounting").add(entry);
 
@@ -72,14 +72,14 @@ async function processEvent(event: WebhookEvent) {
         }
 
     } catch (err: any) {
-        console.error(`[processEvent] Error for userId=${userId}:`, err);
+        console.error(`[processEvent] userId=${userId}:`, err);
         try {
             await client.pushMessage(userId, {
                 type: "text",
-                text: `⚠️ 處理失敗，請稍後再試。\n${err?.message?.slice(0, 100) ?? "未知錯誤"}`,
+                text: `⚠️ 處理失敗：${err?.message?.slice(0, 100) ?? "未知錯誤"}`,
             });
         } catch {
-            // pushMessage 失敗則靜默
+            // reply token 過期或 push 失敗，放棄
         }
     }
 }
@@ -95,13 +95,9 @@ export async function POST(req: Request) {
 
     const events: WebhookEvent[] = body.events || [];
 
-    // 🔑 關鍵：立刻回 200 OK 給 LINE，避免 LINE 以為失敗而自動重試
-    // 所有事件處理都在背景非同步執行
-    for (const event of events) {
-        processEvent(event).catch((err) =>
-            console.error("[webhook] Unhandled event error:", err)
-        );
-    }
+    // 🔑 立刻回 200 OK 給 LINE，確保 LINE 不會因超時重試
+    // waitUntil 告訴 Vercel：「就算 response 已送出，也請等這些 Promise 跑完」
+    waitUntil(Promise.all(events.map(processEvent)));
 
     return NextResponse.json({ status: "ok" });
 }
