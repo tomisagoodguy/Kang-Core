@@ -6,6 +6,8 @@ import Link from "next/link";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 
+export const dynamic = "force-dynamic";
+
 async function getAccountingEntries(limit = 5) {
     try {
         const snapshot = await db

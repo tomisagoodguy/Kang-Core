@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
+import { deleteEventFromGoogleCalendar } from "@/lib/calendar/client";
 
 export async function DELETE(
     request: NextRequest,
@@ -11,7 +12,15 @@ export async function DELETE(
             return NextResponse.json({ error: "Missing ID" }, { status: 400 });
         }
 
-        await db.collection("calendar").doc(id).delete();
+        const docRef = db.collection("calendar").doc(id);
+        const doc = await docRef.get();
+        if (doc.exists) {
+            const data = doc.data();
+            if (data?.gcalEventId) {
+                await deleteEventFromGoogleCalendar(data.gcalEventId);
+            }
+        }
+        await docRef.delete();
 
         return NextResponse.json({ success: true });
     } catch (error) {
