@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { AccountingCard } from "@/components/AccountingCard";
+import { InsightCard } from "@/components/InsightCard";
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { TagPieChart } from "@/components/charts/TagPieChart";
 
@@ -21,6 +22,7 @@ interface AccountingEntry {
     id: string;
     amount: number;
     tag: string;
+    subTag?: string;
     date: string;
     description?: string;
     originalText?: string;
@@ -28,19 +30,35 @@ interface AccountingEntry {
     createdAt?: string;
 }
 
+interface CustomTag {
+    id: string;
+    name: string;
+    parentTag: string;
+}
+
 export default function AccountingPage() {
     const [entries, setEntries] = useState<AccountingEntry[]>([]);
+    const [customTags, setCustomTags] = useState<CustomTag[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTag, setSelectedTag] = useState("all");
+    const [selectedSubTag, setSelectedSubTag] = useState("all");
     const [selectedMonth, setSelectedMonth] = useState("all");
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            const res = await fetch("/api/accounting?limit=200");
-            if (res.ok) {
-                const data = await res.json();
+            const [accRes, tagRes] = await Promise.all([
+                fetch("/api/accounting?limit=200"),
+                fetch("/api/tags")
+            ]);
+
+            if (accRes.ok) {
+                const data = await accRes.json();
                 setEntries(data.entries ?? []);
+            }
+            if (tagRes.ok) {
+                const data = await tagRes.json();
+                setCustomTags(data);
             }
             setLoading(false);
         };
@@ -49,8 +67,9 @@ export default function AccountingPage() {
 
     const filtered = entries.filter((e) => {
         const tagMatch = selectedTag === "all" || e.tag === selectedTag;
+        const subTagMatch = selectedSubTag === "all" || e.subTag === selectedSubTag;
         const monthMatch = selectedMonth === "all" || e.date?.startsWith(selectedMonth);
-        return tagMatch && monthMatch;
+        return tagMatch && subTagMatch && monthMatch;
     });
 
     const totalAmount = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -98,6 +117,8 @@ export default function AccountingPage() {
         <div className="page-container">
             <h1 className="page-title">💳 記帳記錄</h1>
 
+            <InsightCard />
+
             {/* 圖表區 */}
             {!loading && entries.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
@@ -110,12 +131,30 @@ export default function AccountingPage() {
                 <select
                     className="filter-select"
                     value={selectedTag}
-                    onChange={(e) => setSelectedTag(e.target.value)}
+                    onChange={(e) => {
+                        setSelectedTag(e.target.value);
+                        setSelectedSubTag("all"); // 重置子標籤
+                    }}
                 >
                     <option value="all">🏷 全部分類</option>
                     {ALL_TAGS.map((tag) => (
                         <option key={tag} value={tag}>{tag}</option>
                     ))}
+                </select>
+
+                <select
+                    className="filter-select"
+                    value={selectedSubTag}
+                    onChange={(e) => setSelectedSubTag(e.target.value)}
+                    disabled={selectedTag === "all"}
+                >
+                    <option value="all">🔍 全部子標籤</option>
+                    {customTags
+                        .filter(t => t.parentTag === selectedTag)
+                        .map(t => (
+                            <option key={t.id} value={t.name}>{t.name}</option>
+                        ))
+                    }
                 </select>
 
                 <select

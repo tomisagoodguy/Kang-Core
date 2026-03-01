@@ -3,7 +3,49 @@
 /* ═══════════════════════════════════════════════════════════
    CSS Design Tokens
 ═══════════════════════════════════════════════════════════ */
-:root {
+:root[data-theme="light"] {
+  /* Background */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-glass: rgba(0, 0, 0, 0.03);
+  --bg-glass-hover: rgba(0, 0, 0, 0.05);
+
+  /* Border */
+  --border-glass: rgba(0, 0, 0, 0.08);
+  --border-glass-hover: rgba(124, 58, 237, 0.4);
+
+  /* Accent */
+  --accent: #7c3aed;
+  --accent-light: #8b5cf6;
+  --accent-glow: rgba(124, 58, 237, 0.1);
+
+  /* Text */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  /* Tag Colors */
+  --tag-food: #d97706;
+  --tag-transport: #2563eb;
+  --tag-entertainment: #db2777;
+  --tag-utilities: #0891b2;
+  --tag-shopping: #7c3aff;
+  --tag-health: #059669;
+  --tag-education: #ea580c;
+  --tag-other: #64748b;
+
+  /* Success/Danger */
+  --success: #059669;
+  --danger: #dc2626;
+  --warning: #d97706;
+
+  /* Shadow */
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.1);
+}
+
+:root,
+:root[data-theme="dark"] {
   /* Background */
   --bg-primary: #0f0f13;
   --bg-secondary: #16161e;
@@ -39,14 +81,16 @@
   --danger: #ef4444;
   --warning: #f59e0b;
 
+  /* Shadow */
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.2);
+}
+
+:root {
   /* Radius */
   --radius-sm: 6px;
   --radius: 12px;
   --radius-lg: 18px;
-
-  /* Shadow */
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.2);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -70,6 +114,7 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
   background-image:
     radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 20%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
@@ -89,7 +134,8 @@ a {
   z-index: 100;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  background: rgba(15, 15, 19, 0.85);
+  background: var(--bg-secondary);
+  opacity: 0.95;
   border-bottom: 1px solid var(--border-glass);
   padding: 0 24px;
   height: 64px;

@@ -6,10 +6,49 @@ import { db } from "@/lib/firebase/admin";
 import { lineService } from "./line.service";
 import { driveService } from "./drive.service";
 import { discordService } from "./discord.service";
+import { parseQuickCommand } from "./quickCommand";
+import { executeQuery } from "./queryEngine";
+import { ClassificationEngine } from "./classificationEngine";
 
 export class MessageService {
     /** 處理文字訊息 */
     async handleTextMessage(userText: string, userId: string): Promise<void> {
+        // 快速指令攔截（/記, /查, /待, /help）— 不走 Gemini
+        const quickResult = await parseQuickCommand(userText);
+        if (quickResult.handled) {
+            await lineService.pushText(userId, quickResult.replyText!);
+            if (!userText.trim().startsWith("/help") && !userText.trim().startsWith("/查")) {
+                await discordService.sendDiscordNotification(quickResult.replyText!);
+            }
+            return;
+        }
+
+        // 規則引擎初步攔截 (C9: 自動分類規則) — 不走 Gemini
+        const ruleMatch = await ClassificationEngine.match(userText);
+        if (ruleMatch) {
+            // 提取金額（正規表達式輔助）
+            const amountMatch = userText.match(/(\d+)/);
+            if (amountMatch) {
+                const amount = Number(amountMatch[1]);
+                const entry = {
+                    amount,
+                    tag: ruleMatch.tag,
+                    subTag: ruleMatch.subTag || null,
+                    date: new Date().toISOString().slice(0, 10),
+                    description: userText,
+                    originalText: userText,
+                    source: "line-rule",
+                    createdAt: new Date(),
+                };
+                const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
+
+                await lineService.pushText(userId, replyText);
+                await db.collection("accounting").add(entry);
+                await discordService.sendDiscordNotification(replyText);
+                return;
+            }
+        }
+
         const parsedData = await parseUserInput(userText);
 
         if (parsedData.isError) {
@@ -30,6 +69,11 @@ export class MessageService {
             await lineService.pushText(userId, replyText);
             await db.collection("accounting").add(entry);
             await discordService.sendDiscordNotification(replyText);
+
+            // 學習新規則 (C9)
+            if (entry.tag && entry.tag !== "Other") {
+                await ClassificationEngine.learn(userText, entry.tag, entry.subTag);
+            }
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
             const entry = {
@@ -76,8 +120,12 @@ export class MessageService {
             await db.collection("calendar").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
+        } else if (parsedData.type === "query" && parsedData.queryData) {
+            const queryResult = await executeQuery(parsedData.queryData);
+            await lineService.pushText(userId, queryResult.replyText);
+
         } else {
-            await lineService.pushText(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n或「這個連結很有趣 https://...」");
+            await lineService.pushText(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n或「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
         }
     }
 
@@ -116,6 +164,11 @@ export class MessageService {
             await lineService.pushText(userId, replyText);
             await db.collection("accounting").add(entry);
             await discordService.sendDiscordNotification(replyText);
+
+            // 學習新規則 (C9)
+            if (entry.tag && entry.tag !== "Other" && (entry as any).description) {
+                await ClassificationEngine.learn((entry as any).description, entry.tag, (entry as any).subTag);
+            }
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
             const entry = {

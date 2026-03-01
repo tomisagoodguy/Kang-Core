@@ -23,6 +23,7 @@ export const BaseEntrySchema = z.object({
 export const AccountingEntrySchema = BaseEntrySchema.extend({
     amount: z.number().positive(),
     tag: TagEnum,
+    subTag: z.string().optional(),
     date: z.string(), // ISO String YYYY-MM-DD
     description: z.string().optional(),
 });
@@ -48,7 +49,7 @@ export const CalendarEntrySchema = BaseEntrySchema.extend({
 export type CalendarEntry = z.infer<typeof CalendarEntrySchema>;
 
 export const GeminiParseResultSchema = z.object({
-    type: z.enum(["accounting", "archive", "calendar", "unknown"]),
+    type: z.enum(["accounting", "archive", "calendar", "query", "unknown"]),
     accountingData: AccountingEntrySchema.omit({
         id: true,
         createdAt: true,
@@ -67,9 +68,42 @@ export const GeminiParseResultSchema = z.object({
         source: true,
         originalText: true,
     }).optional(),
+    queryData: z.object({
+        queryType: z.enum(["expense", "archive", "calendar"]),
+        tag: z.string().optional(),
+        period: z.string().optional(),
+        limit: z.number().optional(),
+    }).optional(),
     explanation: z.string().optional(),
     isError: z.boolean().default(false),
     errorMessage: z.string().optional(),
 });
 
 export type GeminiParseResult = z.infer<typeof GeminiParseResultSchema>;
+
+export const FrequencyEnum = z.enum(["daily", "weekly", "monthly", "yearly"]);
+
+export const RecurringExpenseSchema = z.object({
+    id: z.string().optional(),
+    amount: z.number().positive(),
+    tag: TagEnum,
+    description: z.string(),
+    frequency: FrequencyEnum,
+    dayOfMonth: z.number().min(1).max(31).optional(),
+    dayOfWeek: z.number().min(0).max(6).optional(),
+    monthOfYear: z.number().min(1).max(12).optional(),
+    isActive: z.boolean().default(true),
+    lastTriggeredAt: z.string().optional(), // ISO String
+    createdAt: z.date().optional(),
+});
+
+export type RecurringExpense = z.infer<typeof RecurringExpenseSchema>;
+
+export const CustomTagSchema = z.object({
+    id: z.string().optional(),
+    name: z.string(),
+    parentTag: TagEnum,
+    createdAt: z.date().optional(),
+});
+
+export type CustomTag = z.infer<typeof CustomTagSchema>;

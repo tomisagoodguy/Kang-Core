@@ -4,11 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { signOut } from "@/lib/firebase/auth";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navLinks = [
     { href: "/", label: "首頁" },
     { href: "/accounting", label: "📊 記帳" },
     { href: "/archive", label: "📚 存檔" },
+    { href: "/recurring", label: "🔁 定期" },
+    { href: "/settings/tags", label: "🏷️ 標籤" },
+    { href: "/settings/rules", label: "⚙️ 規則" },
 ];
 
 export function Navbar() {
@@ -33,6 +37,7 @@ export function Navbar() {
                         {link.label}
                     </Link>
                 ))}
+                <ThemeToggle />
                 {user && (
                     <button
                         className="navbar-logout"

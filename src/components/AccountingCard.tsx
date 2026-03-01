@@ -9,6 +9,7 @@ interface AccountingEntry {
     id: string;
     amount: number;
     tag: string;
+    subTag?: string;
     date: string;
     description?: string;
     originalText?: string;
@@ -23,6 +24,7 @@ interface AccountingCardProps {
 const EDIT_FIELDS = [
     { key: "amount", label: "金額", type: "number" as const },
     { key: "tag", label: "標籤", type: "text" as const },
+    { key: "subTag", label: "子標籤", type: "text" as const },
     { key: "date", label: "日期", type: "date" as const },
     { key: "description", label: "說明", type: "text" as const },
 ];
@@ -64,7 +66,21 @@ export function AccountingCard({ entry }: AccountingCardProps) {
                 <span className="accounting-card-desc">
                     {entry.description || entry.originalText || "—"}
                 </span>
-                <TagBadge tag={entry.tag} />
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <TagBadge tag={entry.tag} />
+                    {entry.subTag && (
+                        <span style={{
+                            fontSize: "0.75rem",
+                            padding: "2px 8px",
+                            background: "rgba(255,255,255,0.05)",
+                            borderRadius: "12px",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            color: "var(--text-secondary)"
+                        }}>
+                            {entry.subTag}
+                        </span>
+                    )}
+                </div>
                 <span className={amountClass}>${formattedAmount}</span>
                 <div className="card-actions">
                     <button className="card-action-btn" onClick={() => setEditOpen(true)}>✏️</button>

@@ -10,7 +10,7 @@ const outputSchema: Schema = {
     properties: {
         type: {
             type: SchemaType.STRING,
-            description: "Must be one of: 'accounting', 'archive', 'calendar', 'unknown'",
+            description: "Must be one of: 'accounting', 'archive', 'calendar', 'query', 'unknown'",
             nullable: false,
         },
         explanation: {
@@ -27,6 +27,11 @@ const outputSchema: Schema = {
                 tag: {
                     type: SchemaType.STRING,
                     description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Other",
+                },
+                subTag: {
+                    type: SchemaType.STRING,
+                    description: "Any specific sub-category if provided (e.g. Lunch, Coffee, Bus)",
+                    nullable: true,
                 },
                 date: { type: SchemaType.STRING, description: "Format: YYYY-MM-DD" },
                 description: { type: SchemaType.STRING, nullable: true },
@@ -61,6 +66,25 @@ const outputSchema: Schema = {
             },
             required: ["title"],
         },
+        queryData: {
+            type: SchemaType.OBJECT,
+            description: "Populate ONLY if type is 'query'. For data retrieval requests.",
+            nullable: true,
+            properties: {
+                queryType: {
+                    type: SchemaType.STRING,
+                    description: "One of: 'expense', 'archive', 'calendar'",
+                },
+                tag: { type: SchemaType.STRING, nullable: true, description: "Filter by tag (e.g. Food, Transport)" },
+                period: {
+                    type: SchemaType.STRING,
+                    nullable: true,
+                    description: "One of: 'this_month', 'last_month', 'this_week', 'last_week', 'today', 'tomorrow'",
+                },
+                limit: { type: SchemaType.NUMBER, nullable: true, description: "Number of results (default 5)" },
+            },
+            required: ["queryType"],
+        },
     },
     required: ["type"],
 };
@@ -74,30 +98,19 @@ Analyze the user input and respond ONLY with a valid JSON object. No markdown, n
 
 JSON schema:
 {
-  "type": "accounting" | "archive" | "unknown",
+  "type": "accounting" | "archive" | "calendar" | "query" | "unknown",
   "explanation": "string (brief reason)",
-  "accountingData": {
-    "amount": number,
-    "tag": "Food" | "Transport" | "Entertainment" | "Utilities" | "Shopping" | "Health" | "Education" | "Other",
-    "date": "YYYY-MM-DD",
-    "description": "string"
-  },
-  "archiveData": {
-    "url": "string or null",
-    "title": "string or null",
-    "summary": "string",
-  "calendarData": {
-    "title": "What to do",
-    "actionDate": "YYYY-MM-DD or null",
-    "actionTime": "HH:mm or null",
-    "description": "string or null"
-  }
+  "accountingData": { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string" },
+  "archiveData": { "url": "...", "title": "...", "summary": "...", "keywords": ["..."] },
+  "calendarData": { "title": "...", "actionDate": "YYYY-MM-DD", "actionTime": "HH:mm", "description": "..." },
+  "queryData": { "queryType": "expense" | "archive" | "calendar", "tag": "...", "period": "this_month" | "last_month" | "this_week" | "last_week" | "today" | "tomorrow", "limit": 5 }
 }
 
 Rules:
 - If user mentions spending money, food, transport, shopping → type = "accounting", fill accountingData
-- If user wants to schedule an email, meeting, reminder, or mentions a future plan/to-do → type = "calendar", fill calendarData (infer actionDate and actionTime if provided, e.g. tomorrow)
+- If user wants to schedule, plan, remind, to-do → type = "calendar", fill calendarData
 - If user shares a link, article, note, or general knowledge → type = "archive", fill archiveData
+- If user is ASKING/QUERYING about their data (e.g. "這個月吃飯花多少", "上週花了多少", "最近收藏了什麼", "明天有什麼事") → type = "query", fill queryData
 - Otherwise → type = "unknown"
 - For dates, use today (${TODAY()}) as reference. Tomorrow is ${new Date(Date.now() + 86400000).toISOString().split("T")[0]}.
 - ONLY output valid JSON, nothing else`;
