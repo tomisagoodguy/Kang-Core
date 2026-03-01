@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
-import { WebhookEvent, Client, WebhookRequestBody, TextMessage, ImageMessage } from "@line/bot-sdk";
+import { WebhookEvent, Client, WebhookRequestBody, TextMessage } from "@line/bot-sdk";
 import { parseUserInput } from "@/lib/gemini/parser";
 import { analyzeImage } from "@/lib/gemini/vision";
 import { uploadImageToDrive } from "@/lib/drive/client";
@@ -145,8 +145,7 @@ async function processEvent(event: WebhookEvent): Promise<void> {
             await handleTextMessage(textMessage.text, userId, event.replyToken);
 
         } else if (event.message.type === "image") {
-            const imageMessage = event.message as ImageMessage;
-            await handleImageMessage(imageMessage.id, userId);
+            await handleImageMessage(event.message.id, userId);
 
         }
         // 其他訊息類型（影片、語音等）目前忽略
