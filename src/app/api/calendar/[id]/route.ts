@@ -3,10 +3,10 @@ import { db } from "@/lib/firebase/admin";
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await context.params;
         if (!id) {
             return NextResponse.json({ error: "Missing ID" }, { status: 400 });
         }
