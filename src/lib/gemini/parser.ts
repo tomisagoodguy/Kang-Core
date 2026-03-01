@@ -86,7 +86,7 @@ export async function parseUserInput(text: string): Promise<GeminiParseResult> {
 
     try {
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash",
             systemInstruction: `You are an AI assistant that parses user intent for the Kang-Core system. You decide if a user is trying to log an expense (accounting) or save information/note/link (archive). Today is ${new Date().toISOString().split("T")[0]}.`,
             generationConfig: {
                 responseMimeType: "application/json",
