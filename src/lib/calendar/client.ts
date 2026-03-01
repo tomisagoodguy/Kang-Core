@@ -59,8 +59,8 @@ export async function addEventToGoogleCalendar(entry: {
             },
         });
         return res.data.id;
-    } catch (e) {
-        console.error("Failed to add event to Google Calendar", e);
+    } catch (e: any) {
+        console.error("Failed to add event to Google Calendar:", e.message || e);
         return null; // Don't crash the whole bot
     }
 }

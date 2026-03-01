@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { WebhookEvent, WebhookRequestBody } from "@line/bot-sdk";
-import { processEvent } from "@/services/lineWebhook.service";
+import { messageService } from "@/services/message.service";
 
 export async function POST(req: Request) {
     let body: WebhookRequestBody;
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const events: WebhookEvent[] = body.events || [];
 
     // 立刻回 200 OK，waitUntil 確保 Vercel 等事件處理完畢
-    waitUntil(Promise.all(events.map(processEvent)));
+    waitUntil(Promise.all(events.map(event => messageService.processEvent(event))));
 
     return NextResponse.json({ status: "ok" });
 }
