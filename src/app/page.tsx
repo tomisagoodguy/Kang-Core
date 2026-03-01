@@ -1,6 +1,7 @@
 import { StatCard } from "@/components/StatCard";
 import { AccountingCard } from "@/components/AccountingCard";
 import { ArchiveCard } from "@/components/ArchiveCard";
+import { CalendarCard } from "@/components/CalendarCard";
 import Link from "next/link";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
@@ -26,6 +27,31 @@ async function getAccountingEntries(limit = 5) {
         });
     } catch (e) {
         console.error("[HomePage] Failed to fetch accounting:", e);
+        return [];
+    }
+}
+
+async function getCalendarEntries(limit = 10) {
+    try {
+        const snapshot = await db
+            .collection("calendar")
+            .orderBy("createdAt", "desc")
+            .limit(limit)
+            .get();
+
+        return snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt:
+                    data.createdAt instanceof Timestamp
+                        ? data.createdAt.toDate().toISOString()
+                        : null,
+            };
+        });
+    } catch (e) {
+        console.error("[HomePage] Failed to fetch calendar:", e);
         return [];
     }
 }
@@ -56,9 +82,10 @@ async function getArchiveEntries(limit = 5) {
 }
 
 export default async function HomePage() {
-    const [accountingEntries, archiveEntries] = await Promise.all([
+    const [accountingEntries, archiveEntries, calendarEntries] = await Promise.all([
         getAccountingEntries(5),
         getArchiveEntries(5),
+        getCalendarEntries(5),
     ]);
 
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -92,6 +119,25 @@ export default async function HomePage() {
                     value={archiveEntries.length}
                     color="var(--accent-light)"
                 />
+            </div>
+
+            {/* Calendar / Todo Section */}
+            <div style={{ marginBottom: "40px" }}>
+                <div className="dashboard-section-title">
+                    <span>🗓️</span> 即將到來 / 代辦事項
+                </div>
+                {calendarEntries.length === 0 ? (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">📭</span>
+                        <p>還沒有代辦事項，傳個時間或計劃給機器人吧！</p>
+                    </div>
+                ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+                        {calendarEntries.map((entry: any) => (
+                            <CalendarCard key={entry.id} entry={entry} />
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Accounting Section */}

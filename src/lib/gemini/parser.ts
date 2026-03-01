@@ -10,7 +10,7 @@ const outputSchema: Schema = {
     properties: {
         type: {
             type: SchemaType.STRING,
-            description: "Must be one of: 'accounting', 'archive', 'unknown'",
+            description: "Must be one of: 'accounting', 'archive', 'calendar', 'unknown'",
             nullable: false,
         },
         explanation: {
@@ -49,6 +49,18 @@ const outputSchema: Schema = {
             },
             required: ["summary", "keywords"],
         },
+        calendarData: {
+            type: SchemaType.OBJECT,
+            description: "Populate ONLY if type is 'calendar'",
+            nullable: true,
+            properties: {
+                title: { type: SchemaType.STRING, nullable: false, description: "What to do" },
+                actionDate: { type: SchemaType.STRING, nullable: true, description: "YYYY-MM-DD" },
+                actionTime: { type: SchemaType.STRING, nullable: true, description: "HH:mm in 24h format" },
+                description: { type: SchemaType.STRING, nullable: true },
+            },
+            required: ["title"],
+        },
     },
     required: ["type"],
 };
@@ -74,15 +86,20 @@ JSON schema:
     "url": "string or null",
     "title": "string or null",
     "summary": "string",
-    "keywords": ["string"]
+  "calendarData": {
+    "title": "What to do",
+    "actionDate": "YYYY-MM-DD or null",
+    "actionTime": "HH:mm or null",
+    "description": "string or null"
   }
 }
 
 Rules:
 - If user mentions spending money, food, transport, shopping → type = "accounting", fill accountingData
-- If user shares a link, article, note, or knowledge → type = "archive", fill archiveData
+- If user wants to schedule an email, meeting, reminder, or mentions a future plan/to-do → type = "calendar", fill calendarData (infer actionDate and actionTime if provided, e.g. tomorrow)
+- If user shares a link, article, note, or general knowledge → type = "archive", fill archiveData
 - Otherwise → type = "unknown"
-- For "yesterday" use ${new Date(Date.now() - 86400000).toISOString().split("T")[0]}
+- For dates, use today (${TODAY()}) as reference. Tomorrow is ${new Date(Date.now() + 86400000).toISOString().split("T")[0]}.
 - ONLY output valid JSON, nothing else`;
 
 // ─── Gemini models (support responseSchema) ───────────────────────────────────

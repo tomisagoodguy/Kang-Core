@@ -59,10 +59,27 @@ async function handleTextMessage(userText: string, userId: string, replyToken: s
         await client.pushMessage(userId, { type: "text", text: replyText });
         await db.collection("archive").add(entry);
 
+    } else if (parsedData.type === "calendar" && parsedData.calendarData) {
+        const entry = {
+            ...parsedData.calendarData,
+            originalText: userText,
+            source: "line",
+            createdAt: new Date(),
+            status: "pending",
+        };
+        let replyText = `🗓️ 行事曆排定！\n📌 標題: ${entry.title}`;
+        if (entry.actionDate) replyText += `\n📅 日期: ${entry.actionDate}`;
+        if (entry.actionTime) replyText += `\n⏰ 時間: ${entry.actionTime}`;
+        if (entry.description) replyText += `\n📝 備註: ${entry.description}`;
+        if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
+
+        await client.pushMessage(userId, { type: "text", text: replyText });
+        await db.collection("calendar").add(entry);
+
     } else {
         await client.pushMessage(userId, {
             type: "text",
-            text: "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n或「這個連結很有趣 https://...」",
+            text: "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n或「這個連結很有趣 https://...」",
         });
     }
 }

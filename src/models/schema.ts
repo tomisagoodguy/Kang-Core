@@ -36,11 +36,19 @@ export const ArchiveEntrySchema = BaseEntrySchema.extend({
     keywords: z.array(z.string()),
     imageUrl: z.string().url().optional(),
 });
-
 export type ArchiveEntry = z.infer<typeof ArchiveEntrySchema>;
 
+export const CalendarEntrySchema = BaseEntrySchema.extend({
+    title: z.string(),
+    actionDate: z.string().optional(), // YYYY-MM-DD
+    actionTime: z.string().optional(), // HH:mm
+    description: z.string().optional(),
+});
+
+export type CalendarEntry = z.infer<typeof CalendarEntrySchema>;
+
 export const GeminiParseResultSchema = z.object({
-    type: z.enum(["accounting", "archive", "unknown"]),
+    type: z.enum(["accounting", "archive", "calendar", "unknown"]),
     accountingData: AccountingEntrySchema.omit({
         id: true,
         createdAt: true,
@@ -48,6 +56,12 @@ export const GeminiParseResultSchema = z.object({
         originalText: true,
     }).optional(),
     archiveData: ArchiveEntrySchema.omit({
+        id: true,
+        createdAt: true,
+        source: true,
+        originalText: true,
+    }).optional(),
+    calendarData: CalendarEntrySchema.omit({
         id: true,
         createdAt: true,
         source: true,
