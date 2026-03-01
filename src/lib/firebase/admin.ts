@@ -6,9 +6,11 @@ if (!admin.apps.length) {
     try {
         // If we have an explicit private key (e.g., local dev or Vercel env variables)
         if (process.env.FIREBASE_PRIVATE_KEY) {
+            const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+            console.log("Firebase Admin init with projectId:", projectId);
             admin.initializeApp({
                 credential: admin.credential.cert({
-                    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+                    projectId,
                     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
                     // Handle multiline string formatted private keys in env vars
                     privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
