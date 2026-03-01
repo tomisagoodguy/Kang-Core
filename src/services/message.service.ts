@@ -9,12 +9,13 @@ import { discordService } from "./discord.service";
 import { parseQuickCommand } from "./quickCommand";
 import { executeQuery } from "./queryEngine";
 import { ClassificationEngine } from "./classificationEngine";
+import { checkBudgetAlert } from "./budget.service";
 
 export class MessageService {
     /** 處理文字訊息 */
     async handleTextMessage(userText: string, userId: string): Promise<void> {
         // 快速指令攔截（/記, /查, /待, /help）— 不走 Gemini
-        const quickResult = await parseQuickCommand(userText);
+        const quickResult = await parseQuickCommand(userText, userId);
         if (quickResult.handled) {
             await lineService.pushText(userId, quickResult.replyText!);
             if (!userText.trim().startsWith("/help") && !userText.trim().startsWith("/查")) {
@@ -74,6 +75,9 @@ export class MessageService {
             if (entry.tag && entry.tag !== "Other") {
                 await ClassificationEngine.learn(userText, entry.tag, entry.subTag);
             }
+
+            // 預算超支警報（非同步不等待）
+            checkBudgetAlert(userId, entry.amount, entry.date, entry.tag).catch(() => { /* 不影響主流程 */ });
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
             const entry = {

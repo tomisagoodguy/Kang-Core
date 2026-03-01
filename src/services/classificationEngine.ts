@@ -8,21 +8,57 @@ interface ClassificationRule {
     lastUsed: Date;
 }
 
+// ─── 記憶體快取（模組級，TTL 5 分鐘）────────────────────────────
+interface CacheEntry {
+    rules: (ClassificationRule & { id: string })[];
+    expiresAt: number;
+}
+let _cache: CacheEntry | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分鐘
+
+function getCachedRules(): (ClassificationRule & { id: string })[] | null {
+    if (_cache && Date.now() < _cache.expiresAt) return _cache.rules;
+    return null;
+}
+
+function setCachedRules(rules: (ClassificationRule & { id: string })[]): void {
+    _cache = { rules, expiresAt: Date.now() + CACHE_TTL_MS };
+}
+
+function invalidateCache(): void {
+    _cache = null;
+}
+
+// ─── 輸入清理 ────────────────────────────────────────────────────
+/**
+ * 清理 keyword，移除特殊字元，長度限制 20 字
+ * 防止惡意字串（XSS、注入）進入 Firestore 規則庫
+ */
+function sanitizeKeyword(text: string): string {
+    return text
+        .trim()
+        .replace(/[<>'";&|]/g, "") // 移除潛在危險字元
+        .slice(0, 20);             // 最多 20 字
+}
+
 export class ClassificationEngine {
     /**
-     * 嘗試匹配已知的分類規則
+     * 嘗試匹配已知的分類規則（含記憶體快取）
      * @param text 使用者輸入的文字
      */
     static async match(text: string): Promise<{ tag: string; subTag?: string } | null> {
         const trimmed = text.trim().toLowerCase();
 
-        // 1. 取得所有規則（規模大時需優化，目前預期規則不多）
-        const snapshot = await db.collection("classification_rules").get();
-        const rules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassificationRule & { id: string }));
+        // 1. 優先使用快取，避免每條訊息都全量讀取 Firestore
+        let rules = getCachedRules();
+        if (!rules) {
+            const snapshot = await db.collection("classification_rules").get();
+            rules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassificationRule & { id: string }));
+            setCachedRules(rules);
+        }
 
-        // 2. 匹配規則（關鍵字包含）
-        // 優先匹配較長的關鍵字
-        const sortedRules = rules.sort((a, b) => b.keyword.length - a.keyword.length);
+        // 2. 匹配規則（關鍵字包含），優先匹配較長的關鍵字
+        const sortedRules = [...rules].sort((a, b) => b.keyword.length - a.keyword.length);
 
         for (const rule of sortedRules) {
             if (trimmed.includes(rule.keyword.toLowerCase())) {
@@ -30,7 +66,7 @@ export class ClassificationEngine {
                 db.collection("classification_rules").doc(rule.id).update({
                     count: (rule.count || 0) + 1,
                     lastUsed: new Date()
-                });
+                }).catch(() => { /* 不影響主流程 */ });
 
                 return { tag: rule.tag, subTag: rule.subTag };
             }
@@ -40,14 +76,14 @@ export class ClassificationEngine {
     }
 
     /**
-     * 學習新規則
-     * 當使用者手動修改 tag 或 Gemini 解析成功時調用
+     * 學習新規則（含輸入清理）
+     * 當使用者手動修改 tag 或快速指令/Gemini 解析成功時調用
      */
-    static async learn(text: string, tag: string, subTag?: string) {
+    static async learn(text: string, tag: string, subTag?: string): Promise<void> {
         if (!text || text.length < 2) return;
 
-        // 簡單提取關鍵字（待優化，目前取前 10 個字或整段）
-        const keyword = text.slice(0, 15).trim();
+        const keyword = sanitizeKeyword(text);
+        if (!keyword) return; // 清理後為空則跳過
 
         const q = db.collection("classification_rules").where("keyword", "==", keyword);
         const snapshot = await q.get();
@@ -62,8 +98,6 @@ export class ClassificationEngine {
                 createdAt: new Date()
             });
         } else {
-            // 已存在則更新，如果 tag 不同，則不更新（保留舊的或以最後一次為準？）
-            // 這裡採取「以最後一次成功分類為準」
             const doc = snapshot.docs[0];
             await doc.ref.update({
                 tag,
@@ -72,5 +106,8 @@ export class ClassificationEngine {
                 lastUsed: new Date()
             });
         }
+
+        // 學習後使快取失效，確保下次 match() 取得最新規則
+        invalidateCache();
     }
 }

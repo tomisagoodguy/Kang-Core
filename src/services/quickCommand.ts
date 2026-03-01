@@ -1,6 +1,10 @@
 import { db } from "@/lib/firebase/admin";
 import { addEventToGoogleCalendar } from "@/lib/calendar/client";
 import { generateFinancialInsights } from "./insights";
+import { getTagEmoji } from "@/utils/tagEmoji";
+import { ClassificationEngine } from "./classificationEngine";
+import { queryArchiveWithAI } from "./archiveQuery.service";
+import { completeTodo } from "./todoComplete.service";
 
 interface QuickCommandResult {
     handled: boolean;
@@ -12,7 +16,7 @@ interface QuickCommandResult {
  * 支援：/記, /查, /待, /help
  * 若文字不以 / 開頭 → { handled: false }
  */
-export async function parseQuickCommand(text: string): Promise<QuickCommandResult> {
+export async function parseQuickCommand(text: string, userId: string): Promise<QuickCommandResult> {
     const trimmed = text.trim();
     if (!trimmed.startsWith("/")) return { handled: false };
 
@@ -46,7 +50,7 @@ export async function parseQuickCommand(text: string): Promise<QuickCommandResul
 
     // /洞察
     if (/^\/洞察$/i.test(trimmed)) {
-        return await handleQuickInsight();
+        return await handleQuickInsight(userId);
     }
 
     // /記 {金額} {描述}
@@ -65,6 +69,28 @@ export async function parseQuickCommand(text: string): Promise<QuickCommandResul
     const todoMatch = trimmed.match(/^\/待\s+(.+)$/);
     if (todoMatch) {
         return await handleQuickTodo(todoMatch[1].trim());
+    }
+
+    // /完成 {關鍵字}
+    const completeMatch = trimmed.match(/^\/完成\s+(.+)$/);
+    if (completeMatch) {
+        const result = await completeTodo(completeMatch[1].trim());
+        return { handled: true, replyText: result.message };
+    }
+
+    // /問 {問題}
+    const askMatch = trimmed.match(/^\/問\s+(.+)$/);
+    if (askMatch) {
+        return await handleArchiveQuery(askMatch[1].trim());
+    }
+
+    // /預算 — 查看或設定預算
+    if (/^\/預算$/.test(trimmed)) {
+        return await handleBudgetQuery(userId);
+    }
+    const budgetSetMatch = trimmed.match(/^\/預算\s+設定\s+(\d+)$/);
+    if (budgetSetMatch) {
+        return await handleBudgetSet(userId, Number(budgetSetMatch[1]));
     }
 
     // 未知指令
@@ -91,6 +117,11 @@ async function handleQuickExpense(amount: number, description: string): Promise<
     };
 
     await db.collection("accounting").add(entry);
+
+    // 學習規則（非同步不等待，不阻塞回覆）
+    if (description && tag !== "Other") {
+        ClassificationEngine.learn(description, tag).catch(() => { /* 失敗不影響主流程 */ });
+    }
 
     return {
         handled: true,
@@ -134,7 +165,7 @@ async function handleQuickQuery(period: string): Promise<QuickCommandResult> {
     const tagLines = Array.from(tagMap.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
-        .map(([tag, amt]) => `　${tagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
+        .map(([tag, amt]) => `\u3000${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
 
     return {
         handled: true,
@@ -185,8 +216,8 @@ async function handleQuickTodo(title: string): Promise<QuickCommandResult> {
 }
 
 /** /洞察 — 快速洞察 */
-async function handleQuickInsight(): Promise<QuickCommandResult> {
-    const insight = await generateFinancialInsights("default_user");
+async function handleQuickInsight(userId: string): Promise<QuickCommandResult> {
+    const insight = await generateFinancialInsights(userId);
     return {
         handled: true,
         replyText: [
@@ -258,17 +289,86 @@ function parsePeriod(period: string): { from: string; to: string; label: string 
     return null;
 }
 
-/** 標籤 emoji */
-function tagEmoji(tag: string): string {
-    const map: Record<string, string> = {
-        Food: "🍽",
-        Transport: "🚗",
-        Entertainment: "🎬",
-        Utilities: "💡",
-        Shopping: "🛒",
-        Health: "🏥",
-        Education: "📚",
-        Other: "📦",
+/** /問 — Archive RAG 問答 */
+async function handleArchiveQuery(question: string): Promise<QuickCommandResult> {
+    const answer = await queryArchiveWithAI(question);
+    return {
+        handled: true,
+        replyText: [
+            "💬 知識庫查詢",
+            "━━━━━━━━━━━━",
+            answer,
+        ].join("\n"),
     };
-    return map[tag] || "📦";
+}
+
+/** /預算 — 查看本月預算使用狀況 */
+async function handleBudgetQuery(userId: string): Promise<QuickCommandResult> {
+    try {
+        const now = new Date();
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const monthStart = `${ym}-01`;
+        const monthEnd = `${ym}-31`;
+
+        const budgetSnap = await db.collection("budgets").where("userId", "==", userId).get();
+        if (budgetSnap.empty) {
+            return {
+                handled: true,
+                replyText: "\ud83d\udcca 尚未設定預算\n\n輸入 /預算 設定 5000 來設定月預算",
+            };
+        }
+
+        const accSnap = await db.collection("accounting")
+            .where("date", ">=", monthStart)
+            .where("date", "<=", monthEnd)
+            .get();
+        const monthTotal = accSnap.docs.reduce((s, d) => s + ((d.data().amount as number) || 0), 0);
+
+        const lines = budgetSnap.docs.map(d => {
+            const b = d.data();
+            const tag = (b.tag as string) || "總";
+            const limit = b.monthlyLimit as number;
+            const ratio = Math.round((monthTotal / limit) * 100);
+            return `${tag === "總" ? "📊" : getTagEmoji(tag)} ${tag}預算: $${monthTotal.toLocaleString()} / $${limit.toLocaleString()} (${ratio}%)`;
+        });
+
+        return {
+            handled: true,
+            replyText: [
+                `📊 ${ym} 預算狀況`,
+                "━━━━━━━━━━━━",
+                ...lines,
+            ].join("\n"),
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 查詢預算失敗" };
+    }
+}
+
+/** /預算 設定 — 設定月總預算 */
+async function handleBudgetSet(userId: string, amount: number): Promise<QuickCommandResult> {
+    try {
+        const existing = await db.collection("budgets")
+            .where("userId", "==", userId)
+            .where("tag", "==", null)
+            .get();
+
+        if (!existing.empty) {
+            await existing.docs[0].ref.update({ monthlyLimit: amount, updatedAt: new Date() });
+        } else {
+            await db.collection("budgets").add({
+                userId,
+                tag: null,
+                monthlyLimit: amount,
+                createdAt: new Date(),
+            });
+        }
+
+        return {
+            handled: true,
+            replyText: `✅ 月總預算已設定為 $${amount.toLocaleString()}\n超過 80% 時我會提醒你！`,
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 設定預算失敗" };
+    }
 }

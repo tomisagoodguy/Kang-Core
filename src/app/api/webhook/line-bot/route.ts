@@ -1,12 +1,24 @@
 import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
-import { WebhookEvent, WebhookRequestBody } from "@line/bot-sdk";
+import { WebhookEvent, WebhookRequestBody, validateSignature } from "@line/bot-sdk";
 import { messageService } from "@/services/message.service";
 
 export async function POST(req: Request) {
+    // 1. 取得原始 body（簽章驗證需要未解析的原始字串）
+    const rawBody = await req.text();
+    const signature = req.headers.get("x-line-signature") ?? "";
+    const channelSecret = process.env.LINE_CHANNEL_SECRET ?? "";
+
+    // 2. 驗證 LINE 簽章，防止偽造 Webhook 事件
+    if (!validateSignature(rawBody, channelSecret, signature)) {
+        console.warn("[Webhook] Invalid signature — rejected");
+        return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+    }
+
+    // 3. 解析 JSON body
     let body: WebhookRequestBody;
     try {
-        body = await req.json();
+        body = JSON.parse(rawBody) as WebhookRequestBody;
     } catch {
         return NextResponse.json({ status: "bad_request" }, { status: 400 });
     }

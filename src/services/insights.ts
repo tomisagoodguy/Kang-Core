@@ -4,7 +4,7 @@ import { safeExecute } from "@/lib/gemini/client";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-export async function generateFinancialInsights(userId: string) {
+export async function generateFinancialInsights(userId: string): Promise<string> {
     try {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

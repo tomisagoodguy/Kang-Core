@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { lineService } from "@/services/line.service";
+import { getTagEmoji } from "@/utils/tagEmoji";
 
 /**
  * 每日消費摘要推播
@@ -48,14 +49,9 @@ export async function GET(req: Request) {
             tagMap.set(tag, (tagMap.get(tag) || 0) + ((e.amount as number) || 0));
         });
 
-        const tagEmoji: Record<string, string> = {
-            Food: "🍽", Transport: "🚗", Entertainment: "🎬", Utilities: "💡",
-            Shopping: "🛒", Health: "🏥", Education: "📚", Other: "📦",
-        };
-
         const tagLines = Array.from(tagMap.entries())
             .sort((a, b) => b[1] - a[1])
-            .map(([tag, amt]) => `${tagEmoji[tag] || "📦"} ${tag}: $${amt.toLocaleString()}`);
+            .map(([tag, amt]) => `${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
 
         if (todayEntries.length === 0) {
             await lineService.pushText(userId, [

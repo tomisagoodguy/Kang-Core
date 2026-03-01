@@ -1,4 +1,5 @@
 import { db } from "@/lib/firebase/admin";
+import { getTagEmoji } from "@/utils/tagEmoji";
 
 interface QueryFilter {
     queryType: "expense" | "archive" | "calendar";
@@ -60,7 +61,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
     const tagLines = Array.from(tagMap.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
-        .map(([tag, amt]) => `　${tagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
+        .map(([tag, amt]) => `\u3000${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
 
     // 最高一筆
     const maxEntry = entries.reduce((max, e) =>
@@ -211,12 +212,4 @@ function resolvePeriod(period: string): { from: string; to: string; label: strin
             return { from, to: now.toISOString().slice(0, 10), label: "本月" };
         }
     }
-}
-
-function tagEmoji(tag: string): string {
-    const map: Record<string, string> = {
-        Food: "🍽", Transport: "🚗", Entertainment: "🎬", Utilities: "💡",
-        Shopping: "🛒", Health: "🏥", Education: "📚", Other: "📦",
-    };
-    return map[tag] || "📦";
 }

@@ -15,6 +15,18 @@
         {
             "path": "/api/cron/recurring",
             "schedule": "5 16 * * *"
+        },
+        {
+            "path": "/api/cron/cleanup-messages",
+            "schedule": "0 2 * * 0"
+        },
+        {
+            "path": "/api/cron/diary-prompt",
+            "schedule": "30 14 * * *"
+        },
+        {
+            "path": "/api/cron/monthly-sheet",
+            "schedule": "0 15 28-31 * *"
         }
     ]
 }
