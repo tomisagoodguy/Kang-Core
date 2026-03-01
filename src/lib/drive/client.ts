@@ -1,19 +1,22 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
 
-const SCOPES = ["https://www.googleapis.com/auth/drive"];
-
 function getDriveClient() {
-    const auth = new google.auth.JWT({
-        email: process.env.GOOGLE_DRIVE_CLIENT_EMAIL,
-        key: (process.env.GOOGLE_DRIVE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
-        scopes: SCOPES,
+    // 使用個人的 OAuth2 憑證，配額算在你的個人帳號上，可上傳到 My Drive
+    const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_OAUTH_CLIENT_ID,
+        process.env.GOOGLE_OAUTH_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+        refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
     });
-    return google.drive({ version: "v3", auth });
+
+    return google.drive({ version: "v3", auth: oauth2Client });
 }
 
 /**
- * 取得（或建立）子資料夾 ID
+ * 取得（或建立）雲端硬碟中的子資料夾 ID
  */
 async function getOrCreateSubfolder(
     drive: ReturnType<typeof google.drive>,
