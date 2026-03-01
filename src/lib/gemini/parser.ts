@@ -84,25 +84,41 @@ export async function parseUserInput(text: string): Promise<GeminiParseResult> {
         }
     }
 
-    try {
-        const model = genAI.getGenerativeModel({
-            model: "gemini-3-flash",
-            systemInstruction: `You are an AI assistant that parses user intent for the Kang-Core system. You decide if a user is trying to log an expense (accounting) or save information/note/link (archive). Today is ${new Date().toISOString().split("T")[0]}.`,
-            generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: outputSchema,
-            },
-        });
+    const FALLBACK_MODELS = [
+        "gemini-3-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash"
+    ];
 
-        const result = await model.generateContent(text);
-        const parsed = JSON.parse(result.response.text()) as GeminiParseResult;
-        return { ...parsed, isError: false };
-    } catch (error) {
-        console.error("Gemini Parsing Error:", error);
-        return {
-            type: "unknown",
-            isError: true,
-            errorMessage: error instanceof Error ? error.message : "Failure during text processing",
-        };
+    let lastError: any = null;
+
+    for (const modelName of FALLBACK_MODELS) {
+        try {
+            console.log(`[Gemini] Appying model: ${modelName} for parsing.`);
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                systemInstruction: `You are an AI assistant that parses user intent for the Kang-Core system. You decide if a user is trying to log an expense (accounting) or save information/note/link (archive). Today is ${new Date().toISOString().split("T")[0]}.`,
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: outputSchema,
+                },
+            });
+
+            const result = await model.generateContent(text);
+            const parsed = JSON.parse(result.response.text()) as GeminiParseResult;
+            console.log(`[Gemini] Model ${modelName} succeeded.`);
+            return { ...parsed, isError: false };
+        } catch (error: any) {
+            console.warn(`[Gemini] Model ${modelName} failed. Reason: ${error?.message || "Unknown error"}`);
+            lastError = error;
+            // Iterate and try the next model
+        }
     }
+
+    console.error(`[Gemini] All fallback models failed. Last error:`, lastError);
+    return {
+        type: "unknown",
+        isError: true,
+        errorMessage: lastError instanceof Error ? lastError.message : "Failure during text processing across all models",
+    };
 }
