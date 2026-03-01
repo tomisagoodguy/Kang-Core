@@ -48,12 +48,13 @@ async function getOrCreateSubfolder(
 }
 
 /**
- * 上傳圖片到 Google Drive，回傳公開可讀取的 URL
+ * 上傳檔案 (圖片或一般檔案) 到 Google Drive，回傳公開可讀取的 URL
  */
-export async function uploadImageToDrive(
-    imageBuffer: Buffer,
+export async function uploadFileToDrive(
+    fileBuffer: Buffer,
     filename: string,
-    subfolder: "receipts" | "screenshots"
+    subfolder: string = "archive",
+    mimeType?: string
 ): Promise<string> {
     const drive = getDriveClient();
     const parentFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!;
@@ -62,16 +63,18 @@ export async function uploadImageToDrive(
     const subFolderId = await getOrCreateSubfolder(drive, parentFolderId, subfolder);
 
     // 上傳檔案
-    const stream = Readable.from(imageBuffer);
+    const stream = Readable.from(fileBuffer);
+    const media: any = { body: stream };
+    if (mimeType) {
+        media.mimeType = mimeType;
+    }
+
     const uploadRes = await drive.files.create({
         requestBody: {
             name: filename,
             parents: [subFolderId],
         },
-        media: {
-            mimeType: "image/jpeg",
-            body: stream,
-        },
+        media,
         fields: "id",
     });
 

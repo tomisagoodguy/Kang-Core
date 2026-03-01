@@ -3,7 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { WebhookEvent, Client, WebhookRequestBody, TextMessage } from "@line/bot-sdk";
 import { parseUserInput } from "@/lib/gemini/parser";
 import { analyzeImage } from "@/lib/gemini/vision";
-import { uploadImageToDrive } from "@/lib/drive/client";
+import { uploadFileToDrive } from "@/lib/drive/client";
 import { db } from "@/lib/firebase/admin";
 
 const client = new Client({
@@ -81,10 +81,11 @@ async function handleImageMessage(messageId: string, userId: string): Promise<vo
 
     // 並行：上傳 Drive + Gemini Vision 分析
     const [driveUrl, parsedData] = await Promise.all([
-        uploadImageToDrive(
+        uploadFileToDrive(
             imageBuffer,
             `${Date.now()}.jpg`,
-            "receipts" // 預設收據資料夾，Vision 結果出來後再確認
+            "receipts", // 預設收據資料夾，Vision 結果出來後再確認
+            "image/jpeg"
         ),
         analyzeImage(imageBuffer, "image/jpeg"),
     ]);
@@ -129,6 +130,39 @@ async function handleImageMessage(messageId: string, userId: string): Promise<vo
     }
 }
 
+/** 處理檔案訊息（如 PDF、DOCX，上傳 Drive 並記錄到知識庫） */
+async function handleFileMessage(messageId: string, fileName: string, userId: string): Promise<void> {
+    await client.pushMessage(userId, {
+        type: "text",
+        text: "📁 收到檔案，上傳至雲端硬碟中...",
+    });
+
+    try {
+        const stream = await client.getMessageContent(messageId);
+        const fileBuffer = await streamToBuffer(stream as unknown as NodeJS.ReadableStream);
+
+        // 上傳到 Drive，自動判斷 MIME type
+        const driveUrl = await uploadFileToDrive(fileBuffer, fileName, "archive");
+
+        const entry = {
+            title: fileName,
+            summary: "此檔案由 LINE 機器人上傳，尚未提供詳細解析。",
+            keywords: ["file", "document"],
+            url: driveUrl,
+            source: "line-file",
+            createdAt: new Date(),
+        };
+
+        const replyText = `✅ 檔案儲存成功！\n📁 標題：${fileName}\n🔗 存檔位置：已存 Drive`;
+
+        await db.collection("archive").add(entry);
+        await client.pushMessage(userId, { type: "text", text: replyText });
+    } catch (e: any) {
+        console.error("handleFileMessage error:", e);
+        await client.pushMessage(userId, { type: "text", text: "⚠️ 檔案處理失敗，請稍後再試。" });
+    }
+}
+
 /** 主要事件處理 */
 async function processEvent(event: WebhookEvent): Promise<void> {
     if (event.type !== "message") return;
@@ -139,6 +173,17 @@ async function processEvent(event: WebhookEvent): Promise<void> {
     // Skip LINE verification pings
     if (event.replyToken === "00000000000000000000000000000000") return;
 
+    // 加入防重複處理鎖 (LINE 有時會因為超時重傳相同的 Webhook 事件)
+    try {
+        await db.collection("processed_messages").doc(event.message.id).create({ timestamp: new Date() });
+    } catch (e: any) {
+        // 如果錯誤碼是 6 (ALREADY_EXISTS)，代表這個事件已經處理過了
+        if (e.code === 6 || e.message?.includes("ALREADY_EXISTS")) {
+            console.log(`[Event ${event.message.id}] Already processed. Skipping.`);
+            return;
+        }
+    }
+
     try {
         if (event.message.type === "text") {
             const textMessage = event.message as TextMessage;
@@ -147,6 +192,9 @@ async function processEvent(event: WebhookEvent): Promise<void> {
         } else if (event.message.type === "image") {
             await handleImageMessage(event.message.id, userId);
 
+        } else if (event.message.type === "file") {
+            const fileMessage = event.message as any;
+            await handleFileMessage(event.message.id, fileMessage.fileName, userId);
         }
         // 其他訊息類型（影片、語音等）目前忽略
 
