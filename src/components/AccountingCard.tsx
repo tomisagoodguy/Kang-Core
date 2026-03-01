@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { TagBadge } from "./TagBadge";
 
 interface AccountingEntry {
@@ -16,12 +20,29 @@ interface AccountingCardProps {
 }
 
 export function AccountingCard({ entry }: AccountingCardProps) {
+    const router = useRouter();
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm("確定要刪除這筆記帳嗎？")) return;
+        setIsDeleting(true);
+        try {
+            await fetch(`/api/accounting/${entry.id}`, { method: "DELETE" });
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+            alert("刪除失敗");
+            setIsDeleting(false);
+        }
+    };
+
     const amountClass =
         entry.amount >= 1000
             ? "accounting-card-amount high"
             : entry.amount >= 500
-            ? "accounting-card-amount medium"
-            : "accounting-card-amount low";
+                ? "accounting-card-amount medium"
+                : "accounting-card-amount low";
 
     const formattedAmount = entry.amount.toLocaleString();
 
@@ -49,7 +70,24 @@ export function AccountingCard({ entry }: AccountingCardProps) {
                 {entry.description || entry.originalText || "—"}
             </span>
             <TagBadge tag={entry.tag} />
-            <span className={amountClass}>${formattedAmount}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: "auto" }}>
+                <span className={amountClass} style={{ marginLeft: 0 }}>${formattedAmount}</span>
+                <button
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        opacity: isDeleting ? 0.5 : 0.8,
+                        filter: "grayscale(0.5)",
+                        transition: "all 0.2s"
+                    }}
+                    title="刪除這筆資料"
+                >
+                    🗑️
+                </button>
+            </div>
         </div>
     );
 }

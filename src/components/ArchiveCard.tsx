@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { TagBadge } from "./TagBadge";
 
 interface ArchiveEntry {
@@ -19,7 +20,23 @@ interface ArchiveCardProps {
 }
 
 export function ArchiveCard({ entry }: ArchiveCardProps) {
+    const router = useRouter();
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm("確定要刪除這筆資料嗎？")) return;
+        setIsDeleting(true);
+        try {
+            await fetch(`/api/archive/${entry.id}`, { method: "DELETE" });
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+            alert("刪除失敗");
+            setIsDeleting(false);
+        }
+    };
 
     let displayTitle = entry.title || "知識存檔";
     if (!entry.title && entry.url) {
@@ -109,9 +126,27 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
                     </a>
                 ) : <span />}
 
-                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                    {isExpanded ? "▲ 點擊收起" : "▼ 點擊展開"}
-                </span>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                        {isExpanded ? "▲ 點擊收起" : "▼ 點擊展開"}
+                    </span>
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "4px",
+                            opacity: isDeleting ? 0.5 : 0.8,
+                            filter: "grayscale(0.5)",
+                            transition: "all 0.2s"
+                        }}
+                        title="刪除這筆資料"
+                    >
+                        🗑️
+                    </button>
+                </div>
             </div>
         </div>
     );
