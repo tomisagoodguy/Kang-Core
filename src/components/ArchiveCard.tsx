@@ -6,6 +6,7 @@ interface ArchiveEntry {
     keywords: string[];
     url?: string;
     title?: string;
+    imageUrl?: string;
     createdAt?: string;
 }
 
@@ -20,6 +21,23 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
 
     return (
         <div className="glass-card archive-card">
+            {entry.imageUrl && (
+                <a href={entry.imageUrl} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={entry.imageUrl}
+                        alt="截圖"
+                        style={{
+                            width: "100%",
+                            height: 120,
+                            objectFit: "cover",
+                            borderRadius: 8,
+                            marginBottom: 8,
+                            border: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                    />
+                </a>
+            )}
             <div className="archive-card-title" title={displayTitle}>
                 {displayTitle}
             </div>
