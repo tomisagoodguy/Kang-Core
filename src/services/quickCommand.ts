@@ -5,6 +5,7 @@ import { getTagEmoji } from "@/utils/tagEmoji";
 import { ClassificationEngine } from "./classificationEngine";
 import { queryArchiveWithAI } from "./archiveQuery.service";
 import { completeTodo } from "./todoComplete.service";
+import { listRecentDriveFiles } from "@/lib/drive/client";
 
 interface QuickCommandResult {
     handled: boolean;
@@ -41,6 +42,9 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
                 "🧠 /洞察",
                 "　　例：AI 分析近期消費狀況",
                 "",
+                "📁 /recent_files",
+                "　　查看最近上傳的 5 個檔案",
+                "",
                 "💡 不用指令也行，直接打字",
                 "　　我會用 AI 自動判斷意圖",
                 "　　或貼收據截圖我也能讀喔！",
@@ -76,6 +80,11 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
     if (completeMatch) {
         const result = await completeTodo(completeMatch[1].trim());
         return { handled: true, replyText: result.message };
+    }
+
+    // /recent_files
+    if (/^\/recent_files$/i.test(trimmed)) {
+        return await handleRecentFiles();
     }
 
     // /問 {問題}
@@ -300,6 +309,35 @@ async function handleArchiveQuery(question: string): Promise<QuickCommandResult>
             answer,
         ].join("\n"),
     };
+}
+
+/** /recent_files — 列出最近 5 筆上傳到 Drive 的檔案 */
+async function handleRecentFiles(): Promise<QuickCommandResult> {
+    try {
+        const files = await listRecentDriveFiles(5);
+        if (files.length === 0) {
+            return { handled: true, replyText: "📭 尚無上傳紀錄" };
+        }
+
+        const lines = files.map((f, i) => {
+            const dt = f.modifiedTime
+                ? new Date(f.modifiedTime).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })
+                : "";
+            return `${i + 1}. 📄 ${f.name}\n　　🕒 ${dt}`;
+        });
+
+        return {
+            handled: true,
+            replyText: [
+                "📁 最近上傳的 5 個檔案",
+                "━━━━━━━━━━━━",
+                ...lines,
+            ].join("\n"),
+        };
+    } catch (e) {
+        console.error("[recent_files]", e);
+        return { handled: true, replyText: "⚠️ 讀取 Drive 失敗，請稍後再試" };
+    }
 }
 
 /** /預算 — 查看本月預算使用狀況 */

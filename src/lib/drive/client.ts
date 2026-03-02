@@ -48,7 +48,8 @@ async function getOrCreateSubfolder(
 }
 
 /**
- * 上傳檔案 (圖片或一般檔案) 到 Google Drive，回傳公開可讀取的 URL
+ * 上傳檔案 (圖片或一般檔案) 到 Google Drive，自動按月分類存放
+ * 路徑：{parentFolder}/{subfolder}/{YYYY-MM}/{filename}
  */
 export async function uploadFileToDrive(
     fileBuffer: Buffer,
@@ -59,8 +60,13 @@ export async function uploadFileToDrive(
     const drive = getDriveClient();
     const parentFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!;
 
-    // 取得或建立子資料夾
+    // 第一層：功能子資料夾（e.g. "archive"）
     const subFolderId = await getOrCreateSubfolder(drive, parentFolderId, subfolder);
+
+    // 第二層：年月資料夾（e.g. "2026-03"）
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const monthFolderId = await getOrCreateSubfolder(drive, subFolderId, yearMonth);
 
     // 上傳檔案
     const stream = Readable.from(fileBuffer);
@@ -72,7 +78,7 @@ export async function uploadFileToDrive(
     const uploadRes = await drive.files.create({
         requestBody: {
             name: filename,
-            parents: [subFolderId],
+            parents: [monthFolderId],
         },
         media,
         fields: "id",
@@ -90,4 +96,30 @@ export async function uploadFileToDrive(
     });
 
     return `https://drive.google.com/uc?export=view&id=${fileId}`;
+}
+
+/**
+ * 列出 Google Drive 中最近上傳的檔案（依修改時間倒序）
+ * @param limit 回傳筆數，預設 5
+ */
+export async function listRecentDriveFiles(limit: number = 5): Promise<{
+    name: string;
+    modifiedTime: string;
+    url: string;
+}[]> {
+    const drive = getDriveClient();
+    const parentFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID!;
+
+    const res = await drive.files.list({
+        q: `'${parentFolderId}' in parents or '${parentFolderId}' in ancestors and mimeType != 'application/vnd.google-apps.folder' and trashed=false`,
+        orderBy: "modifiedTime desc",
+        pageSize: limit,
+        fields: "files(id, name, modifiedTime)",
+    });
+
+    return (res.data.files ?? []).map((f) => ({
+        name: f.name ?? "未知檔名",
+        modifiedTime: f.modifiedTime ?? "",
+        url: `https://drive.google.com/uc?export=view&id=${f.id}`,
+    }));
 }
