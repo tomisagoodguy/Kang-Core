@@ -13,6 +13,11 @@ import { checkBudgetAlert } from "./budget.service";
 import { ArchiveTagEngine } from "./archiveTagEngine";
 import { SessionService } from "./session.service";
 import { getEmbedding } from "@/lib/gemini/embedding";
+import { chatSessionManager } from "@/lib/gemini/sessionManager";
+import { FileManager } from "@/lib/gemini/fileManager";
+import * as fs from "fs/promises";
+import * as os from "os";
+import * as path from "path";
 
 export class MessageService {
     /** 內部發送訊息並紀錄到短記憶 */
@@ -180,8 +185,22 @@ export class MessageService {
             const queryResult = await executeQuery(parsedData.queryData);
             await this.sendReply(userId, queryResult.replyText);
 
+        } else if (parsedData.type === "clear_memory") {
+            chatSessionManager.clearSession(userId);
+            await this.sendReply(userId, "✅ 對話記憶已清除。我們可以重新開始對話了！");
+
         } else {
-            await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「收到薪水 50000」\n「明天下午三點開會」\n「每月10號付家裡伙食費7000」\n「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
+            // Fallback: Dispatch to Chat Session (Context Memory)
+            try {
+                // If the user hasn't specified anything specific, send it to general chat with context memory
+                const session = chatSessionManager.getOrCreateSession(userId);
+                const response = await session.sendMessage(userText);
+                const replyText = response.response.text() || "抱歉，我無法提供回答。";
+                await this.sendReply(userId, replyText);
+            } catch (err) {
+                console.error("[ChatSession] Error:", err);
+                await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「收到薪水 50000」\n「明天下午三點開會」\n「每月10號付家裡伙食費7000」\n「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
+            }
         }
     }
 
@@ -264,13 +283,28 @@ export class MessageService {
     async handleFileMessage(messageId: string, fileName: string, userId: string): Promise<void> {
         SessionService.addMessage(userId, "user", `[上傳了檔案: ${fileName}]`).catch(console.error);
 
-        await this.sendReply(userId, "📁 收到檔案，上傳至雲端硬碟中...");
+        await this.sendReply(userId, "📁 收到檔案，上傳至雲端硬碟與 AI 知識庫中...");
 
         try {
             const fileBuffer = await lineService.getMessageContentBuffer(messageId);
 
             // 上傳到 Drive，自動判斷 MIME type -> (使用預設或省略)
             const driveUrl = await driveService.uploadToDrive(fileName, "application/octet-stream", fileBuffer);
+
+            // 寫入本地 tmp 暫存區，然後交給 FileManager 上傳至 Gemini RAG
+            let aiStatusStr = "已存入 AI 知識庫";
+            try {
+                const tmpPath = path.join(os.tmpdir(), `${messageId}_${fileName}`);
+                await fs.writeFile(tmpPath, fileBuffer);
+                const geminiSuccess = await FileManager.uploadToSearchStore(tmpPath, userId, fileName);
+                await fs.unlink(tmpPath).catch(() => { });
+                if (!geminiSuccess) {
+                    aiStatusStr = "寫入 AI 知識庫失敗";
+                }
+            } catch (fileErr) {
+                console.error("[FileManager] error for file upload:", fileErr);
+                aiStatusStr = "寫入 AI 知識庫發生異常";
+            }
 
             const embeddingText = `檔案: ${fileName} 此檔案由 LINE 機器人上傳，尚未提供詳細解析。`;
             const embeddingArray = await getEmbedding(embeddingText).catch(e => {
@@ -280,7 +314,7 @@ export class MessageService {
 
             const entry: any = {
                 title: fileName,
-                summary: "此檔案由 LINE 機器人上傳，尚未提供詳細解析。",
+                summary: `此檔案由 LINE 機器人上傳。(${aiStatusStr})`,
                 keywords: ["file", "document"],
                 url: driveUrl,
                 source: "line-file",
@@ -290,7 +324,7 @@ export class MessageService {
                 entry.embedding = embeddingArray;
             }
 
-            const replyText = `✅ 檔案儲存成功！\n📁 標題：${fileName}\n🔗 存檔位置：已存 Drive`;
+            const replyText = `✅ 檔案儲存成功！\n📁 標題：${fileName}\n🔗 存檔位置：已存 Drive\n🤖 AI 知識庫：${aiStatusStr}\n💡 您現在可以直接詢問我檔案內容了！`;
 
             await db.collection("archive").add(entry);
             await this.sendReply(userId, replyText);

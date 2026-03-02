@@ -1,0 +1,20 @@
+title: Add AI Brain Upgrade (Context Memory & File Search)
+version: 1.0.0
+description: Integrate context memory management and file search capabilities based on the linebot-gemini-file-search architecture.
+status: proposed
+changes:
+  - type: new-file
+    path: src/lib/gemini/sessionManager.ts
+    description: "Create `ChatSessionManager` singleton to manage in-memory chat sessions per user using Gemini SDK (`client.startChat`) instead of `generateContent`, with an TTL of 1 hour to free resources."
+  - type: new-file
+    path: src/lib/gemini/fileManager.ts
+    description: "Create module for uploading, managing, and indexing documents to Google AI `File Search API` to support scalable RAG without our own vector database."
+  - type: modify
+    path: src/services/message.service.ts
+    description: "Refactor `handleTextMessage` to use `ChatSessionManager` for the chat completions when answering queries. Include the ability to clear chat history with an intent like '清除對話'."
+  - type: modify
+    path: src/app/api/webhook/line-bot/route.ts
+    description: "Refactor webhook to support receiving File (PDF, DOCX) and Image messages via `message.service.ts`, saving them to Vercel tmp or memory, and routing files to `fileManager.ts` and images directly to vision."
+  - type: modify
+    path: src/models/schema.ts
+    description: "Update schemas to represent new intents like 'clear_memory' and parameters required for document metadata."

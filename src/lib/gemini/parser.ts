@@ -12,7 +12,7 @@ const outputSchema: Schema = {
     properties: {
         type: {
             type: SchemaType.STRING,
-            description: "Must be one of: 'accounting', 'archive', 'calendar', 'recurring', 'query', 'unknown'",
+            description: "Must be one of: 'accounting', 'archive', 'calendar', 'recurring', 'query', 'clear_memory', 'unknown'",
             nullable: false,
         },
         explanation: {
@@ -115,7 +115,7 @@ Analyze the user input and respond ONLY with a valid JSON object. No markdown, n
 
 JSON schema:
 {
-  "type": "accounting" | "archive" | "calendar" | "recurring" | "query" | "unknown",
+  "type": "accounting" | "archive" | "calendar" | "recurring" | "query" | "clear_memory" | "unknown",
   "explanation": "string (brief reason)",
   "accountingData": { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string" },
   "archiveData": { "url": "...", "title": "...", "summary": "...", "keywords": ["..."] },
@@ -131,6 +131,7 @@ Rules:
 - If user shares a link, article, note, or general knowledge → type = "archive", fill archiveData
 - If user is ASKING/QUERYING about their data (e.g. "這個月吃飯花多少", "上週花了多少", "最近收藏了什麼", "明天有什麼事") → type = "query", fill queryData (use queryType "expense", "archive", "calendar" respectively).
 - If user is ASKING a complex semantic question about their notes/knowledge (e.g. "之前存過哪些AI相關的文章？", "幫我找關於財務自由的觀念") → type = "query", queryType = "semantic_search", fill 'semanticQuery'.
+- If user wants to clear or reset the conversational memory (e.g. "清除對話", "reset", "clear", "重置") → type = "clear_memory"
 - Otherwise → type = "unknown"
 - For dates, use today (${TODAY()}) as reference. Tomorrow is ${new Date(Date.now() + 86400000).toISOString().split("T")[0]}.
 - CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary' and 'keywords' arrays.
