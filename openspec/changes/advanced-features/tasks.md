@@ -42,7 +42,7 @@
 - [x] 23. 修改記帳頁 filter — 兩層選單（主分類 → 子分類）
 - [x] 24. `accounting` 集合新增 `subTag` 可選欄位
 - [x] 25. 修改 Gemini Prompt — 嘗試匹配自訂子標籤
-- [ ] 26. 修改圓餅圖 — 支援展開子標籤 (保留到 C7/C9 再優化)
+- [x] 26. 修改圓餅圖 — 支援展開子標籤（點擊父標籤鑽取 subTag 分佈，含返回按鈕）
 
 ### B5: PWA
 
@@ -89,10 +89,10 @@
 - [x] 51. 建立規則匹配引擎 `src/services/classificationEngine.ts`
 - [x] 52. 修改記帳流程 — 先查規則再決定是否走 Gemini
 - [x] 53. 記帳完成後自動建立/更新規則
-- [ ] 54. 使用者修改 tag 時同步更新規則
-- [ ] 55. 建立 `/api/rules` CRUD 端點
-- [ ] 56. 建立 `/settings/rules` 管理頁面
-- [ ] 57. 低 confidence 規則高亮提示
+- [x] 54. 使用者修改 tag 時同步更新規則（accounting PUT API 觸發 ClassificationEngine.learn(isManual=true)）
+- [x] 55. 建立 `/api/rules` CRUD 端點
+- [x] 56. 建立 `/settings/rules` 管理頁面
+- [x] 57. 低 confidence 規則高亮提示（紅框 + 頂部警示橫幅 + confidence badge）
 
 ### C10: AI 配額優化與重試機制 (Limit-Proofing)
 
