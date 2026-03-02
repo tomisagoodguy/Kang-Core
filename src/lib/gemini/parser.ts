@@ -28,7 +28,7 @@ const outputSchema: Schema = {
                 amount: { type: SchemaType.NUMBER, nullable: false },
                 tag: {
                     type: SchemaType.STRING,
-                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Other",
+                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Income, Other",
                 },
                 subTag: {
                     type: SchemaType.STRING,
@@ -125,7 +125,7 @@ JSON schema:
 }
 
 Rules:
-- If user mentions spending money, food, transport, shopping → type = "accounting", fill accountingData
+- If user mentions spending money, food, transport, shopping, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income')
 - If user wants to schedule, plan, remind, to-do → type = "calendar", fill calendarData
 - If user wants to set up a regular, fixed, or scheduled expense (e.g. 每個月10號付錢, 每週花多少) → type = "recurring", fill recurringData
 - If user shares a link, article, note, or general knowledge → type = "archive", fill archiveData

@@ -8,6 +8,7 @@ export const TagEnum = z.enum([
     "Shopping",
     "Health",
     "Education",
+    "Income",
     "Other",
 ]);
 

@@ -81,7 +81,8 @@ export class MessageService {
                 source: "line",
                 createdAt: new Date(),
             };
-            let replyText = `✅ 記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
+            const isIncome = entry.tag === "Income";
+            let replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
             await this.sendReply(userId, replyText);
@@ -180,7 +181,7 @@ export class MessageService {
             await this.sendReply(userId, queryResult.replyText);
 
         } else {
-            await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n「每月10號付家裡伙食費7000」\n「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
+            await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「收到薪水 50000」\n「明天下午三點開會」\n「每月10號付家裡伙食費7000」\n「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
         }
     }
 
