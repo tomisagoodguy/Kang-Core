@@ -4,7 +4,9 @@ interface ClassificationRule {
     keyword: string;
     tag: string;
     subTag?: string;
-    count: number;
+    confidence: number;  // 0-1，預設 0.8，使用者手動修正提升至 0.95
+    hitCount: number;
+    source: "auto" | "manual";
     lastUsed: Date;
 }
 
@@ -57,14 +59,16 @@ export class ClassificationEngine {
             setCachedRules(rules);
         }
 
-        // 2. 匹配規則（關鍵字包含），優先匹配較長的關鍵字
-        const sortedRules = [...rules].sort((a, b) => b.keyword.length - a.keyword.length);
+        // 2. 匹配規則（關鍵字包含），優先匹配較長的關鍵字，且 confidence >= 0.7
+        const sortedRules = [...rules]
+            .filter(r => (r.confidence ?? 0.8) >= 0.7)
+            .sort((a, b) => b.keyword.length - a.keyword.length);
 
         for (const rule of sortedRules) {
             if (trimmed.includes(rule.keyword.toLowerCase())) {
-                // 更新使用次數與時間（異步不等待）
+                // 更新命中次數與時間（異步不等待）
                 db.collection("classification_rules").doc(rule.id).update({
-                    count: (rule.count || 0) + 1,
+                    hitCount: (rule.hitCount || 0) + 1,
                     lastUsed: new Date()
                 }).catch(() => { /* 不影響主流程 */ });
 
@@ -79,7 +83,10 @@ export class ClassificationEngine {
      * 學習新規則（含輸入清理）
      * 當使用者手動修改 tag 或快速指令/Gemini 解析成功時調用
      */
-    static async learn(text: string, tag: string, subTag?: string): Promise<void> {
+    /**
+     * @param isManual 是否為使用者手動修改 tag（true → confidence 提升至 0.95）
+     */
+    static async learn(text: string, tag: string, subTag?: string, isManual = false): Promise<void> {
         if (!text || text.length < 2) return;
 
         const keyword = sanitizeKeyword(text);
@@ -93,16 +100,25 @@ export class ClassificationEngine {
                 keyword,
                 tag,
                 subTag: subTag || null,
-                count: 1,
+                confidence: isManual ? 0.95 : 0.8,
+                hitCount: 1,
+                source: isManual ? "manual" : "auto",
                 lastUsed: new Date(),
                 createdAt: new Date()
             });
         } else {
             const doc = snapshot.docs[0];
+            const existing = doc.data();
+            const newConfidence = isManual
+                ? 0.95  // 使用者修正 → 直接拉高
+                : Math.min(1, (existing.confidence ?? 0.8) + 0.02);  // 每次命中微增
+
             await doc.ref.update({
                 tag,
                 subTag: subTag || null,
-                count: (doc.data().count || 0) + 1,
+                confidence: newConfidence,
+                hitCount: (existing.hitCount || 0) + 1,
+                source: isManual ? "manual" : existing.source || "auto",
                 lastUsed: new Date()
             });
         }

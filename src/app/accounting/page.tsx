@@ -123,7 +123,7 @@ export default function AccountingPage() {
             {!loading && entries.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
                     <MonthlyTrendChart data={monthlyTrend} />
-                    <TagPieChart data={tagDistribution} />
+                    <TagPieChart data={tagDistribution} entries={entries} currentMonth={new Date().toISOString().slice(0, 7)} />
                 </div>
             )}
 
