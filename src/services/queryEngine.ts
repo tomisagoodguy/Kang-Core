@@ -1,6 +1,7 @@
 import { db } from "@/lib/firebase/admin";
 import { getTagEmoji } from "@/utils/tagEmoji";
 import { RAGService } from "./rag.service";
+import { getEventsFromGoogleCalendar } from "@/lib/calendar/client";
 
 interface QueryFilter {
     queryType: "expense" | "archive" | "calendar" | "semantic_search";
@@ -159,23 +160,42 @@ async function queryCalendar(period?: string): Promise<QueryResult> {
         .filter((d) => !d.data().actionDate)
         .map((d) => d.data());
 
-    const events = snapshot.docs.map((d) => d.data());
+    const firestoreEvents = snapshot.docs.map((d) => d.data());
 
-    if (events.length === 0 && pendingNoDates.length === 0) {
+    // 也查 Google Calendar 原本的行程
+    const gcalItems = await getEventsFromGoogleCalendar(target);
+    const firestoreGcalIds = new Set(firestoreEvents.filter(e => e.gcalEventId).map(e => e.gcalEventId));
+
+    // 過濾掉已經由 Line Bot 寫入且在 Firestore 裡的行程
+    const filteredGcalEvents = gcalItems.filter(e => e.id && !firestoreGcalIds.has(e.id));
+
+    if (firestoreEvents.length === 0 && pendingNoDates.length === 0 && filteredGcalEvents.length === 0) {
         return { replyText: `🗓 ${label}沒有任何行程或待辦` };
     }
 
-    const eventLines = events.map((e) => {
+    const eventLines = firestoreEvents.map((e) => {
         const time = (e.actionTime as string) ? `⏰ ${e.actionTime} ` : "📌 ";
         const status = (e.status as string) === "done" ? "✅" : "";
         return `${time}${e.title} ${status}`;
     });
 
+    const gcalLines = filteredGcalEvents.map((e) => {
+        const isAllDay = !!e.start?.date;
+        let timeStr = "📌";
+        if (!isAllDay && e.start?.dateTime) {
+            const dateObj = new Date(e.start.dateTime);
+            timeStr = `⏰ ${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
+        }
+        return `${timeStr} ${e.summary} (GCal)`;
+    });
+
+    const allEventLines = [...eventLines, ...gcalLines];
+
     const todoLines = pendingNoDates.slice(0, 5).map((e) => `📌 ${e.title}`);
 
     const sections = [];
-    if (eventLines.length > 0) {
-        sections.push(`📅 ${label}行程`, ...eventLines);
+    if (allEventLines.length > 0) {
+        sections.push(`📅 ${label}行程`, ...allEventLines);
     }
     if (todoLines.length > 0) {
         if (sections.length > 0) sections.push("");

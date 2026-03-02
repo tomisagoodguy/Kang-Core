@@ -155,12 +155,32 @@ export class MessageService {
             await db.collection("calendar").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
+        } else if (parsedData.type === "recurring" && parsedData.recurringData) {
+            const entry = {
+                ...parsedData.recurringData,
+                originalText: userText,
+                source: "line",
+                createdAt: new Date(),
+                isActive: true,
+            };
+
+            let freqStr: string = entry.frequency;
+            if (entry.frequency === "monthly" && entry.dayOfMonth) freqStr = `每月 ${entry.dayOfMonth} 號`;
+            else if (entry.frequency === "weekly" && entry.dayOfWeek !== undefined) freqStr = `每週的第 ${entry.dayOfWeek} 天`;
+
+            let replyText = `🔄 定期支出設定成功！\n💰 金額: $${entry.amount}\n📝 項目: ${entry.description}\n🏷️ 標籤: ${entry.tag}\n⏳ 頻率: ${freqStr}`;
+            if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
+
+            await this.sendReply(userId, replyText);
+            await db.collection("recurring_expenses").add(entry);
+            await discordService.sendDiscordNotification(replyText);
+
         } else if (parsedData.type === "query" && parsedData.queryData) {
             const queryResult = await executeQuery(parsedData.queryData);
             await this.sendReply(userId, queryResult.replyText);
 
         } else {
-            await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n或「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
+            await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「明天下午三點開會」\n「每月10號付家裡伙食費7000」\n「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
         }
     }
 

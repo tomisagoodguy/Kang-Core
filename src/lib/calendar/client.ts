@@ -14,6 +14,29 @@ function getCalendarClient() {
     return google.calendar({ version: "v3", auth: oauth2Client });
 }
 
+export async function getEventsFromGoogleCalendar(dateStr: string) {
+    const calendar = getCalendarClient();
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+
+    const timeMin = new Date(`${dateStr}T00:00:00+08:00`).toISOString();
+    const timeMax = new Date(`${dateStr}T23:59:59+08:00`).toISOString();
+
+    try {
+        const res = await calendar.events.list({
+            calendarId,
+            timeMin,
+            timeMax,
+            singleEvents: true,
+            orderBy: "startTime",
+        });
+
+        return res.data.items || [];
+    } catch (e: any) {
+        console.error("Failed to fetch events from Google Calendar:", e.message || e);
+        return [];
+    }
+}
+
 export async function addEventToGoogleCalendar(entry: {
     title: string;
     description?: string;

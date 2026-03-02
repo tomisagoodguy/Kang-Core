@@ -12,7 +12,7 @@ const outputSchema: Schema = {
     properties: {
         type: {
             type: SchemaType.STRING,
-            description: "Must be one of: 'accounting', 'archive', 'calendar', 'query', 'unknown'",
+            description: "Must be one of: 'accounting', 'archive', 'calendar', 'recurring', 'query', 'unknown'",
             nullable: false,
         },
         explanation: {
@@ -68,6 +68,20 @@ const outputSchema: Schema = {
             },
             required: ["title"],
         },
+        recurringData: {
+            type: SchemaType.OBJECT,
+            description: "Populate ONLY if type is 'recurring'",
+            nullable: true,
+            properties: {
+                amount: { type: SchemaType.NUMBER, nullable: false },
+                tag: { type: SchemaType.STRING, description: "e.g. Food, Utilities..." },
+                description: { type: SchemaType.STRING, nullable: false, description: "Title/description of the recurring expense" },
+                frequency: { type: SchemaType.STRING, description: "One of: 'daily', 'weekly', 'monthly', 'yearly'" },
+                dayOfMonth: { type: SchemaType.NUMBER, nullable: true, description: "1-31. Populate if frequency is monthly or yearly" },
+                dayOfWeek: { type: SchemaType.NUMBER, nullable: true, description: "0-6 (Sun-Sat). Populate if frequency is weekly" },
+            },
+            required: ["amount", "tag", "description", "frequency"],
+        },
         queryData: {
             type: SchemaType.OBJECT,
             description: "Populate ONLY if type is 'query'. For data retrieval requests.",
@@ -101,23 +115,26 @@ Analyze the user input and respond ONLY with a valid JSON object. No markdown, n
 
 JSON schema:
 {
-  "type": "accounting" | "archive" | "calendar" | "query" | "unknown",
+  "type": "accounting" | "archive" | "calendar" | "recurring" | "query" | "unknown",
   "explanation": "string (brief reason)",
   "accountingData": { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string" },
   "archiveData": { "url": "...", "title": "...", "summary": "...", "keywords": ["..."] },
   "calendarData": { "title": "...", "actionDate": "YYYY-MM-DD", "actionTime": "HH:mm", "description": "..." },
+  "recurringData": { "amount": number, "tag": "...", "description": "...", "frequency": "monthly", "dayOfMonth": 10 },
   "queryData": { "queryType": "expense" | "archive" | "calendar" | "semantic_search", "tag": "...", "period": "this_month" | "last_month" | "this_week" | "last_week" | "today" | "tomorrow", "limit": 5, "semanticQuery": "..." }
 }
 
 Rules:
 - If user mentions spending money, food, transport, shopping → type = "accounting", fill accountingData
 - If user wants to schedule, plan, remind, to-do → type = "calendar", fill calendarData
+- If user wants to set up a regular, fixed, or scheduled expense (e.g. 每個月10號付錢, 每週花多少) → type = "recurring", fill recurringData
 - If user shares a link, article, note, or general knowledge → type = "archive", fill archiveData
 - If user is ASKING/QUERYING about their data (e.g. "這個月吃飯花多少", "上週花了多少", "最近收藏了什麼", "明天有什麼事") → type = "query", fill queryData (use queryType "expense", "archive", "calendar" respectively).
 - If user is ASKING a complex semantic question about their notes/knowledge (e.g. "之前存過哪些AI相關的文章？", "幫我找關於財務自由的觀念") → type = "query", queryType = "semantic_search", fill 'semanticQuery'.
 - Otherwise → type = "unknown"
 - For dates, use today (${TODAY()}) as reference. Tomorrow is ${new Date(Date.now() + 86400000).toISOString().split("T")[0]}.
 - CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary' and 'keywords' arrays.
+- CRITICAL TIP: User has existing fixed monthly expenses on the 10th: "家裡伙食費" (amount: 7000, tag: "Food"), "電話費" (amount: 488, tag: "Utilities"). If the user mentions setting these up, or paying them without an amount, YOU CAN INFER the amount and description.
 - For archive keywords, priorities choosing from these frequently used tags if applicable: [${archiveTags.join(", ")}]. You may create new ones ONLY if these don't fit well.
 - ONLY output valid JSON, nothing else`;
 

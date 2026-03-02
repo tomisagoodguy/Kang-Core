@@ -48,8 +48,26 @@ export const CalendarEntrySchema = BaseEntrySchema.extend({
 
 export type CalendarEntry = z.infer<typeof CalendarEntrySchema>;
 
+export const FrequencyEnum = z.enum(["daily", "weekly", "monthly", "yearly"]);
+
+export const RecurringExpenseSchema = z.object({
+    id: z.string().optional(),
+    amount: z.number().positive(),
+    tag: TagEnum,
+    description: z.string(),
+    frequency: FrequencyEnum,
+    dayOfMonth: z.number().min(1).max(31).optional(),
+    dayOfWeek: z.number().min(0).max(6).optional(),
+    monthOfYear: z.number().min(1).max(12).optional(),
+    isActive: z.boolean().default(true),
+    lastTriggeredAt: z.string().optional(), // ISO String
+    createdAt: z.date().optional(),
+});
+
+export type RecurringExpense = z.infer<typeof RecurringExpenseSchema>;
+
 export const GeminiParseResultSchema = z.object({
-    type: z.enum(["accounting", "archive", "calendar", "query", "unknown"]),
+    type: z.enum(["accounting", "archive", "calendar", "recurring", "query", "unknown"]),
     accountingData: AccountingEntrySchema.omit({
         id: true,
         createdAt: true,
@@ -75,30 +93,18 @@ export const GeminiParseResultSchema = z.object({
         limit: z.number().optional(),
         semanticQuery: z.string().optional(), // For RAG search
     }).optional(),
+    recurringData: RecurringExpenseSchema.omit({
+        id: true,
+        createdAt: true,
+        isActive: true,
+        lastTriggeredAt: true,
+    }).optional(),
     explanation: z.string().optional(),
     isError: z.boolean().default(false),
     errorMessage: z.string().optional(),
 });
 
 export type GeminiParseResult = z.infer<typeof GeminiParseResultSchema>;
-
-export const FrequencyEnum = z.enum(["daily", "weekly", "monthly", "yearly"]);
-
-export const RecurringExpenseSchema = z.object({
-    id: z.string().optional(),
-    amount: z.number().positive(),
-    tag: TagEnum,
-    description: z.string(),
-    frequency: FrequencyEnum,
-    dayOfMonth: z.number().min(1).max(31).optional(),
-    dayOfWeek: z.number().min(0).max(6).optional(),
-    monthOfYear: z.number().min(1).max(12).optional(),
-    isActive: z.boolean().default(true),
-    lastTriggeredAt: z.string().optional(), // ISO String
-    createdAt: z.date().optional(),
-});
-
-export type RecurringExpense = z.infer<typeof RecurringExpenseSchema>;
 
 export const CustomTagSchema = z.object({
     id: z.string().optional(),
