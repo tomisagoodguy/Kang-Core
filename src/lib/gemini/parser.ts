@@ -40,6 +40,22 @@ const outputSchema: Schema = {
             },
             required: ["amount", "tag", "date"],
         },
+        accountingDataList: {
+            type: SchemaType.ARRAY,
+            description: "Populate ONLY if type is 'accounting' and user provides MULTIPLE expenses",
+            nullable: true,
+            items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                    amount: { type: SchemaType.NUMBER, nullable: false },
+                    tag: { type: SchemaType.STRING },
+                    subTag: { type: SchemaType.STRING, nullable: true },
+                    date: { type: SchemaType.STRING },
+                    description: { type: SchemaType.STRING, nullable: true },
+                },
+                required: ["amount", "tag", "date"],
+            }
+        },
         archiveData: {
             type: SchemaType.OBJECT,
             description: "Populate ONLY if type is 'archive'",
@@ -118,6 +134,7 @@ JSON schema:
   "type": "accounting" | "archive" | "calendar" | "recurring" | "query" | "clear_memory" | "unknown",
   "explanation": "string (brief reason)",
   "accountingData": { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string" },
+  "accountingDataList": [ { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string" } ],
   "archiveData": { "url": "...", "title": "...", "summary": "...", "keywords": ["..."] },
   "calendarData": { "title": "...", "actionDate": "YYYY-MM-DD", "actionTime": "HH:mm", "description": "..." },
   "recurringData": { "amount": number, "tag": "...", "description": "...", "frequency": "monthly", "dayOfMonth": 10 },
@@ -125,7 +142,7 @@ JSON schema:
 }
 
 Rules:
-- If user mentions spending money, food, transport, shopping, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income')
+- If user mentions spending money, food, transport, shopping, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income'). If user inputs MULTIPLE expenses in one sentence (e.g. "健身50沙拉95"), fill 'accountingDataList' with multiple items instead.
 - If user wants to schedule, plan, remind, to-do → type = "calendar", fill calendarData
 - If user wants to set up a regular, fixed, or scheduled expense (e.g. 每個月10號付錢, 每週花多少) → type = "recurring", fill recurringData
 - If user shares a link, article, note, or general knowledge → type = "archive", fill archiveData

@@ -47,28 +47,32 @@ export class MessageService {
         }
 
         // 規則引擎初步攔截 (C9: 自動分類規則) — 不走 Gemini
-        const ruleMatch = await ClassificationEngine.match(userText);
-        if (ruleMatch) {
-            // 提取金額（正規表達式輔助）
-            const amountMatch = userText.match(/(\d+)/);
-            if (amountMatch) {
-                const amount = Number(amountMatch[1]);
-                const entry = {
-                    amount,
-                    tag: ruleMatch.tag,
-                    subTag: ruleMatch.subTag || null,
-                    date: new Date().toISOString().slice(0, 10),
-                    description: userText,
-                    originalText: userText,
-                    source: "line-rule",
-                    createdAt: new Date(),
-                };
-                const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
+        // 若句子包含多個數字，可能有多筆記帳或特定日期，跳過規則引擎讓 Gemini 精確解析
+        const numMatches = userText.match(/\d+/g);
+        if (!numMatches || numMatches.length <= 1) {
+            const ruleMatch = await ClassificationEngine.match(userText);
+            if (ruleMatch) {
+                // 提取金額（正規表達式輔助）
+                const amountMatch = userText.match(/(\d+)/);
+                if (amountMatch) {
+                    const amount = Number(amountMatch[1]);
+                    const entry = {
+                        amount,
+                        tag: ruleMatch.tag,
+                        subTag: ruleMatch.subTag || null,
+                        date: new Date().toISOString().slice(0, 10),
+                        description: userText,
+                        originalText: userText,
+                        source: "line-rule",
+                        createdAt: new Date(),
+                    };
+                    const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
 
-                await this.sendReply(userId, replyText);
-                await db.collection("accounting").add(entry);
-                await discordService.sendDiscordNotification(replyText);
-                return;
+                    await this.sendReply(userId, replyText);
+                    await db.collection("accounting").add(entry);
+                    await discordService.sendDiscordNotification(replyText);
+                    return;
+                }
             }
         }
 
@@ -79,28 +83,40 @@ export class MessageService {
             return;
         }
 
-        if (parsedData.type === "accounting" && parsedData.accountingData) {
-            const entry = {
-                ...parsedData.accountingData,
-                originalText: userText,
-                source: "line",
-                createdAt: new Date(),
-            };
-            const isIncome = entry.tag === "Income";
-            let replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
-            if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
+        if (parsedData.type === "accounting" && (parsedData.accountingData || parsedData.accountingDataList)) {
+            const list = parsedData.accountingDataList || (parsedData.accountingData ? [parsedData.accountingData] : []);
+            let totalReplyText = "";
 
-            await this.sendReply(userId, replyText);
-            await db.collection("accounting").add(entry);
-            await discordService.sendDiscordNotification(replyText);
+            for (const item of list) {
+                const entry = {
+                    ...item,
+                    originalText: userText,
+                    source: "line",
+                    createdAt: new Date(),
+                };
+                const isIncome = entry.tag === "Income";
+                let replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
 
-            // 學習新規則 (C9)
-            if (entry.tag && entry.tag !== "Other") {
-                await ClassificationEngine.learn(userText, entry.tag, entry.subTag);
+                await db.collection("accounting").add(entry);
+
+                // 學習新規則 (C9)
+                if (entry.tag && entry.tag !== "Other") {
+                    await ClassificationEngine.learn(entry.description || userText, entry.tag, entry.subTag);
+                }
+
+                // 預算超支警報（非同步不等待）
+                checkBudgetAlert(userId, entry.amount, entry.date, entry.tag).catch(() => { /* 不影響主流程 */ });
+
+                totalReplyText += replyText + "\n\n";
             }
 
-            // 預算超支警報（非同步不等待）
-            checkBudgetAlert(userId, entry.amount, entry.date, entry.tag).catch(() => { /* 不影響主流程 */ });
+            if (parsedData.explanation) {
+                totalReplyText += `🤖 AI: ${parsedData.explanation}`;
+            }
+
+            const finalReply = totalReplyText.trim();
+            await this.sendReply(userId, finalReply);
+            await discordService.sendDiscordNotification(finalReply);
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
             const embeddingText = `${parsedData.archiveData.summary} ${parsedData.archiveData.keywords.join(", ")}`;

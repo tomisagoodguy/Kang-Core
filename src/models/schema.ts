@@ -69,6 +69,12 @@ export type RecurringExpense = z.infer<typeof RecurringExpenseSchema>;
 
 export const GeminiParseResultSchema = z.object({
     type: z.enum(["accounting", "archive", "calendar", "recurring", "query", "clear_memory", "unknown"]),
+    accountingDataList: z.array(AccountingEntrySchema.omit({
+        id: true,
+        createdAt: true,
+        source: true,
+        originalText: true,
+    })).optional(),
     accountingData: AccountingEntrySchema.omit({
         id: true,
         createdAt: true,
