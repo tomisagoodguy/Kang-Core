@@ -5,20 +5,10 @@ import { TagBadge } from "./TagBadge";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 
-interface AccountingEntry {
-    id: string;
-    amount: number;
-    tag: string;
-    subTag?: string;
-    date: string;
-    description?: string;
-    originalText?: string;
-    imageUrl?: string;
-    createdAt?: string;
-}
+import type { AccountingEntryView } from "@/models/schema";
 
 interface AccountingCardProps {
-    entry: AccountingEntry;
+    entry: AccountingEntryView;
 }
 
 const EDIT_FIELDS = [

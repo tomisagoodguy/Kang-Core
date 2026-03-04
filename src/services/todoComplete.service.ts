@@ -1,4 +1,5 @@
 import { db } from "@/lib/firebase/admin";
+import type { CalendarEntry } from "@/models/schema";
 
 interface TodoCompleteResult {
     success: boolean;
@@ -27,7 +28,8 @@ export async function completeTodo(keyword: string): Promise<TodoCompleteResult>
 
         // 關鍵字比對（title 包含）
         const matched = snapshot.docs.filter(doc => {
-            const title = ((doc.data().title as string) || "").toLowerCase();
+            const data = doc.data() as CalendarEntry;
+            const title = (data.title || "").toLowerCase();
             return title.includes(trimmedKeyword);
         });
 
@@ -39,7 +41,7 @@ export async function completeTodo(keyword: string): Promise<TodoCompleteResult>
         }
 
         if (matched.length > 1) {
-            const titles = matched.slice(0, 5).map((d, i) => `${i + 1}. ${d.data().title}`).join("\n");
+            const titles = matched.slice(0, 5).map((d, i) => `${i + 1}. ${(d.data() as CalendarEntry).title}`).join("\n");
             return {
                 success: false,
                 message: `❓ 找到 ${matched.length} 筆符合的待辦，請輸入更明確的關鍵字：\n${titles}`
@@ -48,7 +50,8 @@ export async function completeTodo(keyword: string): Promise<TodoCompleteResult>
 
         // 唯一比對：標記為完成
         const doc = matched[0];
-        const title = doc.data().title as string;
+        const data = doc.data() as CalendarEntry;
+        const title = data.title;
         const completedAt = new Date();
 
         await doc.ref.update({

@@ -6,6 +6,7 @@ import { ClassificationEngine } from "./classificationEngine";
 import { queryArchiveWithAI } from "./archiveQuery.service";
 import { completeTodo } from "./todoComplete.service";
 import { listRecentDriveFiles } from "@/lib/drive/client";
+import type { AccountingEntry, CalendarEntry, Budget } from "@/models/schema";
 
 interface QuickCommandResult {
     handled: boolean;
@@ -161,14 +162,14 @@ async function handleQuickQuery(period: string): Promise<QuickCommandResult> {
         .where("date", "<=", range.to)
         .get();
 
-    const entries = snapshot.docs.map((d) => d.data());
-    const total = entries.reduce((s, e) => s + ((e.amount as number) || 0), 0);
+    const entries = snapshot.docs.map((d) => d.data() as AccountingEntry);
+    const total = entries.reduce((s, e) => s + (e.amount || 0), 0);
 
     // 標籤統計
     const tagMap = new Map<string, number>();
     entries.forEach((e) => {
-        const tag = (e.tag as string) || "Other";
-        tagMap.set(tag, (tagMap.get(tag) || 0) + ((e.amount as number) || 0));
+        const tag = e.tag || "Other";
+        tagMap.set(tag, (tagMap.get(tag) || 0) + (e.amount || 0));
     });
 
     const tagLines = Array.from(tagMap.entries())
@@ -360,12 +361,12 @@ async function handleBudgetQuery(userId: string): Promise<QuickCommandResult> {
             .where("date", ">=", monthStart)
             .where("date", "<=", monthEnd)
             .get();
-        const monthTotal = accSnap.docs.reduce((s, d) => s + ((d.data().amount as number) || 0), 0);
+        const monthTotal = accSnap.docs.reduce((s, d) => s + ((d.data() as AccountingEntry).amount || 0), 0);
 
         const lines = budgetSnap.docs.map(d => {
-            const b = d.data();
-            const tag = (b.tag as string) || "總";
-            const limit = b.monthlyLimit as number;
+            const b = d.data() as Budget;
+            const tag = b.tag || "總";
+            const limit = b.monthlyLimit;
             const ratio = Math.round((monthTotal / limit) * 100);
             return `${tag === "總" ? "📊" : getTagEmoji(tag)} ${tag}預算: $${monthTotal.toLocaleString()} / $${limit.toLocaleString()} (${ratio}%)`;
         });

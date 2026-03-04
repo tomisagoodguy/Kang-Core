@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { ALL_TAGS } from "@/utils/constants";
 
 interface Rule {
     id: string;
@@ -12,8 +13,6 @@ interface Rule {
     confidence?: number;
     source?: "auto" | "manual";
 }
-
-const ALL_TAGS = ["Food", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Education", "Other"];
 
 function getConfidence(rule: Rule): number {
     return rule.confidence ?? 0.8;

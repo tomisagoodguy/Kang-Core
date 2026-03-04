@@ -1,29 +1,20 @@
 import { db } from "@/lib/firebase/admin";
-
-interface ClassificationRule {
-    keyword: string;
-    tag: string;
-    subTag?: string;
-    confidence: number;  // 0-1，預設 0.8，使用者手動修正提升至 0.95
-    hitCount: number;
-    source: "auto" | "manual";
-    lastUsed: Date;
-}
+import type { ClassificationRule } from "@/models/schema";
 
 // ─── 記憶體快取（模組級，TTL 5 分鐘）────────────────────────────
 interface CacheEntry {
-    rules: (ClassificationRule & { id: string })[];
+    rules: ClassificationRule[];
     expiresAt: number;
 }
 let _cache: CacheEntry | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分鐘
 
-function getCachedRules(): (ClassificationRule & { id: string })[] | null {
+function getCachedRules(): ClassificationRule[] | null {
     if (_cache && Date.now() < _cache.expiresAt) return _cache.rules;
     return null;
 }
 
-function setCachedRules(rules: (ClassificationRule & { id: string })[]): void {
+function setCachedRules(rules: ClassificationRule[]): void {
     _cache = { rules, expiresAt: Date.now() + CACHE_TTL_MS };
 }
 
@@ -55,7 +46,7 @@ export class ClassificationEngine {
         let rules = getCachedRules();
         if (!rules) {
             const snapshot = await db.collection("classification_rules").get();
-            rules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassificationRule & { id: string }));
+            rules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassificationRule));
             setCachedRules(rules);
         }
 
@@ -67,12 +58,12 @@ export class ClassificationEngine {
         for (const rule of sortedRules) {
             if (trimmed.includes(rule.keyword.toLowerCase())) {
                 // 更新命中次數與時間（異步不等待）
-                db.collection("classification_rules").doc(rule.id).update({
+                db.collection("classification_rules").doc(rule.id!).update({
                     hitCount: (rule.hitCount || 0) + 1,
                     lastUsed: new Date()
                 }).catch(() => { /* 不影響主流程 */ });
 
-                return { tag: rule.tag, subTag: rule.subTag };
+                return { tag: rule.tag, subTag: rule.subTag ?? undefined };
             }
         }
 

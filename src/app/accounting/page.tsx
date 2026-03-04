@@ -5,8 +5,8 @@ import { AccountingCard } from "@/components/AccountingCard";
 import { InsightCard } from "@/components/InsightCard";
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { TagPieChart } from "@/components/charts/TagPieChart";
-
-const ALL_TAGS = ["Food", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Education", "Other"];
+import { ALL_TAGS } from "@/utils/constants";
+import type { AccountingEntryView, CustomTag } from "@/models/schema";
 
 const ALL_MONTHS = () => {
     const months = [];
@@ -18,26 +18,8 @@ const ALL_MONTHS = () => {
     return months;
 };
 
-interface AccountingEntry {
-    id: string;
-    amount: number;
-    tag: string;
-    subTag?: string;
-    date: string;
-    description?: string;
-    originalText?: string;
-    imageUrl?: string;
-    createdAt?: string;
-}
-
-interface CustomTag {
-    id: string;
-    name: string;
-    parentTag: string;
-}
-
 export default function AccountingPage() {
-    const [entries, setEntries] = useState<AccountingEntry[]>([]);
+    const [entries, setEntries] = useState<AccountingEntryView[]>([]);
     const [customTags, setCustomTags] = useState<CustomTag[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTag, setSelectedTag] = useState("all");

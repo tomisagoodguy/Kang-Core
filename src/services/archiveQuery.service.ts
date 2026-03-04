@@ -1,6 +1,7 @@
 import { db } from "@/lib/firebase/admin";
 import { safeExecute } from "@/lib/gemini/client";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { ArchiveEntry } from "@/models/schema";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -22,12 +23,14 @@ export async function queryArchiveWithAI(question: string): Promise<string> {
 
         // 2. 組成 context 文字
         const context = snapshot.docs.map((doc, i) => {
-            const d = doc.data();
-            const title = (d.title as string) || "";
-            const summary = (d.summary as string) || "";
-            const keywords = (d.keywords as string[])?.join(", ") || "";
-            const url = (d.url as string) || "";
-            const date = (d.createdAt as { toDate?: () => Date })?.toDate?.()?.toISOString().slice(0, 10) || "";
+            const d = doc.data() as ArchiveEntry;
+            const title = d.title || "";
+            const summary = d.summary || "";
+            const keywords = d.keywords?.join(", ") || "";
+            const url = d.url || "";
+            const date = d.createdAt instanceof Date
+                ? d.createdAt.toISOString().slice(0, 10)
+                : (d.createdAt as any)?.toDate?.()?.toISOString().slice(0, 10) || "";
             return `[${i + 1}] ${title || "（無標題）"}\n摘要: ${summary}\n關鍵字: ${keywords}${url ? `\n連結: ${url}` : ""}${date ? `\n日期: ${date}` : ""}`;
         }).join("\n\n");
 

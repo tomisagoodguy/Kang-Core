@@ -4,20 +4,10 @@ import { useState } from "react";
 import { TagBadge } from "./TagBadge";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
-
-interface ArchiveEntry {
-    id: string;
-    summary: string;
-    keywords: string[];
-    url?: string;
-    title?: string;
-    imageUrl?: string;
-    createdAt?: string;
-    originalText?: string;
-}
+import type { ArchiveEntryView } from "@/models/schema";
 
 interface ArchiveCardProps {
-    entry: ArchiveEntry;
+    entry: ArchiveEntryView;
 }
 
 const EDIT_FIELDS = [

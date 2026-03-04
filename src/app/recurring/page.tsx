@@ -1,29 +1,17 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { ALL_TAGS } from "@/utils/constants";
+import type { RecurringExpenseView } from "@/models/schema";
 
-const ALL_TAGS = ["Food", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Education", "Other"];
-
-interface RecurringExpense {
-    id: string;
-    amount: number;
-    tag: string;
-    description: string;
-    frequency: "daily" | "weekly" | "monthly" | "yearly";
-    dayOfMonth?: number;
-    dayOfWeek?: number;
-    monthOfYear?: number;
-    isActive: boolean;
-    lastTriggeredAt?: string;
-}
 
 export default function RecurringPage() {
-    const [entries, setEntries] = useState<RecurringExpense[]>([]);
+    const [entries, setEntries] = useState<RecurringExpenseView[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<RecurringExpense | null>(null);
+    const [editingItem, setEditingItem] = useState<RecurringExpenseView | null>(null);
 
     // Form state
     const [amount, setAmount] = useState("");
@@ -53,7 +41,7 @@ export default function RecurringPage() {
         fetchRecurring();
     }, []);
 
-    const handleOpenModal = (item?: RecurringExpense) => {
+    const handleOpenModal = (item?: RecurringExpenseView) => {
         if (item) {
             setEditingItem(item);
             setAmount(item.amount.toString());
@@ -79,7 +67,7 @@ export default function RecurringPage() {
     const handleSave = async () => {
         if (!amount || !description) return alert("請填寫金額與說明");
 
-        const data: Partial<RecurringExpense> = {
+        const data: Partial<RecurringExpenseView> = {
             amount: Number(amount),
             tag,
             description,
@@ -141,7 +129,7 @@ export default function RecurringPage() {
         }
     };
 
-    const formatFreq = (e: RecurringExpense) => {
+    const formatFreq = (e: RecurringExpenseView) => {
         if (e.frequency === "daily") return "每天";
         if (e.frequency === "weekly") {
             const days = ["日", "一", "二", "三", "四", "五", "六"];

@@ -229,7 +229,7 @@ export async function parseUserInput(text: string, historyContext?: string): Pro
         };
     }
 
-    let lastError: any = null;
+    let lastError: Error | null = null;
 
     // 取得最常用的標籤供 AI 選擇
     const archiveTags = await ArchiveTagEngine.getTopKeywords(15);
@@ -241,9 +241,10 @@ export async function parseUserInput(text: string, historyContext?: string): Pro
             const result = await tryGeminiModel(modelName, text, archiveTags, historyContext);
             console.log(`[AI] ✅ ${modelName} succeeded`);
             return result;
-        } catch (err: any) {
-            console.warn(`[AI] ❌ ${modelName} failed: ${err?.message}`);
-            lastError = err;
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`[AI] ❌ ${modelName} failed: ${message}`);
+            lastError = err instanceof Error ? err : new Error(message);
         }
     }
 
@@ -254,9 +255,10 @@ export async function parseUserInput(text: string, historyContext?: string): Pro
             const result = await tryGemmaModel(modelName, text, archiveTags, historyContext);
             console.log(`[AI] ✅ ${modelName} succeeded`);
             return result;
-        } catch (err: any) {
-            console.warn(`[AI] ❌ ${modelName} failed: ${err?.message}`);
-            lastError = err;
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`[AI] ❌ ${modelName} failed: ${message}`);
+            lastError = err instanceof Error ? err : new Error(message);
         }
     }
 

@@ -5,17 +5,10 @@ import { useRouter } from "next/navigation";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 
-interface CalendarEntry {
-    id: string;
-    title: string;
-    actionDate?: string;
-    actionTime?: string;
-    description?: string;
-    status: "pending" | "done";
-}
+import type { CalendarEntryView } from "@/models/schema";
 
 interface CalendarCardProps {
-    entry: CalendarEntry;
+    entry: CalendarEntryView;
 }
 
 const EDIT_FIELDS = [

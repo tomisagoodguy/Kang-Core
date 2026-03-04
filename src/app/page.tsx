@@ -5,10 +5,12 @@ import { CalendarCard } from "@/components/CalendarCard";
 import Link from "next/link";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
+import type { AccountingEntryView, ArchiveEntryView, CalendarEntryView } from "@/models/schema";
+
 
 export const dynamic = "force-dynamic";
 
-async function getAccountingEntries(limit = 5) {
+async function getAccountingEntries(limit = 5): Promise<AccountingEntryView[]> {
     try {
         const snapshot = await db
             .collection("accounting")
@@ -25,7 +27,7 @@ async function getAccountingEntries(limit = 5) {
                     data.createdAt instanceof Timestamp
                         ? data.createdAt.toDate().toISOString()
                         : null,
-            };
+            } as AccountingEntryView;
         });
     } catch (e) {
         console.error("[HomePage] Failed to fetch accounting:", e);
@@ -33,7 +35,7 @@ async function getAccountingEntries(limit = 5) {
     }
 }
 
-async function getCalendarEntries(limit = 10) {
+async function getCalendarEntries(limit = 10): Promise<CalendarEntryView[]> {
     try {
         const snapshot = await db
             .collection("calendar")
@@ -50,7 +52,7 @@ async function getCalendarEntries(limit = 10) {
                     data.createdAt instanceof Timestamp
                         ? data.createdAt.toDate().toISOString()
                         : null,
-            };
+            } as CalendarEntryView;
         });
     } catch (e) {
         console.error("[HomePage] Failed to fetch calendar:", e);
@@ -58,7 +60,7 @@ async function getCalendarEntries(limit = 10) {
     }
 }
 
-async function getArchiveEntries(limit = 5) {
+async function getArchiveEntries(limit = 5): Promise<ArchiveEntryView[]> {
     try {
         const snapshot = await db
             .collection("archive")
@@ -75,7 +77,7 @@ async function getArchiveEntries(limit = 5) {
                     data.createdAt instanceof Timestamp
                         ? data.createdAt.toDate().toISOString()
                         : null,
-            };
+            } as ArchiveEntryView;
         });
     } catch (e) {
         console.error("[HomePage] Failed to fetch archive:", e);
@@ -144,7 +146,7 @@ export default async function HomePage() {
                     </div>
                 ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
-                        {calendarEntries.map((entry: any) => (
+                        {calendarEntries.map((entry: CalendarEntryView) => (
                             <CalendarCard key={entry.id} entry={entry} />
                         ))}
                     </div>
@@ -166,7 +168,7 @@ export default async function HomePage() {
                     </div>
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                        {accountingEntries.map((entry: any) => (
+                        {accountingEntries.map((entry: AccountingEntryView) => (
                             <AccountingCard key={entry.id} entry={entry} />
                         ))}
                     </div>
@@ -188,7 +190,7 @@ export default async function HomePage() {
                     </div>
                 ) : (
                     <div className="archive-grid">
-                        {archiveEntries.map((entry: any) => (
+                        {archiveEntries.map((entry: ArchiveEntryView) => (
                             <ArchiveCard key={entry.id} entry={entry} />
                         ))}
                     </div>

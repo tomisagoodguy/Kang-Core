@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "@/lib/firebase/admin";
 import { safeExecute } from "@/lib/gemini/client";
+import type { AccountingEntry } from "@/models/schema";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -36,9 +37,10 @@ export async function generateFinancialInsights(userId: string): Promise<string>
         }
 
         // 2. Prepare data for Prompt
-        const summary = expenses.reduce((acc: any, curr: any) => {
-            acc[curr.tag] = (acc[curr.tag] || 0) + curr.amount;
-            acc.total += curr.amount;
+        const summary = expenses.reduce((acc: Record<string, number> & { total: number }, curr) => {
+            const tag = curr.tag || 'Other';
+            acc[tag] = (acc[tag] || 0) + (curr.amount || 0);
+            acc.total += (curr.amount || 0);
             return acc;
         }, { total: 0 });
 

@@ -12,7 +12,7 @@ export const TagEnum = z.enum([
     "Other",
 ]);
 
-export const SourceEnum = z.enum(["line", "manual", "system"]);
+export const SourceEnum = z.enum(["line", "manual", "system", "line-rule", "line-image", "line-file"]);
 
 export const BaseEntrySchema = z.object({
     id: z.string().optional(), // Provided by Firestore Document ID usually
@@ -27,6 +27,7 @@ export const AccountingEntrySchema = BaseEntrySchema.extend({
     subTag: z.string().optional(),
     date: z.string(), // ISO String YYYY-MM-DD
     description: z.string().optional(),
+    imageUrl: z.string().url().optional(),
 });
 
 export type AccountingEntry = z.infer<typeof AccountingEntrySchema>;
@@ -45,14 +46,15 @@ export const CalendarEntrySchema = BaseEntrySchema.extend({
     actionDate: z.string().optional(), // YYYY-MM-DD
     actionTime: z.string().optional(), // HH:mm
     description: z.string().optional(),
+    status: z.enum(["pending", "done"]).default("pending"),
+    gcalEventId: z.string().optional(),
 });
 
 export type CalendarEntry = z.infer<typeof CalendarEntrySchema>;
 
 export const FrequencyEnum = z.enum(["daily", "weekly", "monthly", "yearly"]);
 
-export const RecurringExpenseSchema = z.object({
-    id: z.string().optional(),
+export const RecurringExpenseSchema = BaseEntrySchema.extend({
     amount: z.number().positive(),
     tag: TagEnum,
     description: z.string(),
@@ -62,7 +64,6 @@ export const RecurringExpenseSchema = z.object({
     monthOfYear: z.number().min(1).max(12).optional(),
     isActive: z.boolean().default(true),
     lastTriggeredAt: z.string().optional(), // ISO String
-    createdAt: z.date().optional(),
 });
 
 export type RecurringExpense = z.infer<typeof RecurringExpenseSchema>;
@@ -121,3 +122,64 @@ export const CustomTagSchema = z.object({
 });
 
 export type CustomTag = z.infer<typeof CustomTagSchema>;
+
+// ─── Classification Rule ───────────────────────────────────
+export const ClassificationRuleSchema = z.object({
+    id: z.string().optional(),
+    keyword: z.string(),
+    tag: z.string(),
+    subTag: z.string().nullable().optional(),
+    confidence: z.number().default(0.8),
+    hitCount: z.number().default(0),
+    source: z.enum(["auto", "manual"]).default("auto"),
+    lastUsed: z.any(), // Timestamp
+    createdAt: z.any().optional(), // Timestamp
+});
+
+export type ClassificationRule = z.infer<typeof ClassificationRuleSchema>;
+
+// ─── Budget ──────────────────────────────────────────────
+export const BudgetSchema = z.object({
+    id: z.string().optional(),
+    userId: z.string(),
+    tag: z.string().nullable(), // null means total budget
+    monthlyLimit: z.number(),
+    createdAt: z.any(),
+    updatedAt: z.any().optional(),
+});
+
+export type Budget = z.infer<typeof BudgetSchema>;
+
+// ─── 前端用型別（API 回傳後 id 一定存在，createdAt 為 ISO string）─────────
+/** 前端接收的記帳資料（id 必填、createdAt 為 string） */
+export type AccountingEntryView = Omit<AccountingEntry, "id" | "createdAt" | "tag"> & {
+    id: string;
+    tag: string;
+    createdAt?: string;
+    imageUrl?: string;
+};
+
+/** 前端接收的存檔資料 */
+export type ArchiveEntryView = Omit<ArchiveEntry, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的行事曆資料 */
+export type CalendarEntryView = Omit<CalendarEntry, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的定期支出資料 */
+export type RecurringExpenseView = Omit<RecurringExpense, "id" | "createdAt" | "tag"> & {
+    id: string;
+    tag: string;
+    createdAt?: string;
+};
+
+/** 前端接收的自定義標籤資料 */
+export type CustomTagView = Omit<CustomTag, "id" | "parentTag"> & {
+    id: string;
+    parentTag: string;
+};

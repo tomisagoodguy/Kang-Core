@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db as adminDb } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
+import type { AccountingEntryView } from "@/models/schema";
 
 export async function GET(request: NextRequest) {
     try {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
 
         const snapshot = await query.get();
 
-        const entries = snapshot.docs.map((doc) => {
+        const entries: AccountingEntryView[] = snapshot.docs.map((doc) => {
             const data = doc.data();
             return {
                 id: doc.id,
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
                     data.createdAt instanceof Timestamp
                         ? data.createdAt.toDate().toISOString()
                         : data.createdAt ?? null,
-            };
+            } as AccountingEntryView;
         });
 
         return NextResponse.json({ entries, total: entries.length });

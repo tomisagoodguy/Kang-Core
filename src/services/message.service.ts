@@ -18,6 +18,7 @@ import { FileManager } from "@/lib/gemini/fileManager";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
+import type { AccountingEntry, ArchiveEntry, CalendarEntry, RecurringExpense } from "@/models/schema";
 
 export class MessageService {
     /** 內部發送訊息並紀錄到短記憶 */
@@ -56,10 +57,10 @@ export class MessageService {
                 const amountMatch = userText.match(/(\d+)/);
                 if (amountMatch) {
                     const amount = Number(amountMatch[1]);
-                    const entry = {
+                    const entry: AccountingEntry = {
                         amount,
-                        tag: ruleMatch.tag,
-                        subTag: ruleMatch.subTag || null,
+                        tag: ruleMatch.tag as any,
+                        subTag: ruleMatch.subTag ?? undefined,
                         date: new Date().toISOString().slice(0, 10),
                         description: userText,
                         originalText: userText,
@@ -98,7 +99,7 @@ export class MessageService {
 
             for (const item of list) {
                 const docRef = db.collection("accounting").doc();
-                const entry = {
+                const entry: AccountingEntry = {
                     ...item,
                     originalText: userText,
                     source: "line",
@@ -144,7 +145,7 @@ export class MessageService {
                 return null;
             });
 
-            const entry: any = {
+            const entry: ArchiveEntry & { embedding?: number[] } = {
                 ...parsedData.archiveData,
                 originalText: userText,
                 source: "line",
@@ -166,7 +167,7 @@ export class MessageService {
             }
 
         } else if (parsedData.type === "calendar" && parsedData.calendarData) {
-            const entry = {
+            const entry: CalendarEntry = {
                 ...parsedData.calendarData,
                 originalText: userText,
                 source: "line",
@@ -197,13 +198,13 @@ export class MessageService {
             await discordService.sendDiscordNotification(replyText);
 
         } else if (parsedData.type === "recurring" && parsedData.recurringData) {
-            const entry = {
+            const entry: RecurringExpense = {
                 ...parsedData.recurringData,
                 originalText: userText,
                 source: "line",
                 createdAt: new Date(),
                 isActive: true,
-            };
+            } as RecurringExpense;
 
             let freqStr: string = entry.frequency;
             if (entry.frequency === "monthly" && entry.dayOfMonth) freqStr = `每月 ${entry.dayOfMonth} 號`;
@@ -265,8 +266,9 @@ export class MessageService {
         }
 
         if (parsedData.type === "accounting" && parsedData.accountingData) {
-            const entry = {
+            const entry: AccountingEntry = {
                 ...parsedData.accountingData,
+                originalText: "[圖片分析]",
                 imageUrl: driveUrl,
                 source: "line-image",
                 createdAt: new Date(),
@@ -289,8 +291,9 @@ export class MessageService {
                 return null;
             });
 
-            const entry: any = {
+            const entry: ArchiveEntry & { embedding?: number[], imageUrl?: string } = {
                 ...parsedData.archiveData,
+                originalText: "[圖片分析]",
                 imageUrl: driveUrl,
                 source: "line-image",
                 createdAt: new Date(),
@@ -347,10 +350,11 @@ export class MessageService {
                 return null;
             });
 
-            const entry: any = {
+            const entry: ArchiveEntry & { embedding?: number[] } = {
                 title: fileName,
                 summary: `此檔案由 LINE 機器人上傳。(${aiStatusStr})`,
                 keywords: ["file", "document"],
+                originalText: `[檔案上傳: ${fileName}]`,
                 url: driveUrl,
                 source: "line-file",
                 createdAt: new Date(),

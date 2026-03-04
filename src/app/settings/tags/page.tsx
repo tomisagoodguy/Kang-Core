@@ -1,22 +1,17 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { PARENT_TAGS } from "@/utils/constants";
+import type { CustomTagView } from "@/models/schema";
 
-const PARENT_TAGS = ["Food", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Education", "Other"];
-
-interface CustomTag {
-    id: string;
-    name: string;
-    parentTag: string;
-}
 
 export default function SettingsTagsPage() {
-    const [tags, setTags] = useState<CustomTag[]>([]);
+    const [tags, setTags] = useState<CustomTagView[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<CustomTag | null>(null);
+    const [editingItem, setEditingItem] = useState<CustomTagView | null>(null);
 
     // Form state
     const [name, setName] = useState("");
@@ -41,7 +36,7 @@ export default function SettingsTagsPage() {
         fetchTags();
     }, []);
 
-    const handleOpenModal = (item?: CustomTag) => {
+    const handleOpenModal = (item?: CustomTagView) => {
         if (item) {
             setEditingItem(item);
             setName(item.name);
@@ -57,7 +52,7 @@ export default function SettingsTagsPage() {
     const handleSave = async () => {
         if (!name) return alert("請輸入標籤名稱");
 
-        const data: Partial<CustomTag> = {
+        const data: Partial<CustomTagView> = {
             name,
             parentTag,
         };

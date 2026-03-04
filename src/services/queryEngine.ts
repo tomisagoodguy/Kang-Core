@@ -2,6 +2,7 @@ import { db } from "@/lib/firebase/admin";
 import { getTagEmoji } from "@/utils/tagEmoji";
 import { RAGService } from "./rag.service";
 import { getEventsFromGoogleCalendar } from "@/lib/calendar/client";
+import type { AccountingEntry, ArchiveEntry, CalendarEntry } from "@/models/schema";
 
 interface QueryFilter {
     queryType: "expense" | "archive" | "calendar" | "semantic_search";
@@ -43,14 +44,14 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
         .where("date", "<=", range.to) as FirebaseFirestore.Query;
 
     const snapshot = await query.get();
-    let entries = snapshot.docs.map((d) => d.data());
+    let entries = snapshot.docs.map((d) => d.data() as AccountingEntry);
 
     // tag 篩選
     if (filters.tag) {
-        entries = entries.filter((e) => (e.tag as string) === filters.tag);
+        entries = entries.filter((e) => e.tag === filters.tag);
     }
 
-    const total = entries.reduce((s, e) => s + ((e.amount as number) || 0), 0);
+    const total = entries.reduce((s, e) => s + (e.amount || 0), 0);
 
     if (entries.length === 0) {
         const tagLabel = filters.tag ? `「${filters.tag}」` : "";
@@ -60,8 +61,8 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
     // 標籤統計
     const tagMap = new Map<string, number>();
     entries.forEach((e) => {
-        const tag = (e.tag as string) || "Other";
-        tagMap.set(tag, (tagMap.get(tag) || 0) + ((e.amount as number) || 0));
+        const tag = e.tag || "Other";
+        tagMap.set(tag, (tagMap.get(tag) || 0) + (e.amount || 0));
     });
 
     const tagLines = Array.from(tagMap.entries())
@@ -71,7 +72,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
 
     // 最高一筆
     const maxEntry = entries.reduce((max, e) =>
-        ((e.amount as number) || 0) > ((max.amount as number) || 0) ? e : max
+        (e.amount || 0) > (max.amount || 0) ? e : max
     );
 
     const avgAmount = Math.round(total / entries.length);
@@ -84,7 +85,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
             `📝 共 ${entries.length} 筆`,
             `💰 合計 $${total.toLocaleString()}`,
             `📈 平均每筆 $${avgAmount.toLocaleString()}`,
-            `🏆 最高: $${((maxEntry.amount as number) || 0).toLocaleString()} (${(maxEntry.description as string) || "—"})`,
+            `🏆 最高: $${(maxEntry.amount || 0).toLocaleString()} (${maxEntry.description || "—"})`,
             "",
             ...tagLines,
         ].join("\n"),
@@ -103,8 +104,8 @@ async function queryArchive(limit: number): Promise<QueryResult> {
     }
 
     const lines = snapshot.docs.map((doc, i) => {
-        const d = doc.data();
-        const title = (d.title as string) || (d.summary as string)?.slice(0, 30) || "無標題";
+        const d = doc.data() as ArchiveEntry;
+        const title = d.title || d.summary?.slice(0, 30) || "無標題";
         return `${i + 1}. ${title}`;
     });
 
@@ -158,9 +159,9 @@ async function queryCalendar(period?: string): Promise<QueryResult> {
 
     const pendingNoDates = pendingSnapshot.docs
         .filter((d) => !d.data().actionDate)
-        .map((d) => d.data());
+        .map((d) => d.data() as CalendarEntry);
 
-    const firestoreEvents = snapshot.docs.map((d) => d.data());
+    const firestoreEvents = snapshot.docs.map((d) => d.data() as CalendarEntry);
 
     // 也查 Google Calendar 原本的行程
     const gcalItems = await getEventsFromGoogleCalendar(target);
@@ -174,8 +175,8 @@ async function queryCalendar(period?: string): Promise<QueryResult> {
     }
 
     const eventLines = firestoreEvents.map((e) => {
-        const time = (e.actionTime as string) ? `⏰ ${e.actionTime} ` : "📌 ";
-        const status = (e.status as string) === "done" ? "✅" : "";
+        const time = e.actionTime ? `⏰ ${e.actionTime} ` : "📌 ";
+        const status = e.status === "done" ? "✅" : "";
         return `${time}${e.title} ${status}`;
     });
 
