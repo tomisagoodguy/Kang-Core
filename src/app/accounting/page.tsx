@@ -42,7 +42,7 @@ export default function AccountingPage() {
     const [loading, setLoading] = useState(true);
     const [selectedTag, setSelectedTag] = useState("all");
     const [selectedSubTag, setSelectedSubTag] = useState("all");
-    const [selectedMonth, setSelectedMonth] = useState("all");
+    const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
     useEffect(() => {
         const fetchData = async () => {
@@ -173,7 +173,7 @@ export default function AccountingPage() {
                         共 {filtered.length} 筆 ·
                     </span>
                     <span style={{ color: "var(--danger)", fontWeight: 700, fontSize: "1.125rem" }}>
-                        合計 ${totalAmount.toLocaleString()}
+                        {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月合計" : selectedMonth === "all" ? "歷史總計" : `${selectedMonth.slice(5)}月合計`} ${totalAmount.toLocaleString()}
                     </span>
                     <button className="card-action-btn" onClick={handleExportCSV} style={{ opacity: 1, padding: "6px 14px" }}>
                         📥 匯出 CSV
