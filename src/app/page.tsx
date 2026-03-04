@@ -91,10 +91,19 @@ export default async function HomePage() {
     ]);
 
     const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthlyEntries = accountingEntries.filter((e: any) =>
-        e.date?.startsWith(currentMonth)
-    );
-    const monthlyTotal = monthlyEntries.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+
+    // 獨立撈取當月所有記帳記錄以計算正確的總支出與筆數
+    const monthAccSnapshot = await db.collection("accounting")
+        .where("date", ">=", `${currentMonth}-01`)
+        .where("date", "<=", `${currentMonth}-31`)
+        .get();
+
+    const monthlyTotal = monthAccSnapshot.docs.reduce((sum, doc) => sum + (doc.data().amount || 0), 0);
+    const monthlyCount = monthAccSnapshot.size;
+
+    // 取得知識庫總存檔數量
+    const archiveCountRes = await db.collection("archive").count().get();
+    const archiveTotalCount = archiveCountRes.data().count;
 
     return (
         <div className="page-container">
@@ -112,13 +121,13 @@ export default async function HomePage() {
                 <StatCard
                     icon="📝"
                     label="本月記帳筆數"
-                    value={monthlyEntries.length}
+                    value={monthlyCount}
                     color="var(--warning)"
                 />
                 <StatCard
                     icon="📚"
                     label="知識庫存檔"
-                    value={archiveEntries.length}
+                    value={archiveTotalCount}
                     color="var(--accent-light)"
                 />
             </div>
