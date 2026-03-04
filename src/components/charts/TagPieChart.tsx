@@ -212,9 +212,10 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                                 background: "#16161e",
                                 border: "1px solid rgba(255,255,255,0.1)",
                                 borderRadius: "8px",
-                                color: "#f3f4f6",
+                                color: "#f3f4f6", // container text color
                                 fontSize: "0.875rem",
                             }}
+                            itemStyle={{ color: "#f3f4f6" }} // list item text color
                             formatter={(value) => [
                                 `$${Number(value).toLocaleString()} (${total > 0 ? ((Number(value) / total) * 100).toFixed(1) : 0}%)`,
                             ]}

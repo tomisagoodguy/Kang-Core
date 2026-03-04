@@ -9,7 +9,8 @@ export function InsightCard() {
     const fetchInsight = async (force: boolean = false) => {
         setLoading(true);
         try {
-            const res = await fetch("/api/insights");
+            const url = force ? "/api/insights?force=true" : "/api/insights";
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
                 setInsight(data.insight);

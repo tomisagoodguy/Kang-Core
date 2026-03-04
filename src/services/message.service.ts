@@ -85,9 +85,19 @@ export class MessageService {
 
         if (parsedData.type === "accounting" && (parsedData.accountingData || parsedData.accountingDataList)) {
             const list = parsedData.accountingDataList || (parsedData.accountingData ? [parsedData.accountingData] : []);
+
+            if (list.length === 0) {
+                await this.sendReply(userId, "⚠️ AI 判斷為記帳，但無法解析出有效金額與項目，請重新描述 (例如: 早餐 100)。");
+                return;
+            }
+
+            const batch = db.batch();
             let totalReplyText = "";
+            let totalExpense = 0;
+            let firstExpenseTag = "";
 
             for (const item of list) {
+                const docRef = db.collection("accounting").doc();
                 const entry = {
                     ...item,
                     originalText: userText,
@@ -97,17 +107,26 @@ export class MessageService {
                 const isIncome = entry.tag === "Income";
                 let replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
 
-                await db.collection("accounting").add(entry);
+                batch.set(docRef, entry);
 
-                // 學習新規則 (C9)
-                if (entry.tag && entry.tag !== "Other") {
-                    await ClassificationEngine.learn(entry.description || userText, entry.tag, entry.subTag);
+                if (!isIncome) {
+                    totalExpense += entry.amount;
+                    if (!firstExpenseTag) firstExpenseTag = entry.tag;
                 }
 
-                // 預算超支警報（非同步不等待）
-                checkBudgetAlert(userId, entry.amount, entry.date, entry.tag).catch(() => { /* 不影響主流程 */ });
+                // 學習新規則 (C9) - 使用 catch 不等待
+                if (entry.tag && entry.tag !== "Other") {
+                    ClassificationEngine.learn(entry.description || userText, entry.tag, entry.subTag).catch(() => { });
+                }
 
                 totalReplyText += replyText + "\n\n";
+            }
+
+            await batch.commit();
+
+            // 預算超支警報（針對同一批次的總花費只觸發一次）
+            if (totalExpense > 0 && firstExpenseTag) {
+                checkBudgetAlert(userId, totalExpense, list[0].date, firstExpenseTag).catch(() => { /* 不影響主流程 */ });
             }
 
             if (parsedData.explanation) {
