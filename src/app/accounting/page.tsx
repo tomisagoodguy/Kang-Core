@@ -95,6 +95,22 @@ export default function AccountingPage() {
         window.open(`/api/export/accounting?month=${currentMonth}`);
     };
 
+    // 對過濾後的結果按照日期進行群組
+    const groupedEntries = useMemo(() => {
+        const groups: Record<string, AccountingEntryView[]> = {};
+
+        filtered.forEach(entry => {
+            const date = entry.date || "未知日期";
+            if (!groups[date]) {
+                groups[date] = [];
+            }
+            groups[date].push(entry);
+        });
+
+        // 依照日期由新到舊排序
+        return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+    }, [filtered]);
+
     return (
         <div className="page-container">
             <h1 className="page-title">💳 記帳記錄</h1>
@@ -174,9 +190,35 @@ export default function AccountingPage() {
                     <p>沒有符合條件的記帳記錄</p>
                 </div>
             ) : (
-                filtered.map((entry) => (
-                    <AccountingCard key={entry.id} entry={entry} />
-                ))
+                <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                    {groupedEntries.map(([date, dailyEntries]) => {
+                        const dailyTotal = dailyEntries.reduce((sum, item) => sum + (item.amount || 0), 0);
+                        return (
+                            <div key={date}>
+                                <div style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    borderBottom: "1px solid var(--border-glass)",
+                                    paddingBottom: "10px",
+                                    marginBottom: "12px"
+                                }}>
+                                    <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                                        📅 {date}
+                                    </h3>
+                                    <span style={{ fontSize: "0.9375rem", color: "var(--text-secondary)", fontWeight: 500 }}>
+                                        日小計 / <strong style={{ color: "var(--text-primary)" }}>${dailyTotal.toLocaleString()}</strong>
+                                    </span>
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                                    {dailyEntries.map((entry) => (
+                                        <AccountingCard key={entry.id} entry={entry} />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
