@@ -36,7 +36,7 @@ export function AccountingCard({ entry }: AccountingCardProps) {
         <>
             <div className="glass-card accounting-card">
                 {entry.imageUrl && (
-                    <a href={entry.imageUrl} target="_blank" rel="noopener noreferrer">
+                    <a href={entry.imageUrl} target="_blank" rel="noopener noreferrer" style={{ alignSelf: "flex-start", marginTop: "4px" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={entry.imageUrl}
@@ -52,29 +52,37 @@ export function AccountingCard({ entry }: AccountingCardProps) {
                         />
                     </a>
                 )}
-                <span className="accounting-card-date">{entry.date}</span>
-                <span className="accounting-card-desc">
-                    {entry.description || entry.originalText || "—"}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                    <TagBadge tag={entry.tag} />
-                    {entry.subTag && (
-                        <span style={{
-                            fontSize: "0.75rem",
-                            padding: "2px 8px",
-                            background: "rgba(255,255,255,0.05)",
-                            borderRadius: "12px",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            color: "var(--text-secondary)"
-                        }}>
-                            {entry.subTag}
-                        </span>
-                    )}
+
+                <div className="accounting-card-content">
+                    <div className="accounting-card-header">
+                        <span className="accounting-card-date">{entry.date}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <TagBadge tag={entry.tag} />
+                            {entry.subTag && (
+                                <span style={{
+                                    fontSize: "0.75rem",
+                                    padding: "2px 8px",
+                                    background: "rgba(255,255,255,0.05)",
+                                    borderRadius: "12px",
+                                    border: "1px solid rgba(255,255,255,0.1)",
+                                    color: "var(--text-secondary)"
+                                }}>
+                                    {entry.subTag}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <span className="accounting-card-desc" title={entry.description || entry.originalText || "—"}>
+                        {entry.description || entry.originalText || "—"}
+                    </span>
                 </div>
-                <span className={amountClass}>${formattedAmount}</span>
-                <div className="card-actions">
-                    <button className="card-action-btn" onClick={() => setEditOpen(true)}>✏️</button>
-                    <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)}>🗑️</button>
+
+                <div className="accounting-card-right">
+                    <span className={amountClass}>${formattedAmount}</span>
+                    <div className="card-actions" style={{ marginTop: "auto" }}>
+                        <button className="card-action-btn" aria-label="Edit Entry" onClick={() => setEditOpen(true)}>✏️</button>
+                        <button className="card-action-btn danger" aria-label="Delete Entry" onClick={() => setDeleteOpen(true)}>🗑️</button>
+                    </div>
                 </div>
             </div>
 
