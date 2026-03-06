@@ -1,5 +1,6 @@
 'use client';
 
+
 import React, { useMemo, useState } from "react";
 import type { AccountingEntryView } from "@/models/schema";
 import { AccountingCard } from "./AccountingCard";
