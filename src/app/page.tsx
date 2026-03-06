@@ -100,7 +100,10 @@ export default async function HomePage() {
         .where("date", "<=", `${currentMonth}-31`)
         .get();
 
-    const monthlyTotal = monthAccSnapshot.docs.reduce((sum, doc) => sum + (doc.data().amount || 0), 0);
+    const monthDocs = monthAccSnapshot.docs.map(doc => doc.data());
+    const monthlyIncome = monthDocs.reduce((sum, data) => data.tag === "Income" ? sum + (data.amount || 0) : sum, 0);
+    const monthlyExpense = monthDocs.reduce((sum, data) => data.tag !== "Income" ? sum + (data.amount || 0) : sum, 0);
+    const monthlyNet = monthlyIncome - monthlyExpense;
     const monthlyCount = monthAccSnapshot.size;
 
     // 取得知識庫總存檔數量
@@ -115,21 +118,33 @@ export default async function HomePage() {
             {/* Stat Cards */}
             <div className="stat-grid">
                 <StatCard
+                    icon="💰"
+                    label="本月收入"
+                    value={`$${monthlyIncome.toLocaleString()}`}
+                    color="var(--success)"
+                />
+                <StatCard
                     icon="💳"
-                    label="本月總支出"
-                    value={`$${monthlyTotal.toLocaleString()}`}
+                    label="本月支出"
+                    value={`$${monthlyExpense.toLocaleString()}`}
                     color="var(--danger)"
                 />
                 <StatCard
+                    icon="⚖️"
+                    label="本月結餘"
+                    value={`$${monthlyNet.toLocaleString()}`}
+                    color={monthlyNet >= 0 ? "var(--success)" : "var(--danger)"}
+                />
+                <StatCard
                     icon="📝"
-                    label="本月記帳筆數"
-                    value={monthlyCount}
+                    label="本月記帳"
+                    value={`${monthlyCount} 筆`}
                     color="var(--warning)"
                 />
                 <StatCard
                     icon="📚"
                     label="知識庫存檔"
-                    value={archiveTotalCount}
+                    value={`${archiveTotalCount} 篇`}
                     color="var(--accent-light)"
                 />
             </div>
