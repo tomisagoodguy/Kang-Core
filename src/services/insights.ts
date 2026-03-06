@@ -37,24 +37,34 @@ export async function generateFinancialInsights(userId: string): Promise<string>
         }
 
         // 2. Prepare data for Prompt
-        const summary = expenses.reduce((acc: Record<string, number> & { total: number }, curr) => {
+        const summary = expenses.reduce((acc: any, curr) => {
             const tag = curr.tag || 'Other';
-            acc[tag] = (acc[tag] || 0) + (curr.amount || 0);
-            acc.total += (curr.amount || 0);
+            const amount = curr.amount || 0;
+            acc.distribution[tag] = (acc.distribution[tag] || 0) + amount;
+            if (tag === 'Income') {
+                acc.income += amount;
+                acc.netBalance += amount;
+            } else {
+                acc.expenses += amount;
+                acc.netBalance -= amount;
+            }
             return acc;
-        }, { total: 0 });
+        }, { netBalance: 0, income: 0, expenses: 0, distribution: {} });
 
         const prompt = `
-        你是一位專業的理財顧問。以下是使用者過去 30 天的消費摘要：
-        總支出：$${summary.total}
-        各類別支出：${JSON.stringify(summary)}
+        你是一位專業的理財顧問。以下是使用者過去 30 天的財務摘要：
+        總收入：$${summary.income}
+        總支出：$${summary.expenses}
+        淨結餘：$${summary.netBalance}
+        
+        類別分佈：${JSON.stringify(summary.distribution)}
         最近的幾筆交易：${JSON.stringify(expenses.slice(0, 10))}
 
         請提供 3 個簡短且具體理財建議或洞察（每點不超過 50 字）：
-        1. 支出趨勢分析
+        1. 收支平衡分析
         2. 需要注意的潛在過度消費
-        3. 一個具體的省錢建議
-
+        3. 一個具體的理財建議
+        
         請直接輸出這 3 點，並使用繁體中文。
         `;
 

@@ -56,7 +56,19 @@ export default function AccountingPage() {
         return tagMatch && subTagMatch && monthMatch;
     });
 
-    const totalAmount = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const { totalAmount, totalIncome, totalExpenses } = useMemo(() => {
+        return filtered.reduce((acc, e) => {
+            const amount = e.amount || 0;
+            if (e.tag === "Income") {
+                acc.totalIncome += amount;
+                acc.totalAmount += amount;
+            } else {
+                acc.totalExpenses += amount;
+                acc.totalAmount -= amount;
+            }
+            return acc;
+        }, { totalAmount: 0, totalIncome: 0, totalExpenses: 0 });
+    }, [filtered]);
 
     // 聚合：月度趨勢（近 6 個月）
     const monthlyTrend = useMemo(() => {
@@ -66,7 +78,13 @@ export default function AccountingPage() {
         entries.forEach((e) => {
             const m = e.date?.slice(0, 7);
             if (m && map.has(m)) {
-                map.set(m, (map.get(m) || 0) + (e.amount || 0));
+                const amount = e.amount || 0;
+                const current = map.get(m) || 0;
+                if (e.tag === "Income") {
+                    map.set(m, current + amount);
+                } else {
+                    map.set(m, current - amount);
+                }
             }
         });
         return months.map((month) => ({
@@ -168,13 +186,16 @@ export default function AccountingPage() {
                     ))}
                 </select>
 
-                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-                    <span style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                        共 {filtered.length} 筆 ·
-                    </span>
-                    <span style={{ color: "var(--danger)", fontWeight: 700, fontSize: "1.125rem" }}>
-                        {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月合計" : selectedMonth === "all" ? "歷史總計" : `${selectedMonth.slice(5)}月合計`} ${totalAmount.toLocaleString()}
-                    </span>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "16px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+                        <div style={{ display: "flex", gap: "12px", fontSize: "0.8125rem" }}>
+                            <span style={{ color: "var(--success)" }}>收入: ${totalIncome.toLocaleString()}</span>
+                            <span style={{ color: "var(--danger)" }}>支出: ${totalExpenses.toLocaleString()}</span>
+                        </div>
+                        <span style={{ color: totalAmount >= 0 ? "var(--success)" : "var(--danger)", fontWeight: 700, fontSize: "1.125rem" }}>
+                            {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`} {totalAmount < 0 ? '-' : ''}${Math.abs(totalAmount).toLocaleString()}
+                        </span>
+                    </div>
                     <button className="card-action-btn" onClick={handleExportCSV} style={{ opacity: 1, padding: "6px 14px" }}>
                         📥 匯出 CSV
                     </button>
@@ -231,7 +252,9 @@ export default function AccountingPage() {
                     {viewMode === "list" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                             {groupedEntries.map(([date, dailyEntries]) => {
-                                const dailyTotal = dailyEntries.reduce((sum, item) => sum + (item.amount || 0), 0);
+                                const dailyTotal = dailyEntries.reduce((sum, item) => {
+                                    return item.tag === "Income" ? sum + (item.amount || 0) : sum - (item.amount || 0);
+                                }, 0);
                                 return (
                                     <div key={date}>
                                         <div style={{
@@ -246,7 +269,7 @@ export default function AccountingPage() {
                                                 📅 {date}
                                             </h3>
                                             <span style={{ fontSize: "0.9375rem", color: "var(--text-secondary)", fontWeight: 500 }}>
-                                                日小計 / <strong style={{ color: "var(--text-primary)" }}>${dailyTotal.toLocaleString()}</strong>
+                                                日結餘 / <strong style={{ color: dailyTotal >= 0 ? "var(--success)" : "var(--danger)" }}>{dailyTotal < 0 ? '-' : ''}${Math.abs(dailyTotal).toLocaleString()}</strong>
                                             </span>
                                         </div>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>

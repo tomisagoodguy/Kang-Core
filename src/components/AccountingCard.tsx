@@ -23,14 +23,16 @@ export function AccountingCard({ entry }: AccountingCardProps) {
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
 
-    const amountClass =
-        entry.amount >= 1000
+    const isIncome = entry.tag === "Income";
+    const amountClass = isIncome
+        ? "accounting-card-amount low" // low class uses --success color
+        : entry.amount >= 1000
             ? "accounting-card-amount high"
             : entry.amount >= 500
                 ? "accounting-card-amount medium"
                 : "accounting-card-amount low";
 
-    const formattedAmount = entry.amount.toLocaleString();
+    const formattedAmount = `${isIncome ? "+" : "-"}$${entry.amount.toLocaleString()}`;
 
     return (
         <>
@@ -78,7 +80,7 @@ export function AccountingCard({ entry }: AccountingCardProps) {
                 </div>
 
                 <div className="accounting-card-right">
-                    <span className={amountClass}>${formattedAmount}</span>
+                    <span className={amountClass}>{formattedAmount}</span>
                     <div className="card-actions" style={{ marginTop: "auto" }}>
                         <button className="card-action-btn" aria-label="Edit Entry" onClick={() => setEditOpen(true)}>✏️</button>
                         <button className="card-action-btn danger" aria-label="Delete Entry" onClick={() => setDeleteOpen(true)}>🗑️</button>

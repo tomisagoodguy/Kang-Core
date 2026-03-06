@@ -143,7 +143,7 @@ export default function RecurringPage() {
     return (
         <div className="page-container">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h1 className="page-title">🔁 定期/固定支出</h1>
+                <h1 className="page-title">🔁 定期/固定收支</h1>
                 <button
                     onClick={() => handleOpenModal()}
                     style={{
@@ -156,7 +156,7 @@ export default function RecurringPage() {
                         cursor: "pointer"
                     }}
                 >
-                    ＋ 新增定期支出
+                    ＋ 新增定期項目
                 </button>
             </div>
 
@@ -186,7 +186,7 @@ export default function RecurringPage() {
                                     <strong>頻率:</strong> {formatFreq(e)}
                                 </p>
                                 <p className="card-text">
-                                    <strong>金額:</strong> <span style={{ color: "var(--danger)", fontWeight: "bold" }}>${e.amount}</span>
+                                    <strong>金額:</strong> <span style={{ color: e.tag === "Income" ? "var(--success)" : "var(--danger)", fontWeight: "bold" }}>${e.amount}</span>
                                 </p>
                                 {e.lastTriggeredAt && (
                                     <p className="card-date" style={{ marginTop: "4px" }}>
@@ -221,7 +221,7 @@ export default function RecurringPage() {
                         background: "var(--card-bg)", padding: "24px", borderRadius: "16px", width: "100%", maxWidth: "400px",
                         boxShadow: "0 8px 32px var(--shadow-color)"
                     }}>
-                        <h2 style={{ marginBottom: "16px", color: "var(--text-primary)" }}>{editingItem ? "編輯定期支出" : "新增定期支出"}</h2>
+                        <h2 style={{ marginBottom: "16px", color: "var(--text-primary)" }}>{editingItem ? "編輯定期項目" : "新增定期項目"}</h2>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                             <input

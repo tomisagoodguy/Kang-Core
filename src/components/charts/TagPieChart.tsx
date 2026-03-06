@@ -46,6 +46,7 @@ const TAG_COLORS: Record<string, string> = {
     Shopping: "#8b5cf6",
     Health: "#10b981",
     Education: "#f97316",
+    Income: "#22c55e",
     Other: "#6b7280",
 };
 

@@ -31,7 +31,7 @@ export function MonthlyTrendChart({ data }: MonthlyTrendChartProps) {
     return (
         <div className="glass-card" style={{ padding: "24px" }}>
             <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "16px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                📈 月度支出趨勢
+                📈 月度結餘趨勢
             </h3>
             <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -52,7 +52,7 @@ export function MonthlyTrendChart({ data }: MonthlyTrendChartProps) {
                         tick={{ fill: "#9ca3af", fontSize: 12 }}
                         axisLine={false}
                         tickLine={false}
-                        tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                        tickFormatter={(v: number) => `${v < 0 ? '-' : ''}$${Math.abs(v / 1000).toFixed(0)}k`}
                     />
                     <Tooltip
                         contentStyle={{
@@ -62,7 +62,7 @@ export function MonthlyTrendChart({ data }: MonthlyTrendChartProps) {
                             color: "#f3f4f6",
                             fontSize: "0.875rem",
                         }}
-                        formatter={(value) => [`$${Number(value).toLocaleString()}`, "支出"]}
+                        formatter={(value) => [`${Number(value) < 0 ? '-' : ''}$${Math.abs(Number(value)).toLocaleString()}`, "結餘"]}
                     />
                     <Line
                         type="monotone"

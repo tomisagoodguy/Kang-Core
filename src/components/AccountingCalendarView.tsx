@@ -40,7 +40,11 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
                     const dayNum = parseInt(dayMatch, 10);
                     if (mapping[dayNum]) {
                         mapping[dayNum].push(entry);
-                        totalMonth += (entry.amount || 0);
+                        if (entry.tag === "Income") {
+                            totalMonth += (entry.amount || 0);
+                        } else {
+                            totalMonth -= (entry.amount || 0);
+                        }
                     }
                 }
             }
@@ -67,8 +71,8 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
             <div className="glass-card" style={{ padding: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
                     <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>📅 行事曆 ({validMonth})</h2>
-                    <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--danger)" }}>
-                        月合計: ${totalMonthAmount.toLocaleString()}
+                    <span style={{ fontSize: "1.1rem", fontWeight: 600, color: totalMonthAmount >= 0 ? "var(--success)" : "var(--danger)" }}>
+                        月結餘: {totalMonthAmount < 0 ? '-' : ''}${Math.abs(totalMonthAmount).toLocaleString()}
                     </span>
                 </div>
 
@@ -96,7 +100,9 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
 
                         const dayStr = `${validMonth}-${day.toString().padStart(2, '0')}`;
                         const dayEntries = mappedEntries[day];
-                        const dayTotal = dayEntries.reduce((sum, e) => sum + (e.amount || 0), 0);
+                        const dayTotal = dayEntries.reduce((sum, e) => {
+                            return e.tag === "Income" ? sum + (e.amount || 0) : sum - (e.amount || 0);
+                        }, 0);
                         const isSelected = selectedDate === dayStr;
                         const isToday = dayStr === new Date().toISOString().slice(0, 10);
 
@@ -123,9 +129,9 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
                                     fontWeight: isToday ? 800 : 600,
                                     color: isToday ? "var(--accent-light)" : "inherit"
                                 }}>{day}</span>
-                                {dayTotal > 0 && (
-                                    <span style={{ fontSize: "0.85rem", color: "var(--danger)", fontWeight: 700, marginTop: "auto" }}>
-                                        ${dayTotal.toLocaleString()}
+                                {dayEntries.length > 0 && (
+                                    <span style={{ fontSize: "0.85rem", color: dayTotal >= 0 ? "var(--success)" : "var(--danger)", fontWeight: 700, marginTop: "auto" }}>
+                                        {dayTotal < 0 ? '-' : ''}${Math.abs(dayTotal).toLocaleString()}
                                     </span>
                                 )}
                                 {dayEntries.length > 0 && (
