@@ -7,6 +7,7 @@ import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { TagPieChart } from "@/components/charts/TagPieChart";
 import { ALL_TAGS } from "@/utils/constants";
 import type { AccountingEntryView, CustomTag } from "@/models/schema";
+import { AccountingCalendarView } from "@/components/AccountingCalendarView";
 
 const ALL_MONTHS = () => {
     const months = [];
@@ -25,6 +26,7 @@ export default function AccountingPage() {
     const [selectedTag, setSelectedTag] = useState("all");
     const [selectedSubTag, setSelectedSubTag] = useState("all");
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+    const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -190,35 +192,76 @@ export default function AccountingPage() {
                     <p>沒有符合條件的記帳記錄</p>
                 </div>
             ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-                    {groupedEntries.map(([date, dailyEntries]) => {
-                        const dailyTotal = dailyEntries.reduce((sum, item) => sum + (item.amount || 0), 0);
-                        return (
-                            <div key={date}>
-                                <div style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    borderBottom: "1px solid var(--border-glass)",
-                                    paddingBottom: "10px",
-                                    marginBottom: "12px"
-                                }}>
-                                    <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-primary)" }}>
-                                        📅 {date}
-                                    </h3>
-                                    <span style={{ fontSize: "0.9375rem", color: "var(--text-secondary)", fontWeight: 500 }}>
-                                        日小計 / <strong style={{ color: "var(--text-primary)" }}>${dailyTotal.toLocaleString()}</strong>
-                                    </span>
-                                </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-                                    {dailyEntries.map((entry) => (
-                                        <AccountingCard key={entry.id} entry={entry} />
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                <>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
+                        <div style={{ display: "flex", background: "var(--bg-glass)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                            <button
+                                onClick={() => setViewMode("list")}
+                                style={{
+                                    padding: "6px 16px",
+                                    borderRadius: "6px",
+                                    border: "none",
+                                    background: viewMode === "list" ? "var(--primary)" : "transparent",
+                                    color: viewMode === "list" ? "white" : "var(--text-secondary)",
+                                    fontWeight: viewMode === "list" ? 600 : 500,
+                                    cursor: "pointer",
+                                    transition: "all 0.2s"
+                                }}
+                            >
+                                📄 列表
+                            </button>
+                            <button
+                                onClick={() => setViewMode("calendar")}
+                                style={{
+                                    padding: "6px 16px",
+                                    borderRadius: "6px",
+                                    border: "none",
+                                    background: viewMode === "calendar" ? "var(--primary)" : "transparent",
+                                    color: viewMode === "calendar" ? "white" : "var(--text-secondary)",
+                                    fontWeight: viewMode === "calendar" ? 600 : 500,
+                                    cursor: "pointer",
+                                    transition: "all 0.2s"
+                                }}
+                            >
+                                📅 日曆
+                            </button>
+                        </div>
+                    </div>
+
+                    {viewMode === "list" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                            {groupedEntries.map(([date, dailyEntries]) => {
+                                const dailyTotal = dailyEntries.reduce((sum, item) => sum + (item.amount || 0), 0);
+                                return (
+                                    <div key={date}>
+                                        <div style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            borderBottom: "1px solid var(--border-glass)",
+                                            paddingBottom: "10px",
+                                            marginBottom: "12px"
+                                        }}>
+                                            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                                                📅 {date}
+                                            </h3>
+                                            <span style={{ fontSize: "0.9375rem", color: "var(--text-secondary)", fontWeight: 500 }}>
+                                                日小計 / <strong style={{ color: "var(--text-primary)" }}>${dailyTotal.toLocaleString()}</strong>
+                                            </span>
+                                        </div>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                                            {dailyEntries.map((entry) => (
+                                                <AccountingCard key={entry.id} entry={entry} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <AccountingCalendarView entries={filtered} currentMonth={selectedMonth} />
+                    )}
+                </>
             )}
         </div>
     );
