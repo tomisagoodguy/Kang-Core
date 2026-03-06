@@ -10,6 +10,9 @@ const navLinks = [
     { href: "/", label: "首頁" },
     { href: "/accounting", label: "📊 記帳" },
     { href: "/archive", label: "📚 存檔" },
+];
+
+const settingsLinks = [
     { href: "/recurring", label: "🔁 定期" },
     { href: "/settings/tags", label: "🏷️ 標籤" },
     { href: "/settings/rules", label: "⚙️ 規則" },
@@ -37,6 +40,26 @@ export function Navbar() {
                         {link.label}
                     </Link>
                 ))}
+
+                {/* 設定下拉選單 */}
+                <div className="navbar-dropdown">
+                    <div className={`navbar-link ${settingsLinks.some(link => pathname === link.href) ? "active" : ""}`} style={{ cursor: "default" }}>
+                        ⚙️ 設定
+                    </div>
+                    <div className="navbar-dropdown-content">
+                        {settingsLinks.map((link) => (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className={`navbar-link ${pathname === link.href ? "active" : ""}`}
+                                style={{ margin: "2px 8px", width: "auto" }}
+                            >
+                                {link.label}
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+
                 <ThemeToggle />
                 {user && (
                     <button
