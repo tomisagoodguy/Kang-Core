@@ -33,22 +33,23 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
                 "　　例：/記 150 午餐",
                 "",
                 "🔍 /查 本月",
-                "　　/查 上月",
-                "　　/查 本週",
-                "　　/查 上週",
+                "　　/查 上月 / 本週 / 上週",
                 "",
                 "📌 /待 {標題}",
                 "　　例：/待 繳電費",
                 "",
-                "🧠 /洞察",
-                "　　例：AI 分析近期消費狀況",
+                "🧵 /threads 追蹤 {帳號}",
+                "　　例：/threads 追蹤 hogan.tech",
+                "🧵 /threads 取消 {帳號}",
+                "　　例：/threads 取消 hogan.tech",
+                "� /threads 清單",
+                "　　查看目前追蹤的 Threads 創作者",
                 "",
-                "📁 /recent_files",
-                "　　查看最近上傳的 5 個檔案",
+                "🧠 /洞察　　AI 分析消費",
+                "📁 /recent_files　查看最近檔案",
                 "",
                 "💡 不用指令也行，直接打字",
                 "　　我會用 AI 自動判斷意圖",
-                "　　或貼收據截圖我也能讀喔！",
             ].join("\n"),
         };
     }
@@ -101,6 +102,23 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
     const budgetSetMatch = trimmed.match(/^\/預算\s+設定\s+(\d+)$/);
     if (budgetSetMatch) {
         return await handleBudgetSet(userId, Number(budgetSetMatch[1]));
+    }
+
+    // /threads 追蹤 {username}
+    const threadsAddMatch = trimmed.match(/^\/threads\s+追蹤\s+@?([\w.]+)$/i);
+    if (threadsAddMatch) {
+        return await handleThreadsAdd(threadsAddMatch[1]);
+    }
+
+    // /threads 取消 {username}
+    const threadsRemoveMatch = trimmed.match(/^\/threads\s+取消\s+@?([\w.]+)$/i);
+    if (threadsRemoveMatch) {
+        return await handleThreadsRemove(threadsRemoveMatch[1]);
+    }
+
+    // /threads 清單
+    if (/^\/threads\s+清單$/i.test(trimmed)) {
+        return await handleThreadsList();
     }
 
     // 未知指令
@@ -409,5 +427,102 @@ async function handleBudgetSet(userId: string, amount: number): Promise<QuickCom
         };
     } catch {
         return { handled: true, replyText: "⚠️ 設定預算失敗" };
+    }
+}
+
+// ─── Threads 管理指令 ─────────────────────────────
+
+/** /threads 追蹤 {username} */
+async function handleThreadsAdd(username: string): Promise<QuickCommandResult> {
+    try {
+        const cleanUsername = username.replace(/^@/, "").toLowerCase();
+        // Upsert：用 username 當 doc ID 避免重複
+        await db.collection("threads_users").doc(cleanUsername).set({
+            username: cleanUsername,
+            maxPosts: 10,
+            addedAt: new Date(),
+            source: "line-bot",
+        }, { merge: true });
+
+        return {
+            handled: true,
+            replyText: [
+                "✅ 已加入 Threads 追蹤",
+                "━━━━━━━━━━━━",
+                `🧵 @${cleanUsername}`,
+                "",
+                "下次爬蟲執行時開始監控。",
+                "有新貼文我會直接推播到此！",
+            ].join("\n"),
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 新增追蹤失敗，請稍後再試" };
+    }
+}
+
+/** /threads 取消 {username} */
+async function handleThreadsRemove(username: string): Promise<QuickCommandResult> {
+    try {
+        const cleanUsername = username.replace(/^@/, "").toLowerCase();
+        const docRef = db.collection("threads_users").doc(cleanUsername);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            return {
+                handled: true,
+                replyText: `❌ 找不到追蹤的 @${cleanUsername}\n\n用 /threads 清單 查看目前的追蹤名單`,
+            };
+        }
+
+        await docRef.delete();
+
+        return {
+            handled: true,
+            replyText: [
+                "🗑️ 已取消 Threads 追蹤",
+                "━━━━━━━━━━━━",
+                `🧵 @${cleanUsername}`,
+            ].join("\n"),
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 取消追蹤失敗，請稍後再試" };
+    }
+}
+
+/** /threads 清單 */
+async function handleThreadsList(): Promise<QuickCommandResult> {
+    try {
+        const snapshot = await db.collection("threads_users").orderBy("addedAt", "asc").get();
+
+        if (snapshot.empty) {
+            return {
+                handled: true,
+                replyText: [
+                    "🧵 目前沒有透過 LINE 新增的追蹤",
+                    "",
+                    "用以下指令新增：",
+                    "/threads 追蹤 hogan.tech",
+                ].join("\n"),
+            };
+        }
+
+        const lines = snapshot.docs.map((d, i) => {
+            const data = d.data();
+            return `${i + 1}. @${data.username}`;
+        });
+
+        return {
+            handled: true,
+            replyText: [
+                `🧵 Threads 追蹤清單（${snapshot.size} 位）`,
+                "━━━━━━━━━━━━",
+                ...lines,
+                "",
+                "新增：/threads 追蹤 {帳號}",
+                "取消：/threads 取消 {帳號}",
+            ].join("\n"),
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 讀取清單失敗，請稍後再試" };
     }
 }
