@@ -1,0 +1,63 @@
+name: 🧵 Threads Scraper Daily
+
+on:
+  schedule:
+    # 每天 09:00 UTC+8 = 01:00 UTC 執行
+    - cron: "0 1 * * *"
+    # 備用：每天 21:00 UTC+8（午後補抓）
+    - cron: "0 13 * * *"
+  workflow_dispatch:  # 支援手動觸發（GitHub UI 上的 Run workflow 按鈕）
+    inputs:
+      debug:
+        description: "Print extra debug info"
+        required: false
+        default: "false"
+
+jobs:
+  scrape:
+    name: Run threads-scraper
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: services/threads-scraper
+
+    steps:
+      # ── 1. Checkout 代碼 ────────────────────────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. 安裝 uv（Python 套件管理器）────────────────────────────────────
+      - name: ⚡ Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      # ── 3. 安裝 Python 依賴 ─────────────────────────────────────────────────
+      - name: 📦 Install dependencies
+        run: uv sync
+
+      # ── 4. 安裝 Playwright Chromium ─────────────────────────────────────────
+      - name: 🌐 Install Playwright browsers
+        run: uv run playwright install chromium --with-deps
+
+      # ── 5. 執行爬蟲（單次）────────────────────────────────────────────────
+      - name: 🧵 Run Threads scraper
+        run: uv run python run_scheduler.py run
+        env:
+          # Kang-Core Vercel Webhook 端點
+          KANG_CORE_WEBHOOK_URL: ${{ secrets.KANG_CORE_WEBHOOK_URL }}
+          # 關閉 localhost webhook（強制使用 KANG_CORE_WEBHOOK_URL）
+          # 以下為可選的額外覆蓋設定
+          EXPLORE_ENABLED: "false"   # GitHub Actions 關閉探索模式（節省時間）
+          DISCOVERY_ENABLED: "true"
+
+      # ── 6. 上傳 logs（失敗時方便 debug）───────────────────────────────────
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-logs-${{ github.run_id }}
+          path: services/threads-scraper/*.log
+          retention-days: 7

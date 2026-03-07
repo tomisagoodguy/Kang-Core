@@ -93,6 +93,21 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
             "name": "LINE 通知"
         })
 
+    # Kang-Core Next.js Webhook（優先使用環境變數）
+    kang_webhook = os.getenv("KANG_CORE_WEBHOOK_URL")
+    if kang_webhook:
+        # 移除 config.yaml 中的 localhost webhook，換成正式環境
+        if "notifications" in config and "webhooks" in config["notifications"]:
+            config["notifications"]["webhooks"] = [
+                w for w in config["notifications"]["webhooks"]
+                if "localhost" not in w.get("url", "")
+            ]
+        webhooks.append({
+            "url": kang_webhook,
+            "type": "generic",
+            "name": "Kang-Core Production"
+        })
+
     if webhooks:
         if "notifications" not in config:
             config["notifications"] = {}
