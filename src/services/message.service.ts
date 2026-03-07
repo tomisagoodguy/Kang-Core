@@ -37,6 +37,14 @@ export class MessageService {
 
         // 寫入 User 紀錄（背景執行不阻擋）
         SessionService.addMessage(userId, "user", userText).catch(console.error);
+
+        // ── Threads URL 口語化識別（最優先，在 Gemini 之前）────────────────
+        const threadsResult = await detectThreadsIntent(userText, userId);
+        if (threadsResult) {
+            await this.sendReply(userId, threadsResult);
+            return;
+        }
+
         // 快速指令攔截（/記, /查, /待, /help）— 不走 Gemini
         const quickResult = await parseQuickCommand(userText, userId);
         if (quickResult.handled) {
@@ -424,3 +432,90 @@ export class MessageService {
 }
 
 export const messageService = new MessageService();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Threads 口語化識別層
+// 支援：貼連結 + 說話、直接傳 @帳號、口語自然語言
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 從各種輸入格式中識別 Threads 追蹤意圖
+ * @returns 回覆文字，如果不是 Threads 相關則回 null
+ */
+async function detectThreadsIntent(text: string, _userId: string): Promise<string | null> {
+    const lower = text.toLowerCase().trim();
+
+    // ── Step 1: 嘗試從文字中提取 Threads username ──────────────────────────
+    let extractedUsername: string | null = null;
+
+    // 情況 A：貼 threads.net URL
+    // 例：https://www.threads.net/@hogan.tech 或 https://www.threads.net/hogan.tech
+    const urlMatch = text.match(/threads\.net\/@?([\w.]+)/i);
+    if (urlMatch) {
+        extractedUsername = urlMatch[1].replace(/^@/, "");
+    }
+
+    // 情況 B：直接寫 @帳號（但不是 threads URL）
+    // 例：@hogan.tech 追蹤他
+    if (!extractedUsername) {
+        const atMatch = text.match(/@([\w.]+)/);
+        if (atMatch) {
+            extractedUsername = atMatch[1];
+        }
+    }
+
+    // ── Step 2: 判斷意圖（追蹤 or 取消）──────────────────────────────────
+    const isAdd = /追蹤|追|follow|訂閱|監控|加入/.test(lower);
+    const isRemove = /取消|移除|刪除|停止|unfollow|不追|不要追/.test(lower);
+    const isList = /清單|列表|查看追蹤|有哪些|list/.test(lower) && /thread/i.test(lower);
+
+    // ── Step 3: 處理邏輯 ─────────────────────────────────────────────────
+    const { db } = await import("@/lib/firebase/admin");
+
+    // 查看清單
+    if (isList && !extractedUsername) {
+        const snapshot = await db.collection("threads_users").orderBy("addedAt", "asc").get();
+        if (snapshot.empty) {
+            return "🧵 目前追蹤清單是空的\n\n傳 Threads 帳號連結給我，說「追蹤他」就能加入！";
+        }
+        const lines = snapshot.docs.map((d, i) => `${i + 1}. @${d.data().username}`);
+        return [`🧵 Threads 追蹤清單（${snapshot.size} 位）`, "━━━━━━━━━━━━", ...lines].join("\n");
+    }
+
+    // 有辨識到帳號
+    if (extractedUsername) {
+        const username = extractedUsername.toLowerCase();
+
+        // 明確取消
+        if (isRemove) {
+            const docRef = db.collection("threads_users").doc(username);
+            const doc = await docRef.get();
+            if (!doc.exists) {
+                return `❌ 找不到追蹤的 @${username}\n\n輸入「/threads 清單」查看目前的追蹤名單`;
+            }
+            await docRef.delete();
+            return `🗑️ 已取消追蹤 @${username}`;
+        }
+
+        // 預設為追蹤（有 URL 或有 isAdd 關鍵字，或只傳 @帳號）
+        if (isAdd || urlMatch || (!isRemove)) {
+            await db.collection("threads_users").doc(username).set({
+                username,
+                maxPosts: 10,
+                addedAt: new Date(),
+                source: "line-natural",
+            }, { merge: true });
+
+            return [
+                "✅ 已加入 Threads 追蹤",
+                "━━━━━━━━━━━━",
+                `🧵 @${username}`,
+                "",
+                "下次爬蟲執行時開始監控，",
+                "有新貼文我會直接推播給你！",
+            ].join("\n");
+        }
+    }
+
+    return null; // 不是 Threads 相關，繼續往下正常處理
+}
