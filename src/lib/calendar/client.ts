@@ -52,7 +52,7 @@ export async function getUpcomingEventsFromGoogleCalendar(days: number = 7) {
             calendarId,
             timeMin,
             timeMax,
-            maxResults: 20,
+            maxResults: 50,
             singleEvents: true,
             orderBy: "startTime",
         });
@@ -60,6 +60,34 @@ export async function getUpcomingEventsFromGoogleCalendar(days: number = 7) {
         return res.data.items || [];
     } catch (e: any) {
         console.error("Failed to fetch upcoming events from Google Calendar:", e.message || e);
+        return [];
+    }
+}
+
+export async function getMonthlyEventsFromGoogleCalendar(year: number, month: number) {
+    const calendar = getCalendarClient();
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+
+    // month is 1-12
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const timeMin = startDate.toISOString();
+    const timeMax = endDate.toISOString();
+
+    try {
+        const res = await calendar.events.list({
+            calendarId,
+            timeMin,
+            timeMax,
+            maxResults: 200,
+            singleEvents: true,
+            orderBy: "startTime",
+        });
+
+        return res.data.items || [];
+    } catch (e: any) {
+        console.error("Failed to fetch monthly events from Google Calendar:", e.message || e);
         return [];
     }
 }

@@ -10,6 +10,7 @@ const navLinks = [
     { href: "/", label: "首頁" },
     { href: "/accounting", label: "📊 記帳" },
     { href: "/archive", label: "📚 存檔" },
+    { href: "/calendar", label: "🗓️ 日曆" },
 ];
 
 const settingsLinks = [
