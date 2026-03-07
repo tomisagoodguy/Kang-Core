@@ -29,6 +29,7 @@ export async function POST(req: Request) {
                 replyCount: post.reply_count || 0,
                 isDiscovery: false,
                 source: "threads",
+                originalText: post.text || "",
             };
 
             const parsedData = ThreadsEntrySchema.safeParse(mappedData);
