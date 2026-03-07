@@ -1,0 +1,223 @@
+# Threads Scraper 排程設定檔
+
+# ── 追蹤設定 ──────────────────────────────────────────────
+
+# 追蹤特定用戶的最新貼文 - AI/科技領域
+users:
+  # 科技領袖
+  - username: "zuck"           # Mark Zuckerberg (5.4M followers)
+    max_posts: 10
+
+  # AI 相關
+  - username: "aiatmeta"       # Meta AI 官方帳號
+    max_posts: 10
+  - username: "ai.news.daily"  # AI 新聞與科技
+    max_posts: 10
+  - username: "power.ai"       # AI 工具 (800K+ followers)
+    max_posts: 10
+
+  # 科技媒體
+  - username: "verge"          # The Verge (632.5K followers)
+    max_posts: 10
+  - username: "sokane1"        # TechCrunch 資深記者
+    max_posts: 5
+
+  # 繁體中文科技/科學
+  - username: "fox.hsiao"      # Fox Hsiao - INSIDE 創辦人、AI/區塊鏈/科技
+    max_posts: 10
+  - username: "sa_taiwan"      # 科學人 (台灣)
+    max_posts: 10
+
+  # 自動發現的繁體中文科技用戶（2026-02-26）
+  - username: "learn.ai_tools" # AI工具與自動化（平均 5,116 讚）⭐
+    max_posts: 10
+  - username: "hogan.tech"     # 軟體開發、程式設計（平均 4,544 讚）⭐
+    max_posts: 10
+  - username: "gaozishifenzi"  # 機器學習、深度學習（平均 1,816 讚）
+    max_posts: 10
+  - username: "chris.data.life" # 機器學習、深度學習（5 篇，平均 492 讚）
+    max_posts: 10
+  - username: "xxpriscillaxuxx" # 機器學習、深度學習（平均 494 讚）
+    max_posts: 10
+  - username: "techtip_s"      # AI寫作、自動化（平均 398 讚）
+    max_posts: 10
+  - username: "meow.coder"     # RAG、開源（平均 49 讚）
+    max_posts: 10
+  - username: "focaccia_ai"    # 大語言模型（平均 16 讚）
+    max_posts: 10
+
+  # 其他（可選，需自行在 Threads 確認）
+  # - username: "bnextmedia"    # 數位時代
+  #   max_posts: 10
+  # - username: "inside_tw"     # INSIDE 硬塞的網路趨勢觀察
+  #   max_posts: 10
+  # - username: "techcrunch"
+  #   max_posts: 10
+
+# 追蹤特定貼文的新回覆
+threads:
+  # - url: "https://www.threads.net/t/XXXXX"
+  #   check_replies: true
+
+# 關鍵字搜尋 - AI、軟體開發、數位產品、Agent 相關
+keywords:
+  # AI 相關
+  - "AI"
+  - "人工智慧"
+  - "機器學習"
+  - "深度學習"
+  - "ChatGPT"
+  - "Claude"
+  - "GPT"
+  - "LLM"
+  - "Gemini"
+
+  # Agent 相關
+  - "agent"
+  - "agents"
+  - "AI agent"
+  - "智能代理"
+  - "自動化"
+
+  # 軟體開發
+  - "開發"
+  - "編程"
+  - "程式"
+  - "code"
+  - "coding"
+  - "developer"
+  - "programming"
+  - "軟體"
+  - "software"
+  - "API"
+  - "framework"
+
+  # 程式語言
+  - "Python"
+  - "JavaScript"
+  - "TypeScript"
+  - "React"
+  - "Node.js"
+
+  # 數位產品
+  - "產品"
+  - "product"
+  - "SaaS"
+  - "app"
+  - "應用"
+  - "平台"
+  - "startup"
+  - "新創"
+
+  # 工具與平台
+  - "GitHub"
+  - "開源"
+  - "open source"
+  - "tech"
+  - "技術"
+
+# ── 探索模式 ──────────────────────────────────────────────
+# 自動搜尋新的貼文（不限於追蹤的用戶）
+
+explore:
+  # 是否啟用探索模式（關閉，因為內容太雜亂）
+  enabled: false
+
+  # 每次向下滾動次數（每次約 10-15 篇貼文）
+  max_scrolls: 5
+
+  # 說明：
+  # - 抓取 Threads 探索頁面的熱門/推薦貼文
+  # - 會自動過濾關鍵字
+  # - 高互動貼文的作者會被自動發現並追蹤
+
+# ── 排程設定 ──────────────────────────────────────────────
+
+schedule:
+  # 每日執行時間（24小時制）
+  daily_at: "09:00"
+
+  # 或者使用 cron 表達式（進階用法）
+  # cron: "0 9 * * *"  # 每天早上 9:00
+
+# ── 資料庫設定 ──────────────────────────────────────────────
+
+database:
+  path: "threads_data.db"
+
+# ── 通知設定 ──────────────────────────────────────────────
+
+notifications:
+  enabled: true  # 已整合 Kang-Core Webhook Bridge
+
+  # Webhook 設定
+  webhooks:
+    # ── Kang-Core Next.js 整合 ────────────────────────────────────────────────
+    # 本地開發時使用 localhost，部署後換成正式網域
+    - url: "http://localhost:3000/api/webhooks/threads"
+      type: "generic"
+      name: "Kang-Core 本地"
+
+    # 正式環境（在 Vercel 部署後取消此行的 # 並填入你的網址）
+    # - url: "https://YOUR_DOMAIN.vercel.app/api/webhooks/threads"
+    #   type: "generic"
+    #   name: "Kang-Core Production"
+
+    # ── 其他通知平台（選填）─────────────────────────────────────────────────
+    # Discord Webhook
+    # - url: "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+    #   type: "discord"
+    #   name: "Threads Discord"
+
+    # LINE Notify（與 Kang-Core LINE Bot 並行，可選擇擇一）
+    # - url: "YOUR_LINE_NOTIFY_TOKEN"
+    #   type: "line"
+    #   name: "Threads LINE Notify"
+
+  # 通知條件
+  notify_on:
+    new_posts: true      # 新貼文
+    new_replies: true    # 新回覆
+    keyword_match: true  # 關鍵字配對
+
+# ── 自動發現設定 ──────────────────────────────────────────────
+
+discovery:
+  # 是否啟用自動發現優質發文者（Demo：現在開啟）
+  enabled: true
+
+  # 發現條件
+  min_like_count: 50         # 最低平均按讚數（Demo 降低門檻）
+  min_reply_count: 5         # 最低平均回覆數
+  min_posts: 2               # 最少貼文數量
+
+  # 每次最多自動追蹤幾個新用戶
+  max_new_users_per_run: 3
+
+  # 是否自動加入追蹤（若為 false，只會列出但不會自動追蹤）
+  auto_track: true
+
+  # 清理不活躍用戶（超過 N 天未抓取）
+  cleanup_inactive_days: 60
+
+# ── 進階設定 ──────────────────────────────────────────────
+
+advanced:
+  # 是否顯示瀏覽器視窗（除錯用）
+  headless: true
+
+  # 抓取間隔設定（避免被當作機器人）
+  delay_between_requests: 5      # 基本延遲（秒）
+  random_delay: true              # 啟用隨機延遲（更像人類）
+  random_delay_min: 3             # 隨機延遲最小值（秒）
+  random_delay_max: 10            # 隨機延遲最大值（秒）
+
+  # 錯誤處理
+  max_retries: 3                  # 失敗重試次數
+  retry_delay: 30                 # 重試間隔（秒）
+
+  # 請求限制（每小時最多抓取幾個用戶）
+  max_requests_per_hour: 20
+
+  # 去重時間範圍（天），超過此時間的貼文不會重複通知
+  dedup_days: 7

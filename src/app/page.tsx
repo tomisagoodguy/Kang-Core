@@ -2,10 +2,11 @@ import { StatCard } from "@/components/StatCard";
 import { AccountingCard } from "@/components/AccountingCard";
 import { ArchiveCard } from "@/components/ArchiveCard";
 import { CalendarCard } from "@/components/CalendarCard";
+import { ThreadsCard } from "@/components/ThreadsCard";
 import Link from "next/link";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
-import type { AccountingEntryView, ArchiveEntryView, CalendarEntryView } from "@/models/schema";
+import type { AccountingEntryView, ArchiveEntryView, CalendarEntryView, ThreadsEntryView } from "@/models/schema";
 
 
 export const dynamic = "force-dynamic";
@@ -139,11 +140,37 @@ async function getArchiveEntries(limit = 5): Promise<ArchiveEntryView[]> {
     }
 }
 
+async function getThreadsEntries(limit = 6): Promise<ThreadsEntryView[]> {
+    try {
+        const snapshot = await db
+            .collection("threads")
+            .orderBy("createdAt", "desc")
+            .limit(limit)
+            .get();
+
+        return snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt:
+                    data.createdAt instanceof Timestamp
+                        ? data.createdAt.toDate().toISOString()
+                        : null,
+            } as ThreadsEntryView;
+        });
+    } catch (e) {
+        console.error("[HomePage] Failed to fetch threads:", e);
+        return [];
+    }
+}
+
 export default async function HomePage() {
-    const [accountingEntries, archiveEntries, calendarEntries] = await Promise.all([
+    const [accountingEntries, archiveEntries, calendarEntries, threadsEntries] = await Promise.all([
         getAccountingEntries(5),
         getArchiveEntries(5),
         getCalendarEntries(5),
+        getThreadsEntries(6),
     ]);
 
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -245,7 +272,7 @@ export default async function HomePage() {
             </div>
 
             {/* Archive Section */}
-            <div>
+            <div style={{ marginBottom: "40px" }}>
                 <div className="dashboard-section-title">
                     <span>📚</span> 最近存檔
                     <Link href="/archive" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.875rem" }}>
@@ -261,6 +288,34 @@ export default async function HomePage() {
                     <div className="archive-grid">
                         {archiveEntries.map((entry: ArchiveEntryView) => (
                             <ArchiveCard key={entry.id} entry={entry} />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Threads Section */}
+            <div>
+                <div className="dashboard-section-title">
+                    <span>🧵</span> 社群洞察
+                    <span style={{
+                        marginLeft: "8px",
+                        fontSize: "0.7rem",
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        background: "rgba(161,100,255,0.15)",
+                        color: "#c084fc",
+                        fontWeight: 500,
+                    }}>Threads 監控</span>
+                </div>
+                {threadsEntries.length === 0 ? (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">🧵</span>
+                        <p>啟動 threads-scraper 後，監控的 Threads 貼文將自動出現在這裡。</p>
+                    </div>
+                ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+                        {threadsEntries.map((entry: ThreadsEntryView) => (
+                            <ThreadsCard key={entry.id} entry={entry} />
                         ))}
                     </div>
                 )}

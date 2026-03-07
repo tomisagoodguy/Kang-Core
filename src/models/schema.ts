@@ -12,7 +12,7 @@ export const TagEnum = z.enum([
     "Other",
 ]);
 
-export const SourceEnum = z.enum(["line", "manual", "system", "line-rule", "line-image", "line-file"]);
+export const SourceEnum = z.enum(["line", "manual", "system", "line-rule", "line-image", "line-file", "threads"]);
 
 export const BaseEntrySchema = z.object({
     id: z.string().optional(), // Provided by Firestore Document ID usually
@@ -40,6 +40,19 @@ export const ArchiveEntrySchema = BaseEntrySchema.extend({
     imageUrl: z.string().url().optional(),
 });
 export type ArchiveEntry = z.infer<typeof ArchiveEntrySchema>;
+
+export const ThreadsEntrySchema = BaseEntrySchema.extend({
+    threadId: z.string(), // Extracted unique ID
+    threadUrl: z.string().url(),
+    author: z.string(), // username
+    authorId: z.string().optional(),
+    content: z.string(),
+    publishedAt: z.string(), // ISO String
+    likeCount: z.number().optional(),
+    replyCount: z.number().optional(),
+    isDiscovery: z.boolean().default(false), // Found via discovery mode
+});
+export type ThreadsEntry = z.infer<typeof ThreadsEntrySchema>;
 
 export const CalendarEntrySchema = BaseEntrySchema.extend({
     title: z.string(),
@@ -161,6 +174,12 @@ export type AccountingEntryView = Omit<AccountingEntry, "id" | "createdAt" | "ta
 
 /** 前端接收的存檔資料 */
 export type ArchiveEntryView = Omit<ArchiveEntry, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的 Threads 資料 */
+export type ThreadsEntryView = Omit<ThreadsEntry, "id" | "createdAt"> & {
     id: string;
     createdAt?: string;
 };

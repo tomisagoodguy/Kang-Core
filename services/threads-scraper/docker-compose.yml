@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 資料庫
+  postgres:
+    image: postgres:15-alpine
+    container_name: threads-scraper-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: threads_scraper
+      POSTGRES_USER: threads_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U threads_user -d threads_scraper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 排程器服務（自動抓取）
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: threads-scraper-scheduler
+    restart: unless-stopped
+    command: python run_scheduler.py start
+    environment:
+      # 資料庫連線
+      DATABASE_URL: postgresql://threads_user:${DB_PASSWORD:-change_me_in_production}@postgres:5432/threads_scraper
+
+      # 追蹤設定（可選，會覆蓋 config.yaml）
+      TRACKED_USERS: ${TRACKED_USERS:-}
+      KEYWORDS: ${KEYWORDS:-}
+
+      # 探索模式
+      EXPLORE_ENABLED: ${EXPLORE_ENABLED:-true}
+      EXPLORE_MAX_SCROLLS: ${EXPLORE_MAX_SCROLLS:-3}
+
+      # 自動發現
+      DISCOVERY_ENABLED: ${DISCOVERY_ENABLED:-true}
+      DISCOVERY_MIN_LIKE_COUNT: ${DISCOVERY_MIN_LIKE_COUNT:-100}
+
+      # Webhook 通知
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      LINE_NOTIFY_TOKEN: ${LINE_NOTIFY_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config
+
+  # API 服務（查看資料）
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: threads-scraper-api
+    restart: unless-stopped
+    command: python run_api.py
+    environment:
+      DATABASE_URL: postgresql://threads_user:${DB_PASSWORD:-change_me_in_production}@postgres:5432/threads_scraper
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local

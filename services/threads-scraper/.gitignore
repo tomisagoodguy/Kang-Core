@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# UV
+.venv/
+uv.lock
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+threads_data.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output files
+*.json
+profile_*.json
+thread_*.json
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Secrets
+.env
+config.local.yaml
+*.key
+*.pem
+
+# Playwright
+.playwright/
+
+# Test outputs
+test_*.json
