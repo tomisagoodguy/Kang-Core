@@ -48,6 +48,8 @@ jobs:
         env:
           # Kang-Core Vercel Webhook 端點
           KANG_CORE_WEBHOOK_URL: ${{ secrets.KANG_CORE_WEBHOOK_URL }}
+          # API 認證金鑰
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           # 關閉 localhost webhook（強制使用 KANG_CORE_WEBHOOK_URL）
           # 以下為可選的額外覆蓋設定
           EXPLORE_ENABLED: "false"   # GitHub Actions 關閉探索模式（節省時間）

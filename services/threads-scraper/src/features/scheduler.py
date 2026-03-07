@@ -54,6 +54,37 @@ class ThreadsScheduler:
         self.explore_config = self.config.get("explore") or {}
         self.advanced = self.config.get("advanced") or {}
 
+        # ── 💡 動態讀取 Kang-Core API 配置（由 LINE Bot 管理的名單）─────────
+        import os
+        import requests
+        api_url = os.getenv("KANG_CORE_WEBHOOK_URL", "").replace("/api/webhooks/threads", "/api/threads/config")
+        cron_secret = os.getenv("CRON_SECRET")
+
+        if api_url and cron_secret:
+            try:
+                print(f"📡 從 API 同步追蹤清單: {api_url}")
+                resp = requests.get(api_url, headers={"Authorization": f"Bearer {cron_secret}"}, timeout=10)
+                if resp.status_code == 200:
+                    api_data = resp.json()
+                    api_users = api_data.get("users", [])
+                    print(f"   ✅ 已同步 {len(api_users)} 位追蹤者 (來自 LINE Bot)")
+                    
+                    # 合併到 users (避免重複)
+                    existing_usernames = {u.get("username").lower() for u in self.users if u.get("username")}
+                    for au in api_users:
+                        uname = au.get("username").lower()
+                        if uname not in existing_usernames:
+                            self.users.append({
+                                "username": uname,
+                                "max_posts": au.get("maxPosts", 10),
+                                "source": "line-bot-api"
+                            })
+                            existing_usernames.add(uname)
+                else:
+                    print(f"   ⚠️ 同步失敗 (HTTP {resp.status_code})，將僅使用本地設定")
+            except Exception as e:
+                print(f"   ❌ API 同步錯誤: {e}")
+
         # 請求計數器（用於限制請求頻率）
         self.request_count = 0
         self.request_window_start = datetime.now()
