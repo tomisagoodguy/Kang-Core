@@ -70,24 +70,32 @@ export function CalendarCard({ entry }: CalendarCardProps) {
                     </div>
 
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        <button
-                            onClick={handleToggleStatus}
-                            disabled={isCompleting}
-                            style={{
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: "1.2rem",
-                                transition: "transform 0.2s",
-                            }}
-                            title={isDone ? "標為未完成" : "標為已完成"}
-                        >
-                            {isDone ? "✅" : "🔲"}
-                        </button>
-                        <div className="card-actions" style={{ opacity: 1 }}>
-                            <button className="card-action-btn" onClick={() => setEditOpen(true)}>✏️</button>
-                            <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)}>🗑️</button>
-                        </div>
+                        {/* Only show actions if it's not a pure Google Calendar item */}
+                        {!entry.id.startsWith("gcal-") && (
+                            <>
+                                <button
+                                    onClick={handleToggleStatus}
+                                    disabled={isCompleting}
+                                    style={{
+                                        background: "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        fontSize: "1.2rem",
+                                        transition: "transform 0.2s",
+                                    }}
+                                    title={isDone ? "標為未完成" : "標為已完成"}
+                                >
+                                    {isDone ? "✅" : "🔲"}
+                                </button>
+                                <div className="card-actions" style={{ opacity: 1 }}>
+                                    <button className="card-action-btn" onClick={() => setEditOpen(true)}>✏️</button>
+                                    <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)}>🗑️</button>
+                                </div>
+                            </>
+                        )}
+                        {entry.id.startsWith("gcal-") && (
+                            <div style={{ fontSize: "1.2rem" }} title="來自 Google 行事曆">🗓️</div>
+                        )}
                     </div>
                 </div>
 

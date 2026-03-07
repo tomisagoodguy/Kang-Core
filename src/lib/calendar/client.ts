@@ -37,6 +37,33 @@ export async function getEventsFromGoogleCalendar(dateStr: string) {
     }
 }
 
+export async function getUpcomingEventsFromGoogleCalendar(days: number = 7) {
+    const calendar = getCalendarClient();
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+
+    const now = new Date();
+    const timeMin = now.toISOString();
+
+    const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    const timeMax = future.toISOString();
+
+    try {
+        const res = await calendar.events.list({
+            calendarId,
+            timeMin,
+            timeMax,
+            maxResults: 20,
+            singleEvents: true,
+            orderBy: "startTime",
+        });
+
+        return res.data.items || [];
+    } catch (e: any) {
+        console.error("Failed to fetch upcoming events from Google Calendar:", e.message || e);
+        return [];
+    }
+}
+
 export async function addEventToGoogleCalendar(entry: {
     title: string;
     description?: string;

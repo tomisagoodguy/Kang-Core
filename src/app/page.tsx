@@ -35,15 +35,18 @@ async function getAccountingEntries(limit = 5): Promise<AccountingEntryView[]> {
     }
 }
 
+import { getUpcomingEventsFromGoogleCalendar } from "@/lib/calendar/client";
+
 async function getCalendarEntries(limit = 10): Promise<CalendarEntryView[]> {
     try {
+        // Fetch from Firestore
         const snapshot = await db
             .collection("calendar")
             .orderBy("createdAt", "desc")
             .limit(limit)
             .get();
 
-        return snapshot.docs.map((doc) => {
+        const firestoreEntries = snapshot.docs.map((doc) => {
             const data = doc.data();
             return {
                 id: doc.id,
@@ -54,6 +57,57 @@ async function getCalendarEntries(limit = 10): Promise<CalendarEntryView[]> {
                         : null,
             } as CalendarEntryView;
         });
+
+        // Fetch from Google Calendar
+        let gcalEvents: any[] = [];
+        try {
+            gcalEvents = await getUpcomingEventsFromGoogleCalendar(7);
+        } catch (e) {
+            console.error("[HomePage] Failed to fetch Google Calendar:", e);
+        }
+
+        const gcalEntries: CalendarEntryView[] = gcalEvents.map((event) => {
+            let actionDate = "";
+            let actionTime = "";
+
+            if (event.start?.dateTime) {
+                // Set to Asia/Taipei to match app timezone
+                const dt = new Date(event.start.dateTime);
+                // Convert dt to string
+                actionDate = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+                actionTime = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+            } else if (event.start?.date) {
+                actionDate = event.start.date;
+            }
+
+            return {
+                id: `gcal-${event.id}`,
+                title: event.summary || "未命名行程",
+                description: event.description,
+                actionDate,
+                actionTime,
+                status: "pending",
+                gcalEventId: event.id,
+                source: "system",
+                originalText: "Imported from Google Calendar",
+            };
+        });
+
+        // Merging logic: Combine and sort by date/time ascending, maybe deduplicate
+        // If a firestore item has the same gcalEventId, skip it in GcalEntries or vice versa
+        const firestoreGcalIds = new Set(firestoreEntries.map(e => e.gcalEventId).filter(Boolean));
+        const filteredGcalEntries = gcalEntries.filter(e => !firestoreGcalIds.has(e.gcalEventId));
+
+        const allEntries = [...firestoreEntries, ...filteredGcalEntries];
+        // Sort pending ones to the top, and sort by date
+        allEntries.sort((a, b) => {
+            if (a.status !== b.status) return a.status === "pending" ? -1 : 1;
+            const timeA = new Date(`${a.actionDate || "2099-01-01"}T${a.actionTime || "00:00"}`).getTime();
+            const timeB = new Date(`${b.actionDate || "2099-01-01"}T${b.actionTime || "00:00"}`).getTime();
+            return timeA - timeB;
+        });
+
+        return allEntries.slice(0, limit);
     } catch (e) {
         console.error("[HomePage] Failed to fetch calendar:", e);
         return [];
