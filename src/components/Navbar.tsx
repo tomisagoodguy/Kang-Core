@@ -11,6 +11,7 @@ const navLinks = [
     { href: "/accounting", label: "📊 記帳" },
     { href: "/archive", label: "📚 存檔" },
     { href: "/calendar", label: "🗓️ 日曆" },
+    { href: "/threads", label: "🧵 洞察" },
 ];
 
 const settingsLinks = [

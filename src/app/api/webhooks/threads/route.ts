@@ -46,15 +46,13 @@ export async function POST(req: Request) {
             await db.collection("threads").add(entry);
 
             // Notify via Line
-            const message = `🧵 **Threads 新貼文** (@${entry.author})\n\n${entry.content}\n\n❤️ ${entry.likeCount} | 💬 ${entry.replyCount}\n🔗 ${entry.threadUrl}`;
+            // (取代為每日彙整推播 /api/cron/threads-summary)
+            // const message = `🧵 **Threads 新贴文** (@${entry.author})\n\n${entry.content}\n\n❤️ ${entry.likeCount} | 💬 ${entry.replyCount}\n🔗 ${entry.threadUrl}`;
 
-            // Provide the ADMIN_ID or fetch from DB user settings.
-            // In Kang-Core, single-user system usually provides a default LINE_USER_ID in env.
-            const adminUserId = process.env.LINE_USER_ID;
-
-            if (adminUserId) {
-                await lineService.pushText(adminUserId, message);
-            }
+            // const adminUserId = process.env.LINE_USER_ID;
+            // if (adminUserId) {
+            //     await lineService.pushText(adminUserId, message);
+            // }
 
             return NextResponse.json({ status: "ok" });
         }

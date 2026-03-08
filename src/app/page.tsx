@@ -306,6 +306,9 @@ export default async function HomePage() {
                         color: "#c084fc",
                         fontWeight: 500,
                     }}>Threads 監控</span>
+                    <Link href="/threads" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.875rem" }}>
+                        查看全部 →
+                    </Link>
                 </div>
                 {threadsEntries.length === 0 ? (
                     <div className="empty-state">
