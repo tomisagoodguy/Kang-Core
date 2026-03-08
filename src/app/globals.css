@@ -919,6 +919,33 @@ a {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   Custom Scrollbar (For Glass Cards)
+═══════════════════════════════════════════════════════════ */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-glass-hover);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-glass-hover) transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Responsive
 ═══════════════════════════════════════════════════════════ */
 @media (max-width: 1024px) {

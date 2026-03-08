@@ -32,61 +32,92 @@ export function InsightCard() {
     if (!insight && !loading) return null;
 
     return (
-        <div className="glass-card" style={{ padding: "24px", marginBottom: "32px", border: "1px solid rgba(124, 58, 237, 0.3)", position: "relative", overflow: "hidden" }}>
-            {/* Background Glow */}
-            <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "150px", height: "150px", background: "var(--accent)", filter: "blur(80px)", opacity: 0.15, zIndex: 0 }}></div>
+        <div style={{
+            position: "relative",
+            margin: "0 0 24px",
+            borderRadius: "16px",
+            overflow: "hidden"
+        }}>
+            {/* Animated AI background glow */}
+            <div style={{
+                position: "absolute",
+                inset: 0,
+                background: "linear-gradient(120deg, var(--accent) 0%, #3b82f6 50%, var(--accent-light) 100%)",
+                opacity: 0.15,
+                animation: "pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+            }} />
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", position: "relative", zIndex: 1 }}>
-                <Sparkles size={24} className="text-accent" />
-                <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--accent-light)" }}>AI 理財洞察</h3>
-            </div>
-
-            {loading ? (
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "var(--text-secondary)", minHeight: "60px" }}>
-                    <div className="login-spinner" style={{ width: "20px", height: "20px" }}></div>
-                    <p style={{ fontSize: "0.9375rem" }}>正在由 AI 顧問分析近期消費...</p>
+            <div className="glass-card" style={{
+                padding: "20px",
+                display: "flex",
+                gap: "16px",
+                alignItems: "flex-start",
+                border: "1px solid rgba(124, 58, 237, 0.3)",
+                background: "rgba(255, 255, 255, 0.03)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                borderRadius: "16px",
+                position: "relative",
+                zIndex: 1
+            }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "40px", height: "40px", borderRadius: "12px", background: "rgba(124, 58, 237, 0.1)", color: "var(--accent-light)", flexShrink: 0, boxShadow: "0 0 16px rgba(124, 58, 237, 0.2)" }}>
+                    <Sparkles size={20} />
                 </div>
-            ) : (
-                <div style={{ color: "var(--text-primary)", fontSize: "0.95rem", lineHeight: "1.8", whiteSpace: "pre-wrap", position: "relative", zIndex: 1 }}>
-                    {insight}
-
-                    <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 8px 0", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span>AI 洞察與建議</span>
                         <button
                             onClick={() => fetchInsight(true)}
                             disabled={isRefreshing}
+                            aria-label="Refresh insight"
                             style={{
+                                background: "transparent",
+                                border: "none",
+                                cursor: isRefreshing ? "wait" : "pointer",
+                                color: "var(--text-muted)",
                                 display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                background: "var(--bg-glass)",
-                                border: "1px solid var(--border-glass)",
-                                borderRadius: "6px",
-                                color: "var(--text-secondary)",
-                                fontSize: "0.8125rem",
-                                padding: "6px 12px",
-                                cursor: isRefreshing ? "not-allowed" : "pointer",
-                                opacity: isRefreshing ? 0.7 : 1,
-                                transition: "all 0.2s"
+                                padding: "4px",
+                                transition: "all 0.2s",
                             }}
-                            onMouseOver={(e) => {
-                                if (!isRefreshing) {
-                                    e.currentTarget.style.color = "var(--text-primary)";
-                                    e.currentTarget.style.background = "var(--border-glass-hover)";
-                                }
+                            onMouseEnter={(e) => {
+                                if (!isRefreshing) e.currentTarget.style.color = "var(--accent-light)";
                             }}
-                            onMouseOut={(e) => {
-                                if (!isRefreshing) {
-                                    e.currentTarget.style.color = "var(--text-secondary)";
-                                    e.currentTarget.style.background = "var(--bg-glass)";
-                                }
+                            onMouseLeave={(e) => {
+                                if (!isRefreshing) e.currentTarget.style.color = "var(--text-muted)";
                             }}
                         >
-                            <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
-                            {isRefreshing ? "重新分析中..." : "重新產生分析"}
+                            <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
                         </button>
-                    </div>
+                    </h3>
+
+                    {loading ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                            <div className="skeleton" style={{ height: "16px", width: "100%", borderRadius: "4px" }}></div>
+                            <div className="skeleton" style={{ height: "16px", width: "90%", borderRadius: "4px" }}></div>
+                            <div className="skeleton" style={{ height: "16px", width: "60%", borderRadius: "4px" }}></div>
+                        </div>
+                    ) : (
+                        <p style={{
+                            fontSize: "0.9375rem",
+                            color: "var(--text-secondary)",
+                            lineHeight: 1.6,
+                            margin: 0,
+                            fontStyle: "italic",
+                            letterSpacing: "0.01em"
+                        }}>
+                            {insight}
+                        </p>
+                    )}
                 </div>
-            )}
+            </div>
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes pulse-slow {
+                    0%, 100% { opacity: 0.15; transform: scale(1); }
+                    50% { opacity: 0.25; transform: scale(1.02); }
+                }
+            `}} />
         </div>
     );
 }

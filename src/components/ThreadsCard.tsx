@@ -3,14 +3,13 @@
 import { useState } from "react";
 import type { ThreadsEntryView } from "@/models/schema";
 import { deleteThreadAction, toggleThreadSaveAction } from "@/app/actions/threads";
-import { Star, Trash2, Heart, MessageCircle, ExternalLink, ChevronDown, ChevronUp, Sparkles, Pin, LoaderCircle } from "lucide-react";
+import { Star, Trash2, Heart, MessageCircle, ExternalLink, Sparkles, Pin, LoaderCircle } from "lucide-react";
 
 interface ThreadsCardProps {
     entry: ThreadsEntryView;
 }
 
 export function ThreadsCard({ entry }: ThreadsCardProps) {
-    const [isExpanded, setIsExpanded] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isDeleted, setIsDeleted] = useState(false);
     const [isSaved, setIsSaved] = useState(entry.isSaved || false);
@@ -48,16 +47,11 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
         })
         : "";
 
-    const truncatedContent = entry.content.length > 120 && !isExpanded
-        ? entry.content.slice(0, 120) + "..."
-        : entry.content;
-
     return (
         <div
             className="glass-card"
             style={{
                 padding: "24px",
-                cursor: "pointer",
                 transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
                 borderLeft: isSaved ? "4px solid #fbbf24" : "4px solid rgba(161, 100, 255, 0.6)",
                 position: "relative",
@@ -66,7 +60,6 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
                 flexDirection: "column",
                 gap: "16px"
             }}
-            onClick={() => setIsExpanded(!isExpanded)}
         >
             {/* 背景漸層裝飾 */}
             <div style={{
@@ -163,15 +156,21 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
             </div>
 
             {/* 貼文內容 */}
-            <div style={{
-                fontSize: "0.9375rem",
-                color: "var(--text-secondary)",
-                lineHeight: 1.6,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                zIndex: 1
-            }}>
-                {truncatedContent}
+            <div
+                className="custom-scrollbar"
+                style={{
+                    fontSize: "0.9375rem",
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    zIndex: 1,
+                    maxHeight: "180px",
+                    overflowY: "auto",
+                    paddingRight: "8px"
+                }}
+            >
+                {entry.content}
             </div>
 
             {/* Footer: 互動數 + 連結 */}
@@ -200,9 +199,6 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
-                        {isExpanded ? <><ChevronUp size={14} /> 收起</> : <><ChevronDown size={14} /> 展開</>}
-                    </span>
                     <a
                         href={entry.threadUrl}
                         target="_blank"

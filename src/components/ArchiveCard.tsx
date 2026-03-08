@@ -5,7 +5,7 @@ import { TagBadge } from "./TagBadge";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 import type { ArchiveEntryView } from "@/models/schema";
-import { FileText, ExternalLink, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import { FileText, ExternalLink, Pencil, Trash2 } from "lucide-react";
 
 interface ArchiveCardProps {
     entry: ArchiveEntryView;
@@ -19,7 +19,6 @@ const EDIT_FIELDS = [
 ];
 
 export function ArchiveCard({ entry }: ArchiveCardProps) {
-    const [isExpanded, setIsExpanded] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -27,25 +26,30 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
     if (!entry.title && entry.url) {
         try { displayTitle = new URL(entry.url).hostname; } catch { /* invalid URL */ }
     }
-    const summary = entry.summary;
+
+    // Show original text preferentially if it exists, otherwise summary.
+    const contentToDisplay = entry.originalText || entry.summary;
 
     return (
         <>
             <div
                 className="glass-card archive-card"
                 style={{
-                    cursor: "pointer",
-                    gridColumn: isExpanded ? "1 / -1" : "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                    padding: "20px",
                     transition: "all 0.3s ease",
+                    position: "relative",
+                    overflow: "hidden"
                 }}
-                onClick={() => setIsExpanded(!isExpanded)}
             >
                 {entry.imageUrl && (
                     <a
                         href={entry.imageUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
+                        style={{ alignSelf: "flex-start", width: "100%" }}
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -53,75 +57,100 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
                             alt="截圖"
                             style={{
                                 width: "100%",
-                                height: isExpanded ? "auto" : 140,
-                                maxHeight: isExpanded ? 500 : 140,
-                                objectFit: "contain",
+                                height: 140,
+                                objectFit: "cover",
                                 backgroundColor: "rgba(0,0,0,0.5)",
-                                borderRadius: 8,
-                                marginBottom: 8,
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                transition: "all 0.3s ease",
+                                borderRadius: 12,
+                                marginBottom: 4,
+                                border: "1px solid var(--border-glass)",
+                                transition: "transform 0.3s ease, border-color 0.3s ease",
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.borderColor = "var(--border-glass-hover)";
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.borderColor = "var(--border-glass)";
                             }}
                         />
                     </a>
                 )}
 
-                <div className="archive-card-title" style={isExpanded ? { WebkitLineClamp: "unset", display: "block" } : {}} title={displayTitle}>
+                <div className="archive-card-title" title={displayTitle} style={{
+                    fontSize: "1.125rem",
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                    display: "-webkit-box",
+                    WebkitLineClamp: "2",
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden"
+                }}>
                     {displayTitle}
                 </div>
 
-                <div className="archive-card-summary" style={isExpanded ? { WebkitLineClamp: "unset", display: "block" } : {}}>
-                    {summary}
+                <div className="custom-scrollbar" style={{
+                    fontSize: "0.9375rem",
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.6,
+                    maxHeight: "150px",
+                    overflowY: "auto",
+                    paddingRight: "8px",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word"
+                }}>
+                    {contentToDisplay && (
+                        <>
+                            {entry.originalText && (
+                                <strong style={{ color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                                    <FileText size={16} /> 原始內容：
+                                </strong>
+                            )}
+                            {contentToDisplay}
+                        </>
+                    )}
                 </div>
 
-                {isExpanded && entry.originalText && (
-                    <div style={{
-                        marginTop: "12px",
-                        padding: "16px",
-                        background: "rgba(0, 0, 0, 0.2)",
-                        borderRadius: "8px",
-                        fontSize: "0.875rem",
-                        color: "var(--text-secondary)",
-                        whiteSpace: "pre-wrap",
-                        lineHeight: 1.6,
-                        border: "1px solid rgba(255, 255, 255, 0.05)"
-                    }}>
-                        <strong style={{ color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                            <FileText size={16} /> 原始內容：
-                        </strong>
-                        {entry.originalText}
-                    </div>
-                )}
-
-                <div className="archive-card-keywords" style={{ marginTop: isExpanded ? "16px" : "auto" }}>
-                    {(isExpanded ? entry.keywords : entry.keywords.slice(0, 4)).map((kw) => (
+                <div className="archive-card-keywords" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "auto" }}>
+                    {entry.keywords.slice(0, 6).map((kw) => (
                         <TagBadge key={kw} tag={kw} />
                     ))}
+                    {entry.keywords.length > 6 && (
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center" }}>+{entry.keywords.length - 6}</span>
+                    )}
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", paddingTop: "12px", borderTop: "1px solid var(--border-glass)" }}>
                     {entry.url ? (
                         <a
                             href={entry.url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="archive-card-link"
-                            onClick={(e) => e.stopPropagation()}
-                            style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                fontSize: "0.8125rem",
+                                fontWeight: 500,
+                                color: "var(--accent-light)",
+                                textDecoration: "none",
+                                padding: "6px 12px",
+                                borderRadius: "8px",
+                                background: "rgba(161,100,255,0.1)",
+                                transition: "all 0.2s ease"
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(161,100,255,0.2)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "rgba(161,100,255,0.1)")}
                         >
-                            <ExternalLink size={14} /> 查看原始連結
+                            原始連結 <ExternalLink size={14} />
                         </a>
                     ) : <span />}
 
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
-                            {isExpanded ? <><ChevronUp size={14} /> 收起</> : <><ChevronDown size={14} /> 展開</>}
-                        </span>
                         <div className="card-actions" style={{ opacity: 1 }}>
-                            <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); setEditOpen(true); }} title="編輯">
+                            <button className="card-action-btn" onClick={() => setEditOpen(true)} title="編輯" style={{ padding: "6px" }}>
                                 <Pencil size={14} />
                             </button>
-                            <button className="card-action-btn danger" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }} title="刪除">
+                            <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)} title="刪除" style={{ padding: "6px" }}>
                                 <Trash2 size={14} />
                             </button>
                         </div>
