@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
 interface DeleteConfirmProps {
     isOpen: boolean;
@@ -33,7 +34,9 @@ export function DeleteConfirm({ isOpen, onClose, entryId, collection, label }: D
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                <h3 className="modal-title">🗑️ 確認刪除</h3>
+                <h3 className="modal-title" style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)" }}>
+                    <Trash2 size={20} /> 確認刪除
+                </h3>
                 <p className="modal-message">
                     確定要刪除{label ? ` "${label}" ` : "此條目"}嗎？此操作無法復原。
                 </p>

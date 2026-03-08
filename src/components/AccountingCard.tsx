@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TagBadge } from "./TagBadge";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
+import { Pencil, Trash2 } from "lucide-react";
 
 import type { AccountingEntryView } from "@/models/schema";
 
@@ -82,8 +83,12 @@ export function AccountingCard({ entry }: AccountingCardProps) {
                 <div className="accounting-card-right">
                     <span className={amountClass}>{formattedAmount}</span>
                     <div className="card-actions" style={{ marginTop: "auto" }}>
-                        <button className="card-action-btn" aria-label="Edit Entry" onClick={() => setEditOpen(true)}>✏️</button>
-                        <button className="card-action-btn danger" aria-label="Delete Entry" onClick={() => setDeleteOpen(true)}>🗑️</button>
+                        <button className="card-action-btn" aria-label="Edit Entry" onClick={() => setEditOpen(true)}>
+                            <Pencil size={14} />
+                        </button>
+                        <button className="card-action-btn danger" aria-label="Delete Entry" onClick={() => setDeleteOpen(true)}>
+                            <Trash2 size={14} />
+                        </button>
                     </div>
                 </div>
             </div>

@@ -4,6 +4,7 @@ import { ArchiveCard } from "@/components/ArchiveCard";
 import { CalendarCard } from "@/components/CalendarCard";
 import { ThreadsCard } from "@/components/ThreadsCard";
 import Link from "next/link";
+import { LayoutDashboard, Coins, CreditCard, Scale, Receipt, BookMarked, CalendarDays, LineChart, Library, Search, MessageCircle, Inbox } from "lucide-react";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { AccountingEntryView, ArchiveEntryView, CalendarEntryView, ThreadsEntryView } from "@/models/schema";
@@ -193,37 +194,40 @@ export default async function HomePage() {
 
     return (
         <div className="page-container">
-            <h1 className="page-title">📊 儀表板</h1>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <LayoutDashboard size={28} className="text-accent" />
+                儀表板
+            </h1>
             <p className="page-subtitle">透過 LINE Bot 傳訊息，讓 AI 幫你記錄生活的每一筆帳和知識。</p>
 
             {/* Stat Cards */}
             <div className="stat-grid">
                 <StatCard
-                    icon="💰"
+                    icon={<Coins size={24} />}
                     label="本月收入"
                     value={`$${monthlyIncome.toLocaleString()}`}
                     color="var(--success)"
                 />
                 <StatCard
-                    icon="💳"
+                    icon={<CreditCard size={24} />}
                     label="本月支出"
                     value={`$${monthlyExpense.toLocaleString()}`}
                     color="var(--danger)"
                 />
                 <StatCard
-                    icon="⚖️"
+                    icon={<Scale size={24} />}
                     label="本月結餘"
                     value={`$${monthlyNet.toLocaleString()}`}
                     color={monthlyNet >= 0 ? "var(--success)" : "var(--danger)"}
                 />
                 <StatCard
-                    icon="📝"
+                    icon={<Receipt size={24} />}
                     label="本月記帳"
                     value={`${monthlyCount} 筆`}
                     color="var(--warning)"
                 />
                 <StatCard
-                    icon="📚"
+                    icon={<BookMarked size={24} />}
                     label="知識庫存檔"
                     value={`${archiveTotalCount} 篇`}
                     color="var(--accent-light)"
@@ -233,11 +237,11 @@ export default async function HomePage() {
             {/* Calendar / Todo Section */}
             <div style={{ marginBottom: "40px" }}>
                 <div className="dashboard-section-title">
-                    <span>🗓️</span> 即將到來 / 代辦事項
+                    <CalendarDays size={18} /> 即將到來 / 代辦事項
                 </div>
                 {calendarEntries.length === 0 ? (
                     <div className="empty-state">
-                        <span className="empty-state-icon">📭</span>
+                        <Inbox size={48} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
                         <p>還沒有代辦事項，傳個時間或計劃給機器人吧！</p>
                     </div>
                 ) : (
@@ -252,14 +256,14 @@ export default async function HomePage() {
             {/* Accounting Section */}
             <div style={{ marginBottom: "40px" }}>
                 <div className="dashboard-section-title">
-                    <span>💳</span> 最近記帳
+                    <Receipt size={18} /> 最近記帳
                     <Link href="/accounting" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.875rem" }}>
                         查看全部 →
                     </Link>
                 </div>
                 {accountingEntries.length === 0 ? (
                     <div className="empty-state">
-                        <span className="empty-state-icon">📭</span>
+                        <Inbox size={48} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
                         <p>還沒有記帳記錄，傳訊息給機器人吧！</p>
                     </div>
                 ) : (
@@ -274,14 +278,14 @@ export default async function HomePage() {
             {/* Archive Section */}
             <div style={{ marginBottom: "40px" }}>
                 <div className="dashboard-section-title">
-                    <span>📚</span> 最近存檔
+                    <Library size={18} /> 最近存檔
                     <Link href="/archive" style={{ marginLeft: "auto", color: "var(--accent-light)", fontSize: "0.875rem" }}>
                         查看全部 →
                     </Link>
                 </div>
                 {archiveEntries.length === 0 ? (
                     <div className="empty-state">
-                        <span className="empty-state-icon">📭</span>
+                        <Inbox size={48} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
                         <p>還沒有存檔記錄，傳連結或文章給機器人！</p>
                     </div>
                 ) : (
@@ -296,7 +300,7 @@ export default async function HomePage() {
             {/* Threads Section */}
             <div>
                 <div className="dashboard-section-title">
-                    <span>🧵</span> 社群洞察
+                    <MessageCircle size={18} /> 社群洞察
                     <span style={{
                         marginLeft: "8px",
                         fontSize: "0.7rem",
@@ -312,7 +316,7 @@ export default async function HomePage() {
                 </div>
                 {threadsEntries.length === 0 ? (
                     <div className="empty-state">
-                        <span className="empty-state-icon">🧵</span>
+                        <Inbox size={48} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
                         <p>啟動 threads-scraper 後，監控的 Threads 貼文將自動出現在這裡。</p>
                     </div>
                 ) : (

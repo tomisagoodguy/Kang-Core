@@ -5,6 +5,7 @@ import { TagBadge } from "./TagBadge";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 import type { ArchiveEntryView } from "@/models/schema";
+import { FileText, ExternalLink, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 
 interface ArchiveCardProps {
     entry: ArchiveEntryView;
@@ -85,7 +86,9 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
                         lineHeight: 1.6,
                         border: "1px solid rgba(255, 255, 255, 0.05)"
                     }}>
-                        <strong style={{ color: "var(--text-primary)", display: "block", marginBottom: "8px" }}>📝 原始內容：</strong>
+                        <strong style={{ color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                            <FileText size={16} /> 原始內容：
+                        </strong>
                         {entry.originalText}
                     </div>
                 )}
@@ -104,18 +107,23 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
                             rel="noopener noreferrer"
                             className="archive-card-link"
                             onClick={(e) => e.stopPropagation()}
+                            style={{ display: "flex", alignItems: "center", gap: "4px" }}
                         >
-                            🔗 查看原始連結
+                            <ExternalLink size={14} /> 查看原始連結
                         </a>
                     ) : <span />}
 
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                            {isExpanded ? "▲ 收起" : "▼ 展開"}
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                            {isExpanded ? <><ChevronUp size={14} /> 收起</> : <><ChevronDown size={14} /> 展開</>}
                         </span>
                         <div className="card-actions" style={{ opacity: 1 }}>
-                            <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}>✏️</button>
-                            <button className="card-action-btn danger" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }}>🗑️</button>
+                            <button className="card-action-btn" onClick={(e) => { e.stopPropagation(); setEditOpen(true); }} title="編輯">
+                                <Pencil size={14} />
+                            </button>
+                            <button className="card-action-btn danger" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }} title="刪除">
+                                <Trash2 size={14} />
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil } from "lucide-react";
 
 interface FieldDef {
     key: string;
@@ -64,7 +65,9 @@ export function EditModal({ isOpen, onClose, entry, collection, fields }: EditMo
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                <h3 className="modal-title">✏️ 編輯</h3>
+                <h3 className="modal-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Pencil size={20} /> 編輯
+                </h3>
                 <div className="modal-body">
                     {fields.map((f) => (
                         <div key={f.key} className="modal-field">

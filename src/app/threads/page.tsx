@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { ThreadsCard } from "@/components/ThreadsCard";
 import type { ThreadsEntryView } from "@/models/schema";
+import { MessageCircle, Search, Inbox, Tag, LoaderCircle } from "lucide-react";
 
 function useDebounce<T>(value: T, delay: number): T {
     const [debounced, setDebounced] = useState(value);
@@ -62,13 +63,18 @@ export default function ThreadsPage() {
 
     return (
         <div className="page-container">
-            <h1 className="page-title">🧵 社群洞察</h1>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageCircle size={28} className="text-accent" />
+                社群洞察
+            </h1>
 
-            <div className="filter-bar" style={{ marginBottom: "16px" }}>
+            <div className="filter-bar" style={{ marginBottom: "16px", position: "relative" }}>
+                <Search size={18} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
                 <input
                     type="text"
                     className="filter-input"
-                    placeholder="🔍 搜尋內容或作者..."
+                    placeholder="搜尋內容或作者..."
+                    style={{ paddingLeft: "40px" }}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -103,17 +109,17 @@ export default function ThreadsPage() {
 
             {loading ? (
                 <div className="empty-state">
-                    <span className="empty-state-icon">⏳</span>
+                    <LoaderCircle size={48} className="animate-spin" style={{ margin: "0 auto 12px", color: "var(--accent)" }} />
                     <p>載入中...</p>
                 </div>
             ) : entries.length === 0 ? (
                 <div className="empty-state">
-                    <span className="empty-state-icon">📭</span>
+                    <Inbox size={48} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
                     <p>{searchQuery ? `沒有找到「${searchQuery}」的相關貼文` : "還沒有採集到任何 Threads 貼文！"}</p>
                 </div>
             ) : filteredEntries.length === 0 ? (
                 <div className="empty-state">
-                    <span className="empty-state-icon">🏷️</span>
+                    <Tag size={48} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
                     <p>這位作者下沒有記錄，請選擇其他作者。</p>
                 </div>
             ) : (

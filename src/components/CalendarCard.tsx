@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 
+import { Calendar, Clock, CheckSquare, Square, Pencil, Trash2, CalendarDays, AlignLeft } from "lucide-react";
+
 import type { CalendarEntryView } from "@/models/schema";
 
 interface CalendarCardProps {
@@ -63,9 +65,9 @@ export function CalendarCard({ entry }: CalendarCardProps) {
                         }}>
                             {entry.title}
                         </h3>
-                        <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "4px" }}>
-                            {entry.actionDate && <span>📅 {entry.actionDate} </span>}
-                            {entry.actionTime && <span>⏰ {entry.actionTime}</span>}
+                        <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "6px", display: "flex", gap: "12px", alignItems: "center" }}>
+                            {entry.actionDate && <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><Calendar size={12} /> {entry.actionDate}</span>}
+                            {entry.actionTime && <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><Clock size={12} /> {entry.actionTime}</span>}
                         </div>
                     </div>
 
@@ -80,21 +82,31 @@ export function CalendarCard({ entry }: CalendarCardProps) {
                                         background: "none",
                                         border: "none",
                                         cursor: "pointer",
-                                        fontSize: "1.2rem",
+                                        color: isDone ? "var(--success)" : "var(--text-secondary)",
                                         transition: "transform 0.2s",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: "4px"
                                     }}
                                     title={isDone ? "標為未完成" : "標為已完成"}
                                 >
-                                    {isDone ? "✅" : "🔲"}
+                                    {isDone ? <CheckSquare size={18} /> : <Square size={18} />}
                                 </button>
                                 <div className="card-actions" style={{ opacity: 1 }}>
-                                    <button className="card-action-btn" onClick={() => setEditOpen(true)}>✏️</button>
-                                    <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)}>🗑️</button>
+                                    <button className="card-action-btn" onClick={() => setEditOpen(true)} title="編輯">
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)} title="刪除">
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             </>
                         )}
                         {entry.id.startsWith("gcal-") && (
-                            <div style={{ fontSize: "1.2rem" }} title="來自 Google 行事曆">🗓️</div>
+                            <div style={{ color: "var(--brand-google)", display: "flex", alignItems: "center", padding: "4px" }} title="來自 Google 行事曆">
+                                <CalendarDays size={18} />
+                            </div>
                         )}
                     </div>
                 </div>
@@ -106,9 +118,13 @@ export function CalendarCard({ entry }: CalendarCardProps) {
                         background: "rgba(0,0,0,0.2)",
                         padding: "8px",
                         borderRadius: "6px",
-                        marginTop: "4px"
+                        marginTop: "4px",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "6px"
                     }}>
-                        📝 {entry.description}
+                        <AlignLeft size={14} style={{ marginTop: "2px", flexShrink: 0 }} />
+                        <span style={{ wordBreak: "break-word" }}>{entry.description}</span>
                     </div>
                 )}
             </div>

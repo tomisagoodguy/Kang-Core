@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ThreadsEntryView } from "@/models/schema";
 import { deleteThreadAction, toggleThreadSaveAction } from "@/app/actions/threads";
+import { Star, Trash2, Heart, MessageCircle, ExternalLink, ChevronDown, ChevronUp, Sparkles, Pin, LoaderCircle } from "lucide-react";
 
 interface ThreadsCardProps {
     entry: ThreadsEntryView;
@@ -55,12 +56,15 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
         <div
             className="glass-card"
             style={{
-                padding: "16px",
+                padding: "24px",
                 cursor: "pointer",
-                transition: "all 0.3s ease",
-                borderLeft: "3px solid rgba(161, 100, 255, 0.6)",
+                transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                borderLeft: isSaved ? "4px solid #fbbf24" : "4px solid rgba(161, 100, 255, 0.6)",
                 position: "relative",
                 overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px"
             }}
             onClick={() => setIsExpanded(!isExpanded)}
         >
@@ -68,123 +72,104 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
             <div style={{
                 position: "absolute",
                 top: 0, right: 0,
-                width: "80px", height: "80px",
-                background: "radial-gradient(circle, rgba(161,100,255,0.12) 0%, transparent 70%)",
+                width: "120px", height: "120px",
+                background: isSaved ? "radial-gradient(circle, rgba(251,191,36,0.1) 0%, transparent 70%)" : "radial-gradient(circle, rgba(161,100,255,0.08) 0%, transparent 70%)",
                 pointerEvents: "none",
             }} />
 
-            {/* 釘選/儲存按鈕 */}
-            <button
-                onClick={handleToggleSave}
-                title={isSaved ? "取消釘選" : "釘選保留"}
-                style={{
-                    position: "absolute",
-                    top: "12px",
-                    right: "42px",
-                    background: isSaved ? "rgba(251,191,36,0.15)" : "rgba(0,0,0,0.05)",
-                    border: "none",
-                    borderRadius: "50%",
-                    width: "24px",
-                    height: "24px",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: isSaved ? "#fbbf24" : "var(--text-muted)",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    zIndex: 10,
-                    opacity: isSaved ? 1 : 0.5,
-                    transition: "all 0.2s"
-                }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = isSaved ? "rgba(251,191,36,0.25)" : "rgba(0,0,0,0.1)"; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = isSaved ? "1" : "0.5"; e.currentTarget.style.background = isSaved ? "rgba(251,191,36,0.15)" : "rgba(0,0,0,0.05)"; }}
-            >
-                {isSaved ? "⭐" : "🌟"}
-            </button>
+            {/* Header: 作者 + 動作 */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", zIndex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{
+                        width: "40px", height: "40px",
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "16px", fontWeight: 700, color: "#fff",
+                        flexShrink: 0,
+                        boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)"
+                    }}>
+                        {entry.author.charAt(0).toUpperCase()}
+                    </div>
 
-            {/* 隱藏/刪除按鈕 */}
-            <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                title="移除此廢文"
-                style={{
-                    position: "absolute",
-                    top: "12px",
-                    right: "12px",
-                    background: "rgba(0,0,0,0.05)",
-                    border: "none",
-                    borderRadius: "50%",
-                    width: "24px",
-                    height: "24px",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "var(--text-muted)",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    zIndex: 10,
-                    opacity: 0.5,
-                    transition: "all 0.2s"
-                }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = "rgba(0,0,0,0.1)"; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = "0.5"; e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-            >
-                {isDeleting ? "…" : "✕"}
-            </button>
-
-            {/* Header: 作者 + 時間 */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                {/* Avatar placeholder */}
-                <div style={{
-                    width: "36px", height: "36px",
-                    borderRadius: "50%",
-                    background: "linear-gradient(135deg, #a164ff 0%, #6e3cca 100%)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "14px", fontWeight: 700, color: "#fff",
-                    flexShrink: 0,
-                }}>
-                    {entry.author.charAt(0).toUpperCase()}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                                @{entry.author}
+                            </span>
+                            {entry.isDiscovery && (
+                                <span style={{
+                                    background: "rgba(251,191,36,0.1)",
+                                    border: "1px solid rgba(251,191,36,0.2)",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    fontSize: "0.65rem",
+                                    color: "#fbbf24",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px"
+                                }}>
+                                    <Sparkles size={10} /> 自動發現
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                            {publishedDate}
+                        </div>
+                    </div>
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                        fontSize: "0.875rem",
-                        fontWeight: 600,
-                        color: "var(--text-primary)",
-                        display: "flex", alignItems: "center", gap: "6px"
-                    }}>
-                        <span style={{
-                            background: "rgba(161,100,255,0.15)",
-                            padding: "1px 8px",
-                            borderRadius: "12px",
-                            fontSize: "0.75rem",
-                            color: "#c084fc",
-                        }}>
-                            🧵
-                        </span>
-                        @{entry.author}
-                        {entry.isDiscovery && (
-                            <span style={{
-                                background: "rgba(251,191,36,0.15)",
-                                padding: "1px 6px",
-                                borderRadius: "8px",
-                                fontSize: "0.65rem",
-                                color: "#fbbf24",
-                            }}>
-                                ✨ 自動發現
-                            </span>
-                        )}
-                    </div>
-                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                        {publishedDate}
-                    </div>
+                {/* 右上角按鈕組 */}
+                <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                        onClick={handleToggleSave}
+                        title={isSaved ? "取消釘選" : "釘選保留"}
+                        style={{
+                            background: isSaved ? "rgba(251,191,36,0.15)" : "rgba(0,0,0,0.03)",
+                            border: isSaved ? "1px solid rgba(251,191,36,0.3)" : "1px solid transparent",
+                            borderRadius: "8px",
+                            width: "32px", height: "32px",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: isSaved ? "#fbbf24" : "var(--text-muted)",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease"
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = isSaved ? "rgba(251,191,36,0.25)" : "var(--bg-glass-hover)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isSaved ? "rgba(251,191,36,0.15)" : "rgba(0,0,0,0.03)"; }}
+                    >
+                        <Pin size={16} strokeWidth={isSaved ? 3 : 2} fill={isSaved ? "#fbbf24" : "none"} />
+                    </button>
+
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        title="移除此廢文"
+                        style={{
+                            background: "rgba(0,0,0,0.03)",
+                            border: "1px solid transparent",
+                            borderRadius: "8px",
+                            width: "32px", height: "32px",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "var(--text-muted)",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease"
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = "var(--danger)"; e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "rgba(0,0,0,0.03)"; }}
+                    >
+                        {isDeleting ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
                 </div>
             </div>
 
             {/* 貼文內容 */}
             <div style={{
-                fontSize: "0.875rem",
+                fontSize: "0.9375rem",
                 color: "var(--text-secondary)",
-                lineHeight: 1.7,
+                lineHeight: 1.6,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
-                marginBottom: "12px",
+                zIndex: 1
             }}>
                 {truncatedContent}
             </div>
@@ -194,26 +179,29 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                gap: "8px",
+                marginTop: "auto",
+                borderTop: "1px solid var(--border-glass)",
+                paddingTop: "16px",
+                zIndex: 1
             }}>
-                <div style={{ display: "flex", gap: "14px" }}>
+                <div style={{ display: "flex", gap: "16px" }}>
                     {entry.likeCount !== undefined && (
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
-                            <span style={{ fontSize: "0.85rem" }}>❤️</span>
+                        <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Heart size={14} color="#ec4899" />
                             {entry.likeCount.toLocaleString()}
                         </span>
                     )}
                     {entry.replyCount !== undefined && (
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
-                            <span style={{ fontSize: "0.85rem" }}>💬</span>
+                        <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <MessageCircle size={14} color="#3b82f6" />
                             {entry.replyCount.toLocaleString()}
                         </span>
                     )}
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-                        {isExpanded ? "▲ 收起" : "▼ 展開"}
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                        {isExpanded ? <><ChevronUp size={14} /> 收起</> : <><ChevronDown size={14} /> 展開</>}
                     </span>
                     <a
                         href={entry.threadUrl}
@@ -221,18 +209,22 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                            fontSize: "0.75rem",
-                            color: "#c084fc",
+                            fontSize: "0.8125rem",
+                            fontWeight: 500,
+                            color: "var(--accent-light)",
                             textDecoration: "none",
-                            padding: "3px 10px",
-                            borderRadius: "12px",
-                            border: "1px solid rgba(161,100,255,0.3)",
+                            padding: "6px 12px",
+                            borderRadius: "8px",
+                            background: "rgba(161,100,255,0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
                             transition: "all 0.2s",
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(161,100,255,0.15)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(161,100,255,0.2)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(161,100,255,0.1)")}
                     >
-                        查看原文 →
+                        查看原文 <ExternalLink size={14} />
                     </a>
                 </div>
             </div>
