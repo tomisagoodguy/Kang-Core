@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ThreadsEntryView } from "@/models/schema";
+import { deleteThreadAction, toggleThreadSaveAction } from "@/app/actions/threads";
 
 interface ThreadsCardProps {
     entry: ThreadsEntryView;
@@ -9,6 +10,36 @@ interface ThreadsCardProps {
 
 export function ThreadsCard({ entry }: ThreadsCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isDeleted, setIsDeleted] = useState(false);
+    const [isSaved, setIsSaved] = useState(entry.isSaved || false);
+
+    if (isDeleted) return null;
+
+    const handleDelete = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (confirm("確定要在洞察清單中隱藏或刪除這篇貼文嗎？")) {
+            setIsDeleting(true);
+            const res = await deleteThreadAction(entry.id);
+            if (res.success) {
+                setIsDeleted(true);
+            } else {
+                alert("移除失敗：" + res.error);
+                setIsDeleting(false);
+            }
+        }
+    };
+
+    const handleToggleSave = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newState = !isSaved;
+        setIsSaved(newState);
+        const res = await toggleThreadSaveAction(entry.id, newState);
+        if (!res.success) {
+            setIsSaved(!newState); // revert
+            alert("儲存失敗：" + res.error);
+        }
+    };
 
     const publishedDate = entry.publishedAt
         ? new Date(entry.publishedAt).toLocaleDateString("zh-TW", {
@@ -41,6 +72,61 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
                 background: "radial-gradient(circle, rgba(161,100,255,0.12) 0%, transparent 70%)",
                 pointerEvents: "none",
             }} />
+
+            {/* 釘選/儲存按鈕 */}
+            <button
+                onClick={handleToggleSave}
+                title={isSaved ? "取消釘選" : "釘選保留"}
+                style={{
+                    position: "absolute",
+                    top: "12px",
+                    right: "42px",
+                    background: isSaved ? "rgba(251,191,36,0.15)" : "rgba(0,0,0,0.05)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "24px",
+                    height: "24px",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: isSaved ? "#fbbf24" : "var(--text-muted)",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    zIndex: 10,
+                    opacity: isSaved ? 1 : 0.5,
+                    transition: "all 0.2s"
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = isSaved ? "rgba(251,191,36,0.25)" : "rgba(0,0,0,0.1)"; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = isSaved ? "1" : "0.5"; e.currentTarget.style.background = isSaved ? "rgba(251,191,36,0.15)" : "rgba(0,0,0,0.05)"; }}
+            >
+                {isSaved ? "⭐" : "🌟"}
+            </button>
+
+            {/* 隱藏/刪除按鈕 */}
+            <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                title="移除此廢文"
+                style={{
+                    position: "absolute",
+                    top: "12px",
+                    right: "12px",
+                    background: "rgba(0,0,0,0.05)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "24px",
+                    height: "24px",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "var(--text-muted)",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    zIndex: 10,
+                    opacity: 0.5,
+                    transition: "all 0.2s"
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = "rgba(0,0,0,0.1)"; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = "0.5"; e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+            >
+                {isDeleting ? "…" : "✕"}
+            </button>
 
             {/* Header: 作者 + 時間 */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>

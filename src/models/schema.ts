@@ -51,6 +51,7 @@ export const ThreadsEntrySchema = BaseEntrySchema.extend({
     likeCount: z.number().optional(),
     replyCount: z.number().optional(),
     isDiscovery: z.boolean().default(false), // Found via discovery mode
+    isSaved: z.boolean().default(false).optional(), // Manually saved by user
 });
 export type ThreadsEntry = z.infer<typeof ThreadsEntrySchema>;
 

@@ -81,12 +81,50 @@ export async function GET(req: Request) {
         const finalMessage = `🧵 **Threads 每日科技精華**\n\n${summaryText.trim()}`;
 
         // 推播至 LINE
+        // 將推播送出 (非同步或是 awaiting)
         await lineService.pushText(userId, finalMessage);
+
+        // --- 🤖 自動清理機制 ---
+        // 刪除 超過 7 天 且「未被釘選保留 (isSaved)」的廢文
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const oldSnapshot = await db
+            .collection("threads")
+            .where("createdAt", "<", sevenDaysAgo)
+            .get();
+
+        let deletedCount = 0;
+        if (!oldSnapshot.empty) {
+            const batch = db.batch();
+            let batchCount = 0;
+            oldSnapshot.docs.forEach((doc) => {
+                const data = doc.data();
+                if (data.isSaved !== true) {
+                    batch.delete(doc.ref);
+                    deletedCount++;
+                    batchCount++;
+                }
+            });
+
+            // Firebase batch 最多 500 筆，若超過會出錯，這裡簡單防呆處理
+            if (batchCount > 0 && batchCount <= 500) {
+                await batch.commit();
+                console.log(`[threads-summary] Auto-deleted ${deletedCount} old threads.`);
+            } else if (batchCount > 500) {
+                // 如果量超大就一筆一筆刪
+                for (const doc of oldSnapshot.docs) {
+                    if (doc.data().isSaved !== true) {
+                        await doc.ref.delete();
+                    }
+                }
+                console.log(`[threads-summary] Auto-deleted ${deletedCount} old threads loop.`);
+            }
+        }
 
         return NextResponse.json({
             status: "ok",
             processedCount: entries.length,
-            message: "Summary pushed to LINE"
+            deletedCount: deletedCount,
+            message: "Summary pushed to LINE, old threads cleaned up."
         });
 
     } catch (err) {
