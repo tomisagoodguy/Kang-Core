@@ -22,13 +22,23 @@ import type { AccountingEntry, ArchiveEntry, CalendarEntry, RecurringExpense } f
 
 export class MessageService {
     /** 內部發送訊息並紀錄到短記憶 */
-    private async sendReply(userId: string, replyText: string): Promise<void> {
+    private async sendReply(userId: string, state: { token?: string, used?: boolean } | undefined, replyText: string): Promise<void> {
+    if (state?.token && !state.used) {
+        state.used = true;
+        try {
+            await lineService.replyText(state.token, replyText);
+        } catch (e) {
+            console.error('replyText failed:', e);
+            await lineService.pushText(userId, replyText);
+        }
+    } else {
         await lineService.pushText(userId, replyText);
-        SessionService.addMessage(userId, "assistant", replyText).catch(console.error);
     }
+    SessionService.addMessage(userId, 'assistant', replyText).catch(console.error);
+}
 
     /** 處理文字訊息 */
-    async handleTextMessage(userText: string, userId: string): Promise<void> {
+    async handleTextMessage(userText: string, userId: string, state?: { token?: string, used?: boolean }): Promise<void> {
         // 先取得歷史對話
         const history = await SessionService.getRecentHistory(userId);
         const historyContext = history.length > 0
@@ -41,14 +51,14 @@ export class MessageService {
         // ── Threads URL 口語化識別（最優先，在 Gemini 之前）────────────────
         const threadsResult = await detectThreadsIntent(userText, userId);
         if (threadsResult) {
-            await this.sendReply(userId, threadsResult);
+            await this.sendReply(userId, state, threadsResult);
             return;
         }
 
         // 快速指令攔截（/記, /查, /待, /help）— 不走 Gemini
         const quickResult = await parseQuickCommand(userText, userId);
         if (quickResult.handled) {
-            await this.sendReply(userId, quickResult.replyText!);
+            await this.sendReply(userId, state, quickResult.replyText!);
             if (!userText.trim().startsWith("/help") && !userText.trim().startsWith("/查")) {
                 await discordService.sendDiscordNotification(quickResult.replyText!);
             }
@@ -77,7 +87,7 @@ export class MessageService {
                     };
                     const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
 
-                    await this.sendReply(userId, replyText);
+                    await this.sendReply(userId, state, replyText);
                     await db.collection("accounting").add(entry);
                     await discordService.sendDiscordNotification(replyText);
                     return;
@@ -88,7 +98,7 @@ export class MessageService {
         const parsedData = await parseUserInput(userText, historyContext);
 
         if (parsedData.isError) {
-            await this.sendReply(userId, `⚠️ 解析失敗：\n${parsedData.errorMessage}`);
+            await this.sendReply(userId, state, `⚠️ 解析失敗：\n${parsedData.errorMessage}`);
             return;
         }
 
@@ -96,7 +106,7 @@ export class MessageService {
             const list = parsedData.accountingDataList || (parsedData.accountingData ? [parsedData.accountingData] : []);
 
             if (list.length === 0) {
-                await this.sendReply(userId, "⚠️ AI 判斷為記帳，但無法解析出有效金額與項目，請重新描述 (例如: 早餐 100)。");
+                await this.sendReply(userId, state, "⚠️ AI 判斷為記帳，但無法解析出有效金額與項目，請重新描述 (例如: 早餐 100)。");
                 return;
             }
 
@@ -143,7 +153,7 @@ export class MessageService {
             }
 
             const finalReply = totalReplyText.trim();
-            await this.sendReply(userId, finalReply);
+            await this.sendReply(userId, state, finalReply);
             await discordService.sendDiscordNotification(finalReply);
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
@@ -165,7 +175,7 @@ export class MessageService {
             let replyText = `📦 收納成功！\n📋 摘要: ${entry.summary}\n🏷️ 關鍵字: ${entry.keywords.join(", ")}`;
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-            await this.sendReply(userId, replyText);
+            await this.sendReply(userId, state, replyText);
             await db.collection("archive").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
@@ -201,7 +211,7 @@ export class MessageService {
 
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-            await this.sendReply(userId, replyText);
+            await this.sendReply(userId, state, replyText);
             await db.collection("calendar").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
@@ -221,17 +231,17 @@ export class MessageService {
             let replyText = `🔄 定期支出設定成功！\n💰 金額: $${entry.amount}\n📝 項目: ${entry.description}\n🏷️ 標籤: ${entry.tag}\n⏳ 頻率: ${freqStr}`;
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
-            await this.sendReply(userId, replyText);
+            await this.sendReply(userId, state, replyText);
             await db.collection("recurring_expenses").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
         } else if (parsedData.type === "query" && parsedData.queryData) {
             const queryResult = await executeQuery(parsedData.queryData);
-            await this.sendReply(userId, queryResult.replyText);
+            await this.sendReply(userId, state, queryResult.replyText);
 
         } else if (parsedData.type === "clear_memory") {
             chatSessionManager.clearSession(userId);
-            await this.sendReply(userId, "✅ 對話記憶已清除。我們可以重新開始對話了！");
+            await this.sendReply(userId, state, "✅ 對話記憶已清除。我們可以重新開始對話了！");
 
         } else {
             // Fallback: Dispatch to Chat Session (Context Memory)
@@ -240,20 +250,20 @@ export class MessageService {
                 const session = chatSessionManager.getOrCreateSession(userId);
                 const response = await session.sendMessage(userText);
                 const replyText = response.response.text() || "抱歉，我無法提供回答。";
-                await this.sendReply(userId, replyText);
+                await this.sendReply(userId, state, replyText);
             } catch (err) {
                 console.error("[ChatSession] Error:", err);
-                await this.sendReply(userId, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「收到薪水 50000」\n「明天下午三點開會」\n「每月10號付家裡伙食費7000」\n「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
+                await this.sendReply(userId, state, "❓ 無法解析您的意圖，請試試：\n「吃飯花了 150」\n「收到薪水 50000」\n「明天下午三點開會」\n「每月10號付家裡伙食費7000」\n「這個連結很有趣 https://...」\n\n💡 也可以用 /help 查看快速指令");
             }
         }
     }
 
     /** 處理圖片訊息（上傳 Drive + Gemini Vision 分析） */
-    async handleImageMessage(messageId: string, userId: string): Promise<void> {
+    async handleImageMessage(messageId: string, userId: string, state?: { token?: string, used?: boolean }): Promise<void> {
         SessionService.addMessage(userId, "user", "[上傳了一張圖片]").catch(console.error);
 
         // 先回覆「處理中」讓使用者知道收到了
-        await this.sendReply(userId, "🖼️ 收到圖片，分析中...");
+        await this.sendReply(userId, state, "🖼️ 收到圖片，分析中...");
 
         // 下載 LINE 圖片
         const imageBuffer = await lineService.getMessageContentBuffer(messageId);
@@ -269,7 +279,7 @@ export class MessageService {
         ]);
 
         if (parsedData.isError) {
-            await this.sendReply(userId, `⚠️ 圖片分析失敗：${parsedData.errorMessage}\n📁 圖片已存到 Drive：${driveUrl}`);
+            await this.sendReply(userId, state, `⚠️ 圖片分析失敗：${parsedData.errorMessage}\n📁 圖片已存到 Drive：${driveUrl}`);
             return;
         }
 
@@ -283,7 +293,7 @@ export class MessageService {
             };
             const replyText = `✅ 收據記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}\n📁 圖片: 已存 Drive`;
 
-            await this.sendReply(userId, replyText);
+            await this.sendReply(userId, state, replyText);
             await db.collection("accounting").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
@@ -311,7 +321,7 @@ export class MessageService {
             }
             const replyText = `📦 圖片收納成功！\n📋 摘要: ${entry.summary}\n🏷️ 關鍵字: ${entry.keywords.join(", ")}\n📁 圖片: 已存 Drive`;
 
-            await this.sendReply(userId, replyText);
+            await this.sendReply(userId, state, replyText);
             await db.collection("archive").add(entry);
             await discordService.sendDiscordNotification(replyText);
 
@@ -321,15 +331,15 @@ export class MessageService {
             }
 
         } else {
-            await this.sendReply(userId, `❓ 無法辨識圖片內容\n📁 圖片已存 Drive：${driveUrl}`);
+            await this.sendReply(userId, state, `❓ 無法辨識圖片內容\n📁 圖片已存 Drive：${driveUrl}`);
         }
     }
 
     /** 處理檔案訊息（如 PDF、DOCX，上傳 Drive 並記錄到知識庫） */
-    async handleFileMessage(messageId: string, fileName: string, userId: string): Promise<void> {
+    async handleFileMessage(messageId: string, fileName: string, userId: string, state?: { token?: string, used?: boolean }): Promise<void> {
         SessionService.addMessage(userId, "user", `[上傳了檔案: ${fileName}]`).catch(console.error);
 
-        await this.sendReply(userId, "📁 收到檔案，上傳至雲端硬碟與 AI 知識庫中...");
+        await this.sendReply(userId, state, "📁 收到檔案，上傳至雲端硬碟與 AI 知識庫中...");
 
         try {
             const fileBuffer = await lineService.getMessageContentBuffer(messageId);
@@ -374,17 +384,18 @@ export class MessageService {
             const replyText = `✅ 檔案儲存成功！\n📁 標題：${fileName}\n🔗 存檔位置：已存 Drive\n🤖 AI 知識庫：${aiStatusStr}\n💡 您現在可以直接詢問我檔案內容了！`;
 
             await db.collection("archive").add(entry);
-            await this.sendReply(userId, replyText);
+            await this.sendReply(userId, state, replyText);
             await discordService.sendDiscordNotification(replyText);
 
         } catch (e: unknown) {
             console.error("handleFileMessage error:", e);
-            await this.sendReply(userId, "⚠️ 檔案處理失敗，請稍後再試。");
+            await this.sendReply(userId, state, "⚠️ 檔案處理失敗，請稍後再試。");
         }
     }
 
     /** 主要事件處理 */
     async processEvent(event: WebhookEvent): Promise<void> {
+        const state = { token: (event as any).replyToken, used: false };
         if (event.type !== "message") return;
 
         const userId = event.source.userId;
@@ -408,14 +419,14 @@ export class MessageService {
         try {
             if (event.message.type === "text") {
                 const textMessage = event.message as TextMessage;
-                await this.handleTextMessage(textMessage.text, userId);
+                await this.handleTextMessage(textMessage.text, userId, state);
 
             } else if (event.message.type === "image") {
-                await this.handleImageMessage(event.message.id, userId);
+                await this.handleImageMessage(event.message.id, userId, state);
 
             } else if (event.message.type === "file") {
                 const fileMessage = event.message as unknown as { fileName: string };
-                await this.handleFileMessage(event.message.id, fileMessage.fileName, userId);
+                await this.handleFileMessage(event.message.id,  fileMessage.fileName, userId, state);
             }
             // 其他訊息類型（影片、語音等）目前忽略
 
@@ -423,7 +434,7 @@ export class MessageService {
             const error = err as Error;
             console.error(`[processEvent] userId=${userId}:`, error);
             try {
-                await this.sendReply(userId, `⚠️ 處理失敗：${error?.message?.slice(0, 100) ?? "未知錯誤"}`);
+                await this.sendReply(userId, { token: (event as any).replyToken, used: false }, `⚠️ 處理失敗：${error?.message?.slice(0, 100) ?? "未知錯誤"}`);
             } catch {
                 // push message 失敗則靜默
             }
