@@ -176,21 +176,35 @@ export default async function HomePage() {
 
     const currentMonth = new Date().toISOString().slice(0, 7);
 
-    // 獨立撈取當月所有記帳記錄以計算正確的總支出與筆數
-    const monthAccSnapshot = await db.collection("accounting")
-        .where("date", ">=", `${currentMonth}-01`)
-        .where("date", "<=", `${currentMonth}-31`)
-        .get();
+    let monthlyIncome = 0;
+    let monthlyExpense = 0;
+    let monthlyCount = 0;
+    let archiveTotalCount = 0;
 
-    const monthDocs = monthAccSnapshot.docs.map(doc => doc.data());
-    const monthlyIncome = monthDocs.reduce((sum, data) => data.tag === "Income" ? sum + (data.amount || 0) : sum, 0);
-    const monthlyExpense = monthDocs.reduce((sum, data) => data.tag !== "Income" ? sum + (data.amount || 0) : sum, 0);
+    try {
+        // 獨立撈取當月所有記帳記錄以計算正確的總支出與筆數
+        const monthAccSnapshot = await db.collection("accounting")
+            .where("date", ">=", `${currentMonth}-01`)
+            .where("date", "<=", `${currentMonth}-31`)
+            .get();
+
+        const monthDocs = monthAccSnapshot.docs.map(doc => doc.data());
+        monthlyIncome = monthDocs.reduce((sum, data) => data.tag === "Income" ? sum + (data.amount || 0) : sum, 0);
+        monthlyExpense = monthDocs.reduce((sum, data) => data.tag !== "Income" ? sum + (data.amount || 0) : sum, 0);
+        monthlyCount = monthAccSnapshot.size;
+    } catch (e) {
+        console.error("[HomePage] Failed to calculate monthly stats:", e);
+    }
+
+    try {
+        // 取得知識庫總存檔數量
+        const archiveCountRes = await db.collection("archive").count().get();
+        archiveTotalCount = archiveCountRes.data().count;
+    } catch (e) {
+        console.error("[HomePage] Failed to count archive:", e);
+    }
+
     const monthlyNet = monthlyIncome - monthlyExpense;
-    const monthlyCount = monthAccSnapshot.size;
-
-    // 取得知識庫總存檔數量
-    const archiveCountRes = await db.collection("archive").count().get();
-    const archiveTotalCount = archiveCountRes.data().count;
 
     return (
         <div className="page-container">
