@@ -448,11 +448,11 @@ async function detectThreadsIntent(text: string, _userId: string): Promise<strin
     // ── Step 1: 嘗試從文字中提取 Threads username ──────────────────────────
     let extractedUsername: string | null = null;
 
-    // 情況 A：貼 threads.net URL
-    // 例：https://www.threads.net/@hogan.tech 或 https://www.threads.net/hogan.tech
-    const urlMatch = text.match(/threads\.net\/@?([\w.]+)/i);
+    // 情況 A：貼 threads.net 或 threads.com URL
+    // 例：https://www.threads.net/@hogan.tech 或 https://www.threads.com/@hogan.tech
+    const urlMatch = text.match(/threads\.(net|com)\/@?([\w.]+)/i);
     if (urlMatch) {
-        extractedUsername = urlMatch[1].replace(/^@/, "");
+        extractedUsername = urlMatch[2].replace(/^@/, "");
     }
 
     // 情況 B：直接寫 @帳號（但不是 threads URL）
