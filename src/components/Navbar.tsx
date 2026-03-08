@@ -57,18 +57,20 @@ export function Navbar() {
                     <div className={`navbar-link ${settingsLinks.some(link => pathname === link.href) ? "active" : ""}`} style={{ cursor: "default", display: "flex", alignItems: "center", gap: "6px" }}>
                         <Settings size={16} /> 設定
                     </div>
-                    <div className="navbar-dropdown-content" style={{ display: "flex", flexDirection: "column", background: "var(--bg-secondary)", borderRadius: "12px", border: "1px solid var(--border-glass)", boxShadow: "0 10px 40px -10px rgba(0,0,0,0.1)", padding: "8px" }}>
-                        {settingsLinks.map((link) => (
-                            <Link
-                                key={link.href}
-                                href={link.href}
-                                className={`navbar-link ${pathname === link.href ? "active" : ""}`}
-                                style={{ margin: "2px", width: "auto", display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-start", padding: "8px 16px" }}
-                            >
-                                {link.icon}
-                                <span>{link.label}</span>
-                            </Link>
-                        ))}
+                    <div className="navbar-dropdown-content">
+                        <div className="navbar-dropdown-inner">
+                            {settingsLinks.map((link) => (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    className={`navbar-link ${pathname === link.href ? "active" : ""}`}
+                                    style={{ margin: "2px", width: "auto", display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-start", padding: "8px 16px" }}
+                                >
+                                    {link.icon}
+                                    <span>{link.label}</span>
+                                </Link>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
