@@ -4,6 +4,7 @@
 import React, { useMemo, useState } from "react";
 import type { AccountingEntryView } from "@/models/schema";
 import { AccountingCard } from "./AccountingCard";
+import { CalendarDays, MapPin } from "lucide-react";
 
 interface AccountingCalendarViewProps {
     entries: AccountingEntryView[];
@@ -67,10 +68,13 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
     const selectedEntries = hasSelectionData ? mappedEntries[parseInt(selectedDate.split("-")[2], 10)] : [];
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px", marginTop: "16px" }}>
             <div className="glass-card" style={{ padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-                    <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>📅 行事曆 ({validMonth})</h2>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px", alignItems: "center" }}>
+                    <h2 style={{ fontSize: "1.25rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)" }}>
+                        <CalendarDays className="text-accent" size={22} />
+                        行事曆 ({validMonth})
+                    </h2>
                     <span style={{ fontSize: "1.1rem", fontWeight: 600, color: totalMonthAmount >= 0 ? "var(--success)" : "var(--danger)" }}>
                         月結餘: {totalMonthAmount < 0 ? '-' : ''}${Math.abs(totalMonthAmount).toLocaleString()}
                     </span>
@@ -82,8 +86,9 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
                     gap: "8px",
                     textAlign: "center",
                     fontWeight: 600,
-                    marginBottom: "8px",
-                    color: "var(--text-secondary)"
+                    marginBottom: "12px",
+                    color: "var(--text-secondary)",
+                    fontSize: "0.875rem"
                 }}>
                     {["日", "一", "二", "三", "四", "五", "六"].map(d => <div key={d}>{d}</div>)}
                 </div>
@@ -112,22 +117,41 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
                                 onClick={() => handleDayClick(dayStr)}
                                 style={{
                                     padding: "8px",
-                                    borderRadius: "8px",
-                                    background: isSelected ? "var(--primary-light)" : "var(--bg-glass)",
-                                    border: isSelected ? "2px solid var(--primary)" : isToday ? "1px solid var(--accent-light)" : "1px solid transparent",
+                                    borderRadius: "12px",
+                                    background: isSelected ? "var(--bg-glass-hover)" : "var(--bg-glass)",
+                                    border: isSelected ? "2px solid var(--accent)" : isToday ? "1px solid var(--accent-light)" : "1px solid var(--border-glass)",
                                     cursor: "pointer",
                                     display: "flex",
                                     flexDirection: "column",
                                     alignItems: "center",
                                     justifyContent: "space-between",
-                                    minHeight: "80px",
+                                    minHeight: "84px",
                                     transition: "all 0.2s ease"
+                                }}
+                                onMouseOver={(e) => {
+                                    if (!isSelected) {
+                                        e.currentTarget.style.borderColor = "var(--border-glass-hover)";
+                                        e.currentTarget.style.background = "var(--bg-glass-hover)";
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    if (!isSelected) {
+                                        e.currentTarget.style.borderColor = isToday ? "var(--accent-light)" : "var(--border-glass)";
+                                        e.currentTarget.style.background = "var(--bg-glass)";
+                                    }
                                 }}
                             >
                                 <span style={{
-                                    fontSize: "1rem",
+                                    fontSize: "0.9375rem",
                                     fontWeight: isToday ? 800 : 600,
-                                    color: isToday ? "var(--accent-light)" : "inherit"
+                                    color: isToday ? "var(--accent-light)" : "var(--text-primary)",
+                                    background: isToday ? "var(--accent-glow)" : "transparent",
+                                    borderRadius: "50%",
+                                    width: "28px",
+                                    height: "28px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
                                 }}>{day}</span>
                                 {dayEntries.length > 0 && (
                                     <span style={{ fontSize: "0.85rem", color: dayTotal >= 0 ? "var(--success)" : "var(--danger)", fontWeight: 700, marginTop: "auto" }}>
@@ -135,7 +159,7 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
                                     </span>
                                 )}
                                 {dayEntries.length > 0 && (
-                                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 500 }}>
                                         {dayEntries.length} 筆
                                     </span>
                                 )}
@@ -146,14 +170,15 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
             </div>
 
             {selectedDate && (
-                <div className="glass-card" style={{ padding: "20px", background: "rgba(124, 58, 237, 0.05)", borderLeft: "4px solid var(--primary)" }}>
-                    <h3 style={{ marginBottom: "16px", fontSize: "1.125rem", fontWeight: 700 }}>
-                        📌 {selectedDate} 的記帳 ({selectedEntries.length} 筆)
+                <div className="glass-card" style={{ padding: "20px", background: "var(--bg-glass)", borderLeft: "4px solid var(--accent)", transition: "all 0.3s ease" }}>
+                    <h3 style={{ marginBottom: "20px", fontSize: "1.125rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)" }}>
+                        <MapPin className="text-secondary" size={20} />
+                        {selectedDate} 的記帳 ({selectedEntries.length} 筆)
                     </h3>
                     {selectedEntries.length === 0 ? (
-                        <p style={{ color: "var(--text-muted)" }}>這天沒有記帳紀錄。</p>
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.9375rem" }}>這天沒有記帳紀錄。</p>
                     ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px" }}>
                             {selectedEntries.map(entry => (
                                 <AccountingCard key={entry.id} entry={entry} />
                             ))}

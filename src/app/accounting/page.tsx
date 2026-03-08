@@ -8,6 +8,17 @@ import { TagPieChart } from "@/components/charts/TagPieChart";
 import { ALL_TAGS } from "@/utils/constants";
 import type { AccountingEntryView, CustomTag } from "@/models/schema";
 import { AccountingCalendarView } from "@/components/AccountingCalendarView";
+import {
+    Wallet,
+    Tags,
+    Filter,
+    Calendar,
+    Download,
+    Loader2,
+    Inbox,
+    List,
+    CalendarDays
+} from "lucide-react";
 
 const ALL_MONTHS = () => {
     const months = [];
@@ -133,58 +144,79 @@ export default function AccountingPage() {
 
     return (
         <div className="page-container">
-            <h1 className="page-title">💳 記帳記錄</h1>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <Wallet className="text-accent" size={28} />
+                記帳記錄
+            </h1>
 
             <InsightCard />
 
             {/* 圖表區 */}
             {!loading && entries.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "24px" }}>
                     <MonthlyTrendChart data={monthlyTrend} />
                     <TagPieChart data={tagDistribution} entries={entries} currentMonth={new Date().toISOString().slice(0, 7)} />
                 </div>
             )}
 
-            <div className="filter-bar">
-                <select
-                    className="filter-select"
-                    value={selectedTag}
-                    onChange={(e) => {
-                        setSelectedTag(e.target.value);
-                        setSelectedSubTag("all"); // 重置子標籤
-                    }}
-                >
-                    <option value="all">🏷 全部分類</option>
-                    {ALL_TAGS.map((tag) => (
-                        <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                </select>
+            <div className="filter-bar" style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
+                <div style={{ position: "relative", flex: "1", minWidth: "160px" }}>
+                    <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }}>
+                        <Tags size={16} />
+                    </div>
+                    <select
+                        className="filter-select"
+                        value={selectedTag}
+                        onChange={(e) => {
+                            setSelectedTag(e.target.value);
+                            setSelectedSubTag("all"); // 重置子標籤
+                        }}
+                        style={{ paddingLeft: "36px", width: "100%" }}
+                    >
+                        <option value="all">全部分類</option>
+                        {ALL_TAGS.map((tag) => (
+                            <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                    </select>
+                </div>
 
-                <select
-                    className="filter-select"
-                    value={selectedSubTag}
-                    onChange={(e) => setSelectedSubTag(e.target.value)}
-                    disabled={selectedTag === "all"}
-                >
-                    <option value="all">🔍 全部子標籤</option>
-                    {customTags
-                        .filter(t => t.parentTag === selectedTag)
-                        .map(t => (
-                            <option key={t.id} value={t.name}>{t.name}</option>
-                        ))
-                    }
-                </select>
+                <div style={{ position: "relative", flex: "1", minWidth: "160px" }}>
+                    <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }}>
+                        <Filter size={16} />
+                    </div>
+                    <select
+                        className="filter-select"
+                        value={selectedSubTag}
+                        onChange={(e) => setSelectedSubTag(e.target.value)}
+                        disabled={selectedTag === "all"}
+                        style={{ paddingLeft: "36px", width: "100%" }}
+                    >
+                        <option value="all">全部子標籤</option>
+                        {customTags
+                            .filter(t => t.parentTag === selectedTag)
+                            .map(t => (
+                                <option key={t.id} value={t.name}>{t.name}</option>
+                            ))
+                        }
+                    </select>
+                </div>
 
-                <select
-                    className="filter-select"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                    <option value="all">📅 全部月份</option>
-                    {ALL_MONTHS().map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                    ))}
-                </select>
+                <div style={{ position: "relative", flex: "1", minWidth: "160px" }}>
+                    <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }}>
+                        <Calendar size={16} />
+                    </div>
+                    <select
+                        className="filter-select"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        style={{ paddingLeft: "36px", width: "100%" }}
+                    >
+                        <option value="all">全部月份</option>
+                        {ALL_MONTHS().map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "16px" }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
@@ -196,61 +228,70 @@ export default function AccountingPage() {
                             {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`} {totalAmount < 0 ? '-' : ''}${Math.abs(totalAmount).toLocaleString()}
                         </span>
                     </div>
-                    <button className="card-action-btn" onClick={handleExportCSV} style={{ opacity: 1, padding: "6px 14px" }}>
-                        📥 匯出 CSV
+                    <button className="card-action-btn" onClick={handleExportCSV} style={{ display: "flex", alignItems: "center", gap: "6px", opacity: 1, padding: "8px 14px", fontWeight: 500 }}>
+                        <Download size={16} />
+                        匯出 CSV
                     </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="empty-state">
-                    <span className="empty-state-icon">⏳</span>
-                    <p>載入中...</p>
+                <div className="empty-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                    <Loader2 className="animate-spin text-accent" size={32} />
+                    <p style={{ color: "var(--text-secondary)" }}>載入中...</p>
                 </div>
             ) : filtered.length === 0 ? (
-                <div className="empty-state">
-                    <span className="empty-state-icon">📭</span>
-                    <p>沒有符合條件的記帳記錄</p>
+                <div className="empty-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                    <Inbox className="text-muted opacity-50" size={48} />
+                    <p style={{ color: "var(--text-secondary)" }}>沒有符合條件的記帳記錄</p>
                 </div>
             ) : (
                 <>
                     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
-                        <div style={{ display: "flex", background: "var(--bg-glass)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                        <div style={{ display: "flex", background: "var(--bg-glass)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border-glass)" }}>
                             <button
                                 onClick={() => setViewMode("list")}
                                 style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
                                     padding: "6px 16px",
-                                    borderRadius: "6px",
+                                    borderRadius: "4px",
                                     border: "none",
-                                    background: viewMode === "list" ? "var(--primary)" : "transparent",
-                                    color: viewMode === "list" ? "white" : "var(--text-secondary)",
+                                    background: viewMode === "list" ? "var(--border-glass-hover)" : "transparent",
+                                    color: viewMode === "list" ? "var(--text-primary)" : "var(--text-secondary)",
                                     fontWeight: viewMode === "list" ? 600 : 500,
                                     cursor: "pointer",
                                     transition: "all 0.2s"
                                 }}
                             >
-                                📄 列表
+                                <List size={16} />
+                                列表
                             </button>
                             <button
                                 onClick={() => setViewMode("calendar")}
                                 style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
                                     padding: "6px 16px",
-                                    borderRadius: "6px",
+                                    borderRadius: "4px",
                                     border: "none",
-                                    background: viewMode === "calendar" ? "var(--primary)" : "transparent",
-                                    color: viewMode === "calendar" ? "white" : "var(--text-secondary)",
+                                    background: viewMode === "calendar" ? "var(--border-glass-hover)" : "transparent",
+                                    color: viewMode === "calendar" ? "var(--text-primary)" : "var(--text-secondary)",
                                     fontWeight: viewMode === "calendar" ? 600 : 500,
                                     cursor: "pointer",
                                     transition: "all 0.2s"
                                 }}
                             >
-                                📅 日曆
+                                <CalendarDays size={16} />
+                                日曆
                             </button>
                         </div>
                     </div>
 
                     {viewMode === "list" ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "32px", marginTop: "16px" }}>
                             {groupedEntries.map(([date, dailyEntries]) => {
                                 const dailyTotal = dailyEntries.reduce((sum, item) => {
                                     return item.tag === "Income" ? sum + (item.amount || 0) : sum - (item.amount || 0);
@@ -262,17 +303,18 @@ export default function AccountingPage() {
                                             justifyContent: "space-between",
                                             alignItems: "center",
                                             borderBottom: "1px solid var(--border-glass)",
-                                            paddingBottom: "10px",
-                                            marginBottom: "12px"
+                                            paddingBottom: "12px",
+                                            marginBottom: "16px"
                                         }}>
-                                            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-primary)" }}>
-                                                📅 {date}
+                                            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                                                <Calendar size={18} className="text-secondary" />
+                                                {date}
                                             </h3>
-                                            <span style={{ fontSize: "0.9375rem", color: "var(--text-secondary)", fontWeight: 500 }}>
-                                                日結餘 / <strong style={{ color: dailyTotal >= 0 ? "var(--success)" : "var(--danger)" }}>{dailyTotal < 0 ? '-' : ''}${Math.abs(dailyTotal).toLocaleString()}</strong>
+                                            <span style={{ fontSize: "0.875rem", color: "var(--text-secondary)", fontWeight: 500 }}>
+                                                日結餘 / <strong style={{ color: dailyTotal >= 0 ? "var(--success)" : "var(--danger)", marginLeft: "4px" }}>{dailyTotal < 0 ? '-' : ''}${Math.abs(dailyTotal).toLocaleString()}</strong>
                                             </span>
                                         </div>
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px" }}>
                                             {dailyEntries.map((entry) => (
                                                 <AccountingCard key={entry.id} entry={entry} />
                                             ))}
@@ -289,3 +331,4 @@ export default function AccountingPage() {
         </div>
     );
 }
+
