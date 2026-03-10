@@ -259,7 +259,7 @@ export default async function HomePage() {
                         <p>還沒有代辦事項，傳個時間或計劃給機器人吧！</p>
                     </div>
                 ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+                    <div className="calendar-grid">
                         {calendarEntries.map((entry: CalendarEntryView) => (
                             <CalendarCard key={entry.id} entry={entry} />
                         ))}
@@ -334,7 +334,7 @@ export default async function HomePage() {
                         <p>啟動 threads-scraper 後，監控的 Threads 貼文將自動出現在這裡。</p>
                     </div>
                 ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+                    <div className="threads-grid">
                         {threadsEntries.map((entry: ThreadsEntryView) => (
                             <ThreadsCard key={entry.id} entry={entry} />
                         ))}
@@ -344,4 +344,4 @@ export default async function HomePage() {
         </div>
     );
 }
- 
+

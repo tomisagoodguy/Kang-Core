@@ -31,7 +31,7 @@ export async function checkBudgetAlert(
             if (budgetTag && budgetTag !== tag) continue;
 
             // 查詢當月同 tag 總支出
-            let query = db.collection("accounting")
+            const query = db.collection("accounting")
                 .where("date", ">=", monthStart)
                 .where("date", "<=", monthEnd) as FirebaseFirestore.Query;
 

@@ -44,11 +44,8 @@ export function CalendarCard({ entry }: CalendarCardProps) {
     return (
         <>
             <div
-                className="glass-card"
+                className="glass-card calendar-card"
                 style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
                     opacity: isDone ? 0.6 : 1,
                     borderLeft: isDone ? "4px solid var(--success, #4CAF50)" : "4px solid var(--warning, #FFC107)",
                     transition: "all 0.3s"

@@ -123,7 +123,7 @@ export default function ThreadsPage() {
                     <p>這位作者下沒有記錄，請選擇其他作者。</p>
                 </div>
             ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px", paddingBottom: "40px" }}>
+                <div className="threads-grid" style={{ paddingBottom: "40px" }}>
                     {filteredEntries.map((entry) => (
                         <ThreadsCard key={entry.id} entry={entry} />
                     ))}

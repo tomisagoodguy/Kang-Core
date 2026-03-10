@@ -37,7 +37,7 @@ export function AccountingCard({ entry }: AccountingCardProps) {
 
     return (
         <>
-            <div className="glass-card accounting-card" style={{ padding: "16px", gap: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
+            <div className="glass-card accounting-card" style={{ cursor: "pointer", transition: "all 0.2s ease" }}>
                 {entry.imageUrl ? (
                     <a href={entry.imageUrl} target="_blank" rel="noopener noreferrer" style={{ alignSelf: "flex-start", marginTop: "2px" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -49,16 +49,9 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
 
     return (
         <div
-            className="glass-card"
+            className="glass-card threads-card"
             style={{
-                padding: "24px",
-                transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
                 borderLeft: isSaved ? "4px solid #fbbf24" : "4px solid rgba(161, 100, 255, 0.6)",
-                position: "relative",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px"
             }}
         >
             {/* 背景漸層裝飾 */}

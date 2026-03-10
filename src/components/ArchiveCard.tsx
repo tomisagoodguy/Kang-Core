@@ -35,10 +35,6 @@ export function ArchiveCard({ entry }: ArchiveCardProps) {
             <div
                 className="glass-card archive-card"
                 style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                    padding: "20px",
                     transition: "all 0.3s ease",
                     position: "relative",
                     overflow: "hidden"

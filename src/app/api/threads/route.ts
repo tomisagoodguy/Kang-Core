@@ -10,10 +10,8 @@ export async function GET(req: Request) {
         const q = searchParams.get("q")?.toLowerCase() || "";
         const limit = parseInt(limitStr, 10);
 
-        let snapshot;
-
         // Simplified fetch, filtering will be done mostly in-memory here if simple
-        snapshot = await db
+        const snapshot = await db
             .collection("threads")
             .orderBy("createdAt", "desc")
             .limit(limit)

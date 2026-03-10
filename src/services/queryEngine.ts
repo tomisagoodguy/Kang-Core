@@ -38,7 +38,7 @@ export async function executeQuery(filters: QueryFilter): Promise<QueryResult> {
 async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
     const range = resolvePeriod(filters.period ?? "this_month");
 
-    let query = db
+    const query = db
         .collection("accounting")
         .where("date", ">=", range.from)
         .where("date", "<=", range.to) as FirebaseFirestore.Query;

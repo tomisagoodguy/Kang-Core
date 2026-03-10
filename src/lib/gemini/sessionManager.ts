@@ -40,7 +40,6 @@ class ChatSessionManager {
         const model = genAI.getGenerativeModel({
             model: MODEL_NAME,
             systemInstruction: "你是一個專業的文件分析助手與生活助理。\n當用戶詢問一般問題時，友善、專業地回答。\n若有上傳文件，請結合文件庫搜尋並提供準確的回答。\n請保持對話記憶，若用戶提到「剛才」、「之前」，需回顧對話歷史。\n請務必使用繁體中文。（若系統無法取得文件內容，請誠實告知。）",
-            // @ts-ignore
             tools: tools.length > 0 ? tools : undefined
         });
 

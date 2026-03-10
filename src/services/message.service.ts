@@ -23,19 +23,19 @@ import type { AccountingEntry, ArchiveEntry, CalendarEntry, RecurringExpense } f
 export class MessageService {
     /** 內部發送訊息並紀錄到短記憶 */
     private async sendReply(userId: string, state: { token?: string, used?: boolean } | undefined, replyText: string): Promise<void> {
-    if (state?.token && !state.used) {
-        state.used = true;
-        try {
-            await lineService.replyText(state.token, replyText);
-        } catch (e) {
-            console.error('replyText failed:', e);
+        if (state?.token && !state.used) {
+            state.used = true;
+            try {
+                await lineService.replyText(state.token, replyText);
+            } catch (e) {
+                console.error('replyText failed:', e);
+                await lineService.pushText(userId, replyText);
+            }
+        } else {
             await lineService.pushText(userId, replyText);
         }
-    } else {
-        await lineService.pushText(userId, replyText);
+        SessionService.addMessage(userId, 'assistant', replyText).catch(console.error);
     }
-    SessionService.addMessage(userId, 'assistant', replyText).catch(console.error);
-}
 
     /** 處理文字訊息 */
     async handleTextMessage(userText: string, userId: string, state?: { token?: string, used?: boolean }): Promise<void> {
@@ -49,7 +49,7 @@ export class MessageService {
         SessionService.addMessage(userId, "user", userText).catch(console.error);
 
         // ── Threads URL 口語化識別（最優先，在 Gemini 之前）────────────────
-        const threadsResult = await detectThreadsIntent(userText, userId);
+        const threadsResult = await detectThreadsIntent(userText);
         if (threadsResult) {
             await this.sendReply(userId, state, threadsResult);
             return;
@@ -77,7 +77,7 @@ export class MessageService {
                     const amount = Number(amountMatch[1]);
                     const entry: AccountingEntry = {
                         amount,
-                        tag: ruleMatch.tag as any,
+                        tag: ruleMatch.tag as AccountingEntry["tag"],
                         subTag: ruleMatch.subTag ?? undefined,
                         date: new Date().toISOString().slice(0, 10),
                         description: userText,
@@ -124,7 +124,7 @@ export class MessageService {
                     createdAt: new Date(),
                 };
                 const isIncome = entry.tag === "Income";
-                let replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
+                const replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
 
                 batch.set(docRef, entry);
 
@@ -298,8 +298,8 @@ export class MessageService {
             await discordService.sendDiscordNotification(replyText);
 
             // 學習新規則 (C9)
-            if (entry.tag && entry.tag !== "Other" && (entry as any).description) {
-                await ClassificationEngine.learn((entry as any).description, entry.tag, (entry as any).subTag);
+            if (entry.tag && entry.tag !== "Other" && entry.description) {
+                await ClassificationEngine.learn(entry.description, entry.tag, entry.subTag);
             }
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {
@@ -395,7 +395,8 @@ export class MessageService {
 
     /** 主要事件處理 */
     async processEvent(event: WebhookEvent): Promise<void> {
-        const state = { token: (event as any).replyToken, used: false };
+        const replyToken = "replyToken" in event ? (event.replyToken as string) : undefined;
+        const state = { token: replyToken, used: false };
         if (event.type !== "message") return;
 
         const userId = event.source.userId;
@@ -426,7 +427,7 @@ export class MessageService {
 
             } else if (event.message.type === "file") {
                 const fileMessage = event.message as unknown as { fileName: string };
-                await this.handleFileMessage(event.message.id,  fileMessage.fileName, userId, state);
+                await this.handleFileMessage(event.message.id, fileMessage.fileName, userId, state);
             }
             // 其他訊息類型（影片、語音等）目前忽略
 
@@ -434,7 +435,8 @@ export class MessageService {
             const error = err as Error;
             console.error(`[processEvent] userId=${userId}:`, error);
             try {
-                await this.sendReply(userId, { token: (event as any).replyToken, used: false }, `⚠️ 處理失敗：${error?.message?.slice(0, 100) ?? "未知錯誤"}`);
+                const replyToken = "replyToken" in event ? (event.replyToken as string) : undefined;
+                await this.sendReply(userId, { token: replyToken, used: false }, `⚠️ 處理失敗：${error?.message?.slice(0, 100) ?? "未知錯誤"}`);
             } catch {
                 // push message 失敗則靜默
             }
@@ -453,7 +455,7 @@ export const messageService = new MessageService();
  * 從各種輸入格式中識別 Threads 追蹤意圖
  * @returns 回覆文字，如果不是 Threads 相關則回 null
  */
-async function detectThreadsIntent(text: string, _userId: string): Promise<string | null> {
+async function detectThreadsIntent(text: string): Promise<string | null> {
     const lower = text.toLowerCase().trim();
 
     // ── Step 1: 嘗試從文字中提取 Threads username ──────────────────────────
@@ -508,8 +510,8 @@ async function detectThreadsIntent(text: string, _userId: string): Promise<strin
             return `🗑️ 已取消追蹤 @${username}`;
         }
 
-        // 預設為追蹤（有 URL 或有 isAdd 關鍵字，或只傳 @帳號）
-        if (isAdd || urlMatch || (!isRemove)) {
+        // 只有明確有追蹤關鍵字才追蹤
+        if (isAdd) {
             await db.collection("threads_users").doc(username).set({
                 username,
                 maxPosts: 10,
