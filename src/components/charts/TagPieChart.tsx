@@ -183,8 +183,8 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                             nameKey={drillTag ? "name" : "tag"}
                             cx="50%"
                             cy="50%"
-                            innerRadius={50}
-                            outerRadius={90}
+                            innerRadius={70}
+                            outerRadius={110}
                             paddingAngle={2}
                             strokeWidth={0}
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -199,7 +199,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                                     setActiveIndex(-1);
                                 }
                             }}
-                            style={{ cursor: (!drillTag && entries) ? "pointer" : "default" }}
+                            style={{ cursor: (!drillTag && entries) ? "pointer" : "default", outline: "none" }}
                         >
                             {displayData.map((entry, index) => {
                                 const baseColor = drillTag
