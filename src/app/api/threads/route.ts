@@ -13,7 +13,7 @@ export async function GET(req: Request) {
         // Simplified fetch, filtering will be done mostly in-memory here if simple
         const snapshot = await db
             .collection("threads")
-            .orderBy("createdAt", "desc")
+            .orderBy("publishedAt", "desc")
             .limit(limit)
             .get();
 

@@ -101,15 +101,27 @@ async function getCalendarEntries(limit = 10): Promise<CalendarEntryView[]> {
         const filteredGcalEntries = gcalEntries.filter(e => !firestoreGcalIds.has(e.gcalEventId));
 
         const allEntries = [...firestoreEntries, ...filteredGcalEntries];
-        // Sort pending ones to the top, and sort by date
-        allEntries.sort((a, b) => {
+
+        // 取得台灣時間的今天日期字串 (YYYY-MM-DD)
+        const d = new Date();
+        d.setUTCHours(d.getUTCHours() + 8);
+        const todayStr = d.toISOString().split("T")[0];
+
+        // 1. 過濾掉「時間已經過去 (早於今天)」的資料，讓即將到來只顯示未來的
+        const upcomingEntries = allEntries.filter(e => {
+            if (!e.actionDate) return true; // 特殊沒有日期的就保留
+            return e.actionDate >= todayStr;
+        });
+
+        // 2. 排序 (未完成排前面，日期小的排前面)
+        upcomingEntries.sort((a, b) => {
             if (a.status !== b.status) return a.status === "pending" ? -1 : 1;
             const timeA = new Date(`${a.actionDate || "2099-01-01"}T${a.actionTime || "00:00"}`).getTime();
             const timeB = new Date(`${b.actionDate || "2099-01-01"}T${b.actionTime || "00:00"}`).getTime();
             return timeA - timeB;
         });
 
-        return allEntries.slice(0, limit);
+        return upcomingEntries.slice(0, limit);
     } catch (e) {
         console.error("[HomePage] Failed to fetch calendar:", e);
         return [];
