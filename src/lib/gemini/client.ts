@@ -49,6 +49,6 @@ export async function safeExecute<T>(
 /**
  * 獲取原始模型實例（僅在特殊需求時使用）
  */
-export function getGeminiModel(modelName: string = "gemini-1.5-flash"): GenerativeModel {
+export function getGeminiModel(modelName: string = "gemini-2.5-flash"): GenerativeModel {
     return genAI.getGenerativeModel({ model: modelName });
 }

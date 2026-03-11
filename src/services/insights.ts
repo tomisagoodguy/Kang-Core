@@ -14,15 +14,15 @@ export async function generateFinancialInsights(userId: string): Promise<string>
         // 1b. Check Persistent Cache (Firestore) - limit to 1 hour (3600s)
         const oneHourAgo = new Date(Date.now() - 3600000);
         const cachedSnapshot = await db.collection("insights")
-            .where("userId", "==", userId)
             .where("createdAt", ">=", oneHourAgo)
             .orderBy("createdAt", "desc")
-            .limit(1)
             .get();
 
-        if (!cachedSnapshot.empty) {
+        const userCache = cachedSnapshot.docs.find(doc => doc.data().userId === userId);
+
+        if (userCache) {
             console.log(`[Insight] Using cached result from Firestore`);
-            return cachedSnapshot.docs[0].data().content;
+            return userCache.data().content;
         }
 
         const snapshot = await db.collection("accounting")
@@ -68,7 +68,7 @@ export async function generateFinancialInsights(userId: string): Promise<string>
         請直接輸出這 3 點，並使用繁體中文。
         `;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const result = await safeExecute(() => model.generateContent(prompt));
         const responseText = result.response.text();
 

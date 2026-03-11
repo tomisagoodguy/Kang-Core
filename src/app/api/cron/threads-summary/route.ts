@@ -47,7 +47,7 @@ export async function GET(req: Request) {
         }
 
         // 使用 Gemini 進行摘要
-        const model = getGeminiModel("gemini-1.5-flash");
+        const model = getGeminiModel("gemini-2.5-flash");
 
         const systemPrompt = `你是一個專業的科技與軟體開發資訊助理，具備資深產品經理與架構師的敏銳度。
 使用者會提供你過去 24 小時內爬取到的 Threads 貼文內容（包含作者、內容、互動數據等）。
