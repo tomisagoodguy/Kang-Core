@@ -81,27 +81,28 @@ export default function AccountingPage() {
         }, { totalAmount: 0, totalIncome: 0, totalExpenses: 0 });
     }, [filtered]);
 
-    // 聚合：月度趨勢（近 6 個月）
+    // 聚合：月度支出趨勢（僅顯示有資料的月份）
     const monthlyTrend = useMemo(() => {
-        const months = ALL_MONTHS().reverse(); // oldest first
         const map = new Map<string, number>();
-        months.forEach((m) => map.set(m, 0));
+        
         entries.forEach((e) => {
+            if (e.tag === "Income") return; // 趨勢圖改為專注於「支出」
             const m = e.date?.slice(0, 7);
-            if (m && map.has(m)) {
+            if (m) {
                 const amount = e.amount || 0;
-                const current = map.get(m) || 0;
-                if (e.tag === "Income") {
-                    map.set(m, current + amount);
-                } else {
-                    map.set(m, current - amount);
-                }
+                map.set(m, (map.get(m) || 0) + amount);
             }
         });
-        return months.map((month) => ({
-            month: month.slice(5), // "03" from "2026-03"
-            total: map.get(month) || 0,
-        }));
+
+        // 取得所有有資料的月份並排序
+        return Array.from(map.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([month, total]) => ({
+                month: month.slice(5) + "月", 
+                fullMonth: month,
+                total: total,
+            }))
+            .slice(-6); // 最多保留最近 6 個有資料的月份
     }, [entries]);
 
     // 聚合：當月標籤分佈

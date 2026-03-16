@@ -98,6 +98,15 @@ function renderActiveShape(props: any) {
 export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const [drillTag, setDrillTag] = useState<string | null>(null);
+    const [viewType, setViewType] = useState<"expense" | "income">("expense");
+
+    // 根據視圖類型過濾資料
+    const filteredData = useMemo(() => {
+        if (viewType === "income") {
+            return data.filter(d => d.tag === "Income");
+        }
+        return data.filter(d => d.tag !== "Income");
+    }, [data, viewType]);
 
     // 計算子標籤分佈
     const subTagData = useMemo<SubTagData[]>(() => {
@@ -127,8 +136,8 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
         );
     }
 
-    const total = (drillTag ? subTagData : data).reduce((sum, d) => sum + d.total, 0);
-    const displayData = drillTag ? subTagData : data;
+    const total = (drillTag ? subTagData : filteredData).reduce((sum, d) => sum + d.total, 0);
+    const displayData = drillTag ? subTagData : filteredData;
     const parentColor = drillTag ? TAG_COLORS[drillTag] || TAG_COLORS.Other : undefined;
 
     return (
@@ -140,24 +149,68 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                         <>
                             <span style={{ color: parentColor }}>⬤</span> {drillTag} 子標籤分佈
                         </>
-                    ) : "🥧 當月標籤分佈"}
+                    ) : (
+                        `🥧 當月${viewType === "expense" ? "支出" : "收入"}分佈`
+                    )}
                 </h3>
-                {drillTag && (
-                    <button
-                        onClick={() => { setDrillTag(null); setActiveIndex(-1); }}
-                        style={{
-                            fontSize: "0.78rem",
-                            padding: "4px 10px",
-                            background: "rgba(255,255,255,0.08)",
-                            border: "1px solid rgba(255,255,255,0.15)",
+                <div style={{ display: "flex", gap: "8px" }}>
+                    {!drillTag && (
+                        <div style={{
+                            display: "flex",
+                            background: "rgba(255,255,255,0.05)",
                             borderRadius: "6px",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                        }}
-                    >
-                        ← 返回總覽
-                    </button>
-                )}
+                            padding: "2px",
+                            border: "1px solid rgba(255,255,255,0.1)"
+                        }}>
+                            <button
+                                onClick={() => setViewType("expense")}
+                                style={{
+                                    fontSize: "0.7rem",
+                                    padding: "4px 8px",
+                                    background: viewType === "expense" ? "rgba(255,255,255,0.1)" : "transparent",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    color: viewType === "expense" ? "var(--text-primary)" : "var(--text-muted)",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s"
+                                }}
+                            >
+                                支出
+                            </button>
+                            <button
+                                onClick={() => setViewType("income")}
+                                style={{
+                                    fontSize: "0.7rem",
+                                    padding: "4px 8px",
+                                    background: viewType === "income" ? "rgba(255,255,255,0.1)" : "transparent",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    color: viewType === "income" ? "var(--text-primary)" : "var(--text-muted)",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s"
+                                }}
+                            >
+                                收入
+                            </button>
+                        </div>
+                    )}
+                    {drillTag && (
+                        <button
+                            onClick={() => { setDrillTag(null); setActiveIndex(-1); }}
+                            style={{
+                                fontSize: "0.78rem",
+                                padding: "4px 10px",
+                                background: "rgba(255,255,255,0.08)",
+                                border: "1px solid rgba(255,255,255,0.15)",
+                                borderRadius: "6px",
+                                color: "var(--text-secondary)",
+                                cursor: "pointer",
+                            }}
+                        >
+                            ← 返回總覽
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* 提示（只在頂層且有 entries 時顯示） */}
