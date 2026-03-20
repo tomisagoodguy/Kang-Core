@@ -51,7 +51,9 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
         entries = entries.filter((e) => e.tag === filters.tag);
     }
 
-    const total = entries.reduce((s, e) => s + (e.amount || 0), 0);
+    const totalIncome = entries.filter(e => e.tag === "Income").reduce((s, e) => s + (e.amount || 0), 0);
+    const totalExpense = entries.filter(e => e.tag !== "Income").reduce((s, e) => s + (e.amount || 0), 0);
+    const netBalance = totalIncome - totalExpense;
 
     if (entries.length === 0) {
         const tagLabel = filters.tag ? `「${filters.tag}」` : "";
@@ -68,24 +70,30 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
     const tagLines = Array.from(tagMap.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
-        .map(([tag, amt]) => `\u3000${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
+        .map(([tag, amt]) => {
+            const prefix = tag === "Income" ? "➕" : "➖";
+            return `\u3000${prefix} ${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`;
+        });
 
     // 最高一筆
     const maxEntry = entries.reduce((max, e) =>
         (e.amount || 0) > (max.amount || 0) ? e : max
     );
 
-    const avgAmount = Math.round(total / entries.length);
+    const totalEntriesCount = entries.length;
+    const avgAmount = totalEntriesCount > 0 ? Math.round(totalExpense / Math.max(1, entries.filter(e => e.tag !== "Income").length)) : 0;
     const tagLabel = filters.tag ? `「${filters.tag}」` : "";
 
     return {
         replyText: [
             `📊 ${range.label}${tagLabel}消費統計`,
             "━━━━━━━━━━━━",
-            `📝 共 ${entries.length} 筆`,
-            `💰 合計 $${total.toLocaleString()}`,
-            `📈 平均每筆 $${avgAmount.toLocaleString()}`,
-            `🏆 最高: $${(maxEntry.amount || 0).toLocaleString()} (${maxEntry.description || "—"})`,
+            `📝 共 ${entries.length} 筆資料`,
+            `💰 總收入: $${totalIncome.toLocaleString()}`,
+            `💸 總支出: $${totalExpense.toLocaleString()}`,
+            `⚖️ 淨結餘: $${netBalance.toLocaleString()}`,
+            `📈 平均支出/筆: $${avgAmount.toLocaleString()}`,
+            `🏆 最高支出: $${(maxEntry.amount || 0).toLocaleString()} (${maxEntry.description || "—"})`,
             "",
             ...tagLines,
         ].join("\n"),

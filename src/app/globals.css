@@ -32,6 +32,7 @@
   --tag-shopping: #7c3aff;
   --tag-health: #059669;
   --tag-education: #ea580c;
+  --tag-insurance: #0369a1;
   --tag-income: #10b981;
   --tag-other: #64748b;
 
@@ -75,6 +76,7 @@
   --tag-shopping: #8b5cf6;
   --tag-health: #10b981;
   --tag-education: #f97316;
+  --tag-insurance: #38bdf8;
   --tag-income: #10b981;
   --tag-other: #647280;
 
@@ -308,6 +310,11 @@ a {
   background: rgba(249, 115, 22, 0.15);
   color: var(--tag-education);
 }
+.tag-badge[data-tag="Insurance"] {
+  background: rgba(3, 105, 161, 0.15);
+  color: var(--tag-insurance);
+}
+
 
 .tag-badge[data-tag="Income"] {
   background: rgba(16, 185, 129, 0.15);

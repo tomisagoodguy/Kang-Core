@@ -11,6 +11,7 @@ const TAG_EMOJI_MAP: Record<string, string> = {
     Shopping: "🛒",
     Health: "🏥",
     Education: "📚",
+    Insurance: "🛡️",
     Other: "📦",
 };
 

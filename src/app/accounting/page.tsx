@@ -67,19 +67,19 @@ export default function AccountingPage() {
         return tagMatch && subTagMatch && monthMatch;
     });
 
-    const { totalAmount, totalIncome, totalExpenses } = useMemo(() => {
+    const { totalIncome, totalExpenses } = useMemo(() => {
         return filtered.reduce((acc, e) => {
             const amount = e.amount || 0;
             if (e.tag === "Income") {
                 acc.totalIncome += amount;
-                acc.totalAmount += amount;
             } else {
                 acc.totalExpenses += amount;
-                acc.totalAmount -= amount;
             }
             return acc;
-        }, { totalAmount: 0, totalIncome: 0, totalExpenses: 0 });
+        }, { totalIncome: 0, totalExpenses: 0 });
     }, [filtered]);
+
+    const netBalance = useMemo(() => totalIncome - totalExpenses, [totalIncome, totalExpenses]);
 
     // 聚合：月度支出趨勢（僅顯示有資料的月份）
     const monthlyTrend = useMemo(() => {
@@ -225,8 +225,8 @@ export default function AccountingPage() {
                             <span style={{ color: "var(--success)" }}>收入: ${totalIncome.toLocaleString()}</span>
                             <span style={{ color: "var(--danger)" }}>支出: ${totalExpenses.toLocaleString()}</span>
                         </div>
-                        <span style={{ color: totalAmount >= 0 ? "var(--success)" : "var(--danger)", fontWeight: 700, fontSize: "1.125rem" }}>
-                            {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`} {totalAmount < 0 ? '-' : ''}${Math.abs(totalAmount).toLocaleString()}
+                        <span style={{ color: netBalance >= 0 ? "var(--success)" : "var(--danger)", fontWeight: 700, fontSize: "1.125rem" }}>
+                            {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`} {netBalance < 0 ? '-' : ''}${Math.abs(netBalance).toLocaleString()}
                         </span>
                     </div>
                     <button className="card-action-btn" onClick={handleExportCSV} style={{ display: "flex", alignItems: "center", gap: "6px", opacity: 1, padding: "8px 14px", fontWeight: 500 }}>

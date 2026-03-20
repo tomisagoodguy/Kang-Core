@@ -28,7 +28,7 @@ const outputSchema: Schema = {
                 amount: { type: SchemaType.NUMBER, nullable: false },
                 tag: {
                     type: SchemaType.STRING,
-                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Income, Other",
+                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Income, Other",
                 },
                 subTag: {
                     type: SchemaType.STRING,
@@ -141,8 +141,14 @@ JSON schema:
   "queryData": { "queryType": "expense" | "archive" | "calendar" | "semantic_search", "tag": "...", "period": "this_month" | "last_month" | "this_week" | "last_week" | "today" | "tomorrow", "limit": 5, "semanticQuery": "..." }
 }
 
+Financial Concepts:
+- Balance (結餘) = Income (收入) - Expenses (支出).
+- IncomeTags: 'Income'
+- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Other'
+
 Rules:
-- If user mentions spending money, food, transport, shopping, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income'). If user inputs MULTIPLE expenses in one sentence (e.g. "健身50沙拉95"), fill 'accountingDataList' with multiple items instead.
+- If user mentions spending money, food, transport, shopping, insurance, health, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income'). If user inputs MULTIPLE expenses in one sentence (e.g. "健身50沙拉95"), fill 'accountingDataList' with multiple items instead.
+- If user asks about 'Balance' or 'Net Profit', they are asking for 'Income - Expenses' for a specific period.
 - If user wants to schedule, plan, remind, to-do → type = "calendar", fill calendarData
 - If user wants to set up a regular, fixed, or scheduled expense (e.g. 每個月10號付錢, 每週花多少) → type = "recurring", fill recurringData
 - If user shares a link, article, note, or general knowledge → type = "archive", fill archiveData

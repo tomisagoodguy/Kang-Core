@@ -61,7 +61,7 @@ export async function generateFinancialInsights(userId: string): Promise<string>
         最近的幾筆交易：${JSON.stringify(expenses.slice(0, 10))}
 
         請提供 3 個簡短且具體理財建議或洞察（每點不超過 50 字）：
-        1. 收支平衡分析
+        1. 收支平衡分析 (請記住：結餘 = 收入 - 支出)
         2. 需要注意的潛在過度消費
         3. 一個具體的理財建議
         
