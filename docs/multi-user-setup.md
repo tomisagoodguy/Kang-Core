@@ -12,7 +12,7 @@
 
 所有用戶的 LINE User ID，逗號分隔。
 
-```
+```env
 LINE_USER_IDS=Uxxxxxxxxxx,Uxxxxxxxxxx
 ```
 
@@ -22,7 +22,7 @@ LINE_USER_IDS=Uxxxxxxxxxx,Uxxxxxxxxxx
 
 Google 帳號 email 對應 LINE User ID，供 Dashboard 登入識別用。格式：`email:lineUserId`，逗號分隔。
 
-```
+```env
 EMAIL_LINE_MAP=admin@gmail.com:Uxxxxxxxxxx,mom@gmail.com:Uxxxxxxxxxx
 ```
 
@@ -55,14 +55,14 @@ EMAIL_LINE_MAP="你的gmail@gmail.com:你的LINE_USER_ID,媽媽的gmail@gmail.co
 
 可能需要建立的索引：
 
-| Collection | 索引欄位 |
-|-----------|---------|
-| `accounting` | `userId ASC` + `createdAt DESC` |
-| `accounting` | `userId ASC` + `date ASC` |
-| `calendar` | `userId ASC` + `actionDate ASC` |
-| `calendar` | `userId ASC` + `status ASC` |
-| `recurring_expenses` | `userId ASC` + `isActive ASC` |
-| `classification_rules` | `userId ASC` + `lastUsed DESC` |
+| Collection             | 索引欄位                        |
+| ---------------------- | ------------------------------- |
+| `accounting`           | `userId ASC` + `createdAt DESC` |
+| `accounting`           | `userId ASC` + `date ASC`       |
+| `calendar`             | `userId ASC` + `actionDate ASC` |
+| `calendar`             | `userId ASC` + `status ASC`     |
+| `recurring_expenses`   | `userId ASC` + `isActive ASC`   |
+| `classification_rules` | `userId ASC` + `lastUsed DESC`  |
 
 ---
 
@@ -82,12 +82,12 @@ EMAIL_LINE_MAP="你的gmail@gmail.com:你的LINE_USER_ID,媽媽的gmail@gmail.co
 
 ## Cron 推播政策
 
-| Cron | 台灣時間 | 推播對象 |
-|------|---------|---------|
-| daily-summary | 21:00 | 所有用戶（各自資料）|
-| calendar-remind | 08:00 | 所有用戶（各自行事曆）|
-| monthly-report | 每月1日 09:00 | 所有用戶（各自帳目）|
-| recurring | 00:05 | 所有用戶（各自定期支出）|
-| diary-prompt | 22:30 | 所有用戶 |
-| threads-summary | 20:00 | 所有用戶（全域內容）|
-| monthly-sheet | 每月底 23:00 | 管理員專屬（Google Sheets）|
+| Cron            | 台灣時間      | 推播對象                    |
+| --------------- | ------------- | --------------------------- |
+| daily-summary   | 21:00         | 所有用戶（各自資料）        |
+| calendar-remind | 08:00         | 所有用戶（各自行事曆）      |
+| monthly-report  | 每月1日 09:00 | 所有用戶（各自帳目）        |
+| recurring       | 00:05         | 所有用戶（各自定期支出）    |
+| diary-prompt    | 22:30         | 所有用戶                    |
+| threads-summary | 20:00         | 所有用戶（全域內容）        |
+| monthly-sheet   | 每月底 23:00  | 管理員專屬（Google Sheets） |

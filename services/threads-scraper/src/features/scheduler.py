@@ -7,7 +7,7 @@ import yaml
 import random
 import re
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
 import schedule
 
 from src.core.scraper import scrape_thread, scrape_profile, scrape_explore, scrape_search
@@ -18,6 +18,18 @@ from src.core.config_loader import load_config
 
 
 class ThreadsScheduler:
+    config: Dict[str, Any]
+    db: Any
+    notifier: Optional[Notifier]
+    users: List[Dict[str, Any]]
+    threads: List[Dict[str, Any]]
+    keywords: List[str]
+    explore_config: Dict[str, Any]
+    advanced: Dict[str, Any]
+    request_count: int
+    request_window_start: datetime
+    discovery: Optional[UserDiscovery]
+
     def __init__(self, config_path: str = "config.yaml"):
         """初始化排程器"""
         print("🚀 初始化 Threads Scraper 排程器...")
@@ -70,9 +82,12 @@ class ThreadsScheduler:
                     print(f"   ✅ 已同步 {len(api_users)} 位追蹤者 (來自 LINE Bot)")
                     
                     # 合併到 users (避免重複)
-                    existing_usernames = {u.get("username").lower() for u in self.users if u.get("username")}
+                    existing_usernames = {str(u.get("username")).lower() for u in self.users if u.get("username")}
                     for au in api_users:
-                        uname = au.get("username").lower()
+                        uname_val = au.get("username")
+                        if not uname_val:
+                            continue
+                        uname = uname_val.lower()
                         if uname not in existing_usernames:
                             self.users.append({
                                 "username": uname,
@@ -109,13 +124,13 @@ class ThreadsScheduler:
     def _smart_delay(self):
         """智能延遲（模擬人類行為）"""
         if self.advanced.get("random_delay", True):
-            min_delay = self.advanced.get("random_delay_min", 3)
-            max_delay = self.advanced.get("random_delay_max", 10)
+            min_delay = float(self.advanced.get("random_delay_min", 3))
+            max_delay = float(self.advanced.get("random_delay_max", 10))
             delay = random.uniform(min_delay, max_delay)
             print(f"   ⏳ 延遲 {delay:.1f} 秒...")
             time.sleep(delay)
         else:
-            delay = self.advanced.get("delay_between_requests", 5)
+            delay = float(self.advanced.get("delay_between_requests", 5))
             if delay > 0:
                 time.sleep(delay)
 
@@ -153,8 +168,8 @@ class ThreadsScheduler:
         Returns:
             抓取結果或 None
         """
-        max_retries = self.advanced.get("max_retries", 3)
-        retry_delay = self.advanced.get("retry_delay", 30)
+        max_retries = int(self.advanced.get("max_retries", 3))
+        retry_delay = float(self.advanced.get("retry_delay", 30))
 
         for attempt in range(max_retries):
             try:
@@ -180,8 +195,8 @@ class ThreadsScheduler:
         self.request_count = 0
         self.request_window_start = datetime.now()
 
-        total_new_posts = 0
-        total_new_replies = 0
+        total_new_posts: int = 0
+        total_new_replies: int = 0
 
         # 1. 合併手動設定和自動追蹤的用戶
         users_to_scrape = []
@@ -226,8 +241,8 @@ class ThreadsScheduler:
 
                 if explore_data:
                     explore_posts = explore_data.get("explore_posts", [])
-                    new_explore_count = 0
-                    skipped_count = 0
+                    new_explore_count: int = 0
+                    skipped_count: int = 0
 
                     # 儲存探索貼文（只保存符合關鍵字的）
                     for post in explore_posts:
@@ -250,19 +265,20 @@ class ThreadsScheduler:
                             if has_keyword:
                                 print(f"   🎯 發現關鍵字貼文: @{post.get('username')} (匹配: {', '.join(matched_keywords)})")
                             else:
-                                skipped_count += 1
+                                skipped_count += 1  # pyre-ignore
 
                         # 只保存符合條件的貼文
                         if should_save:
                             success, is_new = self.db.save_post(post)
                             if success and is_new:
-                                new_explore_count += 1
+                                new_explore_count += 1  # pyre-ignore
 
                             # 如果貼文互動數高，嘗試從中發現用戶
-                            if self.discovery and post.get("like_count", 0) >= self.discovery.config.get("min_like_count", 100):
-                                self.discovery.discover_from_post(post)
+                            discovery = self.discovery
+                            if discovery and post.get("like_count", 0) >= discovery.config.get("min_like_count", 100):
+                                discovery.discover_from_post(post)
 
-                    total_new_posts += new_explore_count
+                    total_new_posts = total_new_posts + new_explore_count
 
                     if self.keywords:
                         print(f"   ✅ 探索頁面: {len(explore_posts)} 篇貼文，{new_explore_count} 篇符合關鍵字並保存，{skipped_count} 篇已略過")
@@ -316,8 +332,8 @@ class ThreadsScheduler:
 
                 # 儲存貼文（只保存符合關鍵字的）
                 threads = data.get("threads", [])[:max_posts]
-                new_count = 0
-                skipped_count = 0
+                new_count: int = 0
+                skipped_count: int = 0
 
                 for thread in threads:
                     # 檢查是否符合關鍵字（使用全詞匹配）
@@ -336,15 +352,15 @@ class ThreadsScheduler:
                         should_save = has_keyword
 
                         if not has_keyword:
-                            skipped_count += 1
+                            skipped_count += 1  # pyre-ignore
 
                     # 只保存符合條件的貼文
                     if should_save:
                         success, is_new = self.db.save_post(thread)
                         if success and is_new:
-                            new_count += 1
+                            new_count += 1  # pyre-ignore
 
-                total_new_posts += new_count
+                total_new_posts += new_count  # pyre-ignore
 
                 # 顯示結果
                 if self.keywords and skipped_count > 0:
@@ -401,18 +417,19 @@ class ThreadsScheduler:
                 try:
                     # 儲存搜尋結果
                     posts = search_data.get("posts", [])
-                    new_count = 0
+                    new_count: int = 0
 
                     for post in posts:
                         success, is_new = self.db.save_post(post)
                         if success and is_new:
-                            new_count += 1
+                            new_count += 1  # pyre-ignore
 
                         # 如果貼文互動數高，嘗試從中發現用戶
-                        if self.discovery and post.get("like_count", 0) >= self.discovery.config.get("min_like_count", 100):
-                            self.discovery.discover_from_post(post)
+                        discovery = self.discovery
+                        if discovery and post.get("like_count", 0) >= discovery.config.get("min_like_count", 100):
+                            discovery.discover_from_post(post)
 
-                    total_new_posts += new_count
+                    total_new_posts += new_count  # pyre-ignore
 
                     print(f"   ✅ 找到 {len(posts)} 篇貼文，{new_count} 篇為新貼文")
 
@@ -430,8 +447,9 @@ class ThreadsScheduler:
                     self.db.log_tracking("keyword", keyword, 0, 0, f"error: {e}")
 
         # 5. 自動發現新用戶
-        if self.discovery and total_new_posts > 0:
-            new_discovered = self.discovery.discover_from_database()
+        discovery = self.discovery
+        if discovery and total_new_posts > 0:
+            new_discovered = discovery.discover_from_database()
             if new_discovered:
                 print(f"\n🎉 自動發現了 {len(new_discovered)} 個新用戶！")
 
@@ -468,14 +486,14 @@ class ThreadsScheduler:
 
                     # 儲存回覆
                     replies = data.get("replies", [])
-                    new_reply_count = 0
+                    new_reply_count: int = 0
 
                     for reply in replies:
                         success, is_new = self.db.save_reply(reply, post_id)
                         if success and is_new:
-                            new_reply_count += 1
+                            new_reply_count += 1  # type: ignore
 
-                    total_new_replies += new_reply_count
+                    total_new_replies += new_reply_count  # type: ignore
 
                     # 記錄日誌
                     self.db.log_tracking(
@@ -493,19 +511,21 @@ class ThreadsScheduler:
                 self.db.log_tracking("post", thread_url, 0, 0, f"error: {e}")
 
         # 7. 清理不活躍用戶
-        if self.discovery:
-            cleanup_days = self.discovery.config.get("cleanup_inactive_days", 60)
-            self.discovery.cleanup_inactive_users(days=cleanup_days)
+        discovery = self.discovery
+        if discovery:
+            cleanup_days = discovery.config.get("cleanup_inactive_days", 60)
+            discovery.cleanup_inactive_users(days=cleanup_days)
 
         # 8. 發送通知
-        if self.notifier and (total_new_posts > 0 or total_new_replies > 0):
+        notifier = self.notifier
+        if notifier and (total_new_posts > 0 or total_new_replies > 0):
             print(f"\n📢 發送通知...")
 
             # 發送新貼文通知
             if total_new_posts > 0:
                 unnotified_posts = self.db.get_unnotified_posts(self.keywords)
                 if unnotified_posts:
-                    self.notifier.send_new_posts(unnotified_posts, self.keywords)
+                    notifier.send_new_posts(unnotified_posts, self.keywords)
                     post_ids = [p["id"] for p in unnotified_posts]
                     self.db.mark_as_notified(post_ids, is_reply=False)
                     print(f"   ✅ 已通知 {len(unnotified_posts)} 篇新貼文")
@@ -514,7 +534,7 @@ class ThreadsScheduler:
             if total_new_replies > 0:
                 unnotified_replies = self.db.get_unnotified_replies()
                 if unnotified_replies:
-                    self.notifier.send_new_replies(unnotified_replies)
+                    notifier.send_new_replies(unnotified_replies)
                     reply_ids = [r["id"] for r in unnotified_replies]
                     self.db.mark_as_notified(reply_ids, is_reply=True)
                     print(f"   ✅ 已通知 {len(unnotified_replies)} 則新回覆")
@@ -561,8 +581,9 @@ class ThreadsScheduler:
 
     def test_webhooks(self):
         """測試 Webhook 連線"""
-        if self.notifier:
-            self.notifier.test_connection()
+        notifier = self.notifier
+        if notifier:
+            notifier.test_connection()
         else:
             print("⚠️  通知功能未啟用")
 
@@ -576,8 +597,9 @@ class ThreadsScheduler:
         print(f"   近 24h 貼文: {stats['posts_last_24h']}\n")
 
         # 顯示自動追蹤統計
-        if self.discovery:
-            self.discovery.print_report()
+        discovery = self.discovery
+        if discovery:
+            discovery.print_report()
 
 
 def main():

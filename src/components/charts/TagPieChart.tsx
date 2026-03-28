@@ -9,6 +9,7 @@ import {
     Tooltip,
     Legend,
     Sector,
+    Label,
 } from "recharts";
 import type { PieLabelRenderProps } from "recharts";
 
@@ -260,6 +261,23 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                                     : TAG_COLORS[(entry as TagData).tag] || TAG_COLORS.Other;
                                 return <Cell key={`cell-${index}`} fill={baseColor} />;
                             })}
+                            <Label
+                                position="center"
+                                content={({ viewBox }) => {
+                                    if (activeIndex !== -1) return null;
+                                    const { cx, cy } = viewBox as { cx: number; cy: number };
+                                    return (
+                                        <g>
+                                            <text x={cx} y={cy - 10} textAnchor="middle" fill="#9ca3af" fontSize={11}>
+                                                {drillTag ?? (viewType === "expense" ? "當月支出" : "當月收入")}
+                                            </text>
+                                            <text x={cx} y={cy + 14} textAnchor="middle" fill="#f3f4f6" fontSize={17} fontWeight={700}>
+                                                ${total.toLocaleString()}
+                                            </text>
+                                        </g>
+                                    );
+                                }}
+                            />
                         </Pie>
                         <Tooltip
                             contentStyle={{
