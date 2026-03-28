@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { lineService } from "@/services/line.service";
+import { getAllLineUserIds } from "@/lib/userRegistry";
 
 /**
  * 晚間日記提示推播
@@ -14,9 +15,9 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = process.env.LINE_USER_ID;
-    if (!userId) {
-        return NextResponse.json({ error: "LINE_USER_ID not set" }, { status: 500 });
+    const userIds = getAllLineUserIds();
+    if (userIds.length === 0) {
+        return NextResponse.json({ error: "LINE_USER_IDS not set" }, { status: 500 });
     }
 
     try {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
             day: "2-digit",
         });
 
-        await lineService.pushText(userId, [
+        const diaryMessage = [
             "🌙 每日日記時間",
             "━━━━━━━━━━━━",
             `📅 ${today}`,
@@ -37,9 +38,13 @@ export async function GET(req: Request) {
             "",
             "直接打字給我，我幫你整理收藏！",
             "（或傳截圖、連結也可以）",
-        ].join("\n"));
+        ].join("\n");
 
-        return NextResponse.json({ status: "ok" });
+        for (const userId of userIds) {
+            await lineService.pushText(userId, diaryMessage);
+        }
+
+        return NextResponse.json({ status: "ok", usersNotified: userIds.length });
     } catch (err) {
         console.error("[diary-prompt] Error:", err);
         return NextResponse.json({ error: "Failed" }, { status: 500 });
