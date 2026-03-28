@@ -156,7 +156,7 @@ Rules:
 - If user is ASKING a complex semantic question about their notes/knowledge (e.g. "之前存過哪些AI相關的文章？", "幫我找關於財務自由的觀念") → type = "query", queryType = "semantic_search", fill 'semanticQuery'.
 - If user wants to clear or reset the conversational memory (e.g. "清除對話", "reset", "clear", "重置") → type = "clear_memory"
 - Otherwise → type = "unknown"
-- For dates, use today (${TODAY()}) as reference. Tomorrow is ${new Date(Date.now() + 86400000).toISOString().split("T")[0]}.
+- For dates, use today (${TODAY()}) as reference. Key relative dates: 昨天=${new Date(Date.now() - 86400000).toISOString().split("T")[0]}, 前天=${new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0]}, 大前天=${new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0]}, 明天=${new Date(Date.now() + 86400000).toISOString().split("T")[0]}. For dates like "X月Y號" or "X/Y", assume current year ${new Date().getFullYear()} (use last year if the resulting date is in the future).
 - CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary' and 'keywords' arrays.
 - CRITICAL TIP: User has existing fixed monthly expenses on the 10th: "家裡伙食費" (amount: 7000, tag: "Food"), "電話費" (amount: 488, tag: "Utilities"). If the user mentions setting these up, or paying them without an amount, YOU CAN INFER the amount and description.
 - For archive keywords, priorities choosing from these frequently used tags if applicable: [${archiveTags.join(", ")}]. You may create new ones ONLY if these don't fit well.
@@ -181,7 +181,7 @@ const GEMMA_MODELS = [
 async function tryGeminiModel(modelName: string, text: string, archiveTags: string[], historyContext?: string): Promise<GeminiParseResult> {
     const model = genAI.getGenerativeModel({
         model: modelName,
-        systemInstruction: `You are an AI assistant that parses user intent for the Kang-Core system. Today is ${TODAY()}. CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary', 'keywords', and any explanation. For archive keywords, please prioritize these: ${archiveTags.join(", ")}.\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}`,
+        systemInstruction: `You are an AI assistant that parses user intent for the Kang-Core system. Today is ${TODAY()}. Key relative dates: 昨天=${new Date(Date.now() - 86400000).toISOString().split("T")[0]}, 前天=${new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0]}, 大前天=${new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0]}, 明天=${new Date(Date.now() + 86400000).toISOString().split("T")[0]}. For dates like "X月Y號" or "X/Y", assume year ${new Date().getFullYear()} (use last year if the date would be in the future). CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary', 'keywords', and any explanation. For archive keywords, please prioritize these: ${archiveTags.join(", ")}.\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}`,
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: outputSchema,

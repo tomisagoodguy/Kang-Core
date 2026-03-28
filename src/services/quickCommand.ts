@@ -181,9 +181,11 @@ async function handleQuickQuery(period: string): Promise<QuickCommandResult> {
         .get();
 
     const entries = snapshot.docs.map((d) => d.data() as AccountingEntry);
-    const total = entries.reduce((s, e) => s + (e.amount || 0), 0);
 
-    // 標籤統計
+    const income = entries.filter((e) => e.tag === "Income").reduce((s, e) => s + (e.amount || 0), 0);
+    const expenses = entries.filter((e) => e.tag !== "Income").reduce((s, e) => s + (e.amount || 0), 0);
+
+    // 標籤統計（排除 Income）
     const tagMap = new Map<string, number>();
     entries.forEach((e) => {
         const tag = e.tag || "Other";
@@ -195,16 +197,19 @@ async function handleQuickQuery(period: string): Promise<QuickCommandResult> {
         .slice(0, 5)
         .map(([tag, amt]) => `\u3000${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
 
+    const summaryLines = [
+        `📊 ${range.label}統計`,
+        "━━━━━━━━━━━━",
+        `📝 共 ${entries.length} 筆`,
+        `💸 支出 $${expenses.toLocaleString()}`,
+        ...(income > 0 ? [`💵 收入 $${income.toLocaleString()}`, `📈 結餘 $${(income - expenses).toLocaleString()}`] : []),
+        "",
+        ...tagLines,
+    ];
+
     return {
         handled: true,
-        replyText: [
-            `📊 ${range.label}消費統計`,
-            "━━━━━━━━━━━━",
-            `📝 共 ${entries.length} 筆`,
-            `💰 合計 $${total.toLocaleString()}`,
-            "",
-            ...tagLines,
-        ].join("\n"),
+        replyText: summaryLines.join("\n"),
     };
 }
 
