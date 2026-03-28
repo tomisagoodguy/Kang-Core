@@ -1,5 +1,5 @@
 import { StatCard } from "@/components/StatCard";
-import { AccountingCard } from "@/components/AccountingCard";
+import { AccountingRow } from "@/components/AccountingRow";
 import { ArchiveCard } from "@/components/ArchiveCard";
 import { CalendarCard } from "@/components/CalendarCard";
 import { ThreadsCard } from "@/components/ThreadsCard";
@@ -293,9 +293,11 @@ export default async function HomePage() {
                         <p>還沒有記帳記錄，傳訊息給機器人吧！</p>
                     </div>
                 ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                        {accountingEntries.map((entry: AccountingEntryView) => (
-                            <AccountingCard key={entry.id} entry={entry} />
+                    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-glass)", borderRadius: "12px", overflow: "hidden" }}>
+                        {accountingEntries.map((entry: AccountingEntryView, idx) => (
+                            <div key={entry.id} style={{ borderTop: idx > 0 ? "1px solid var(--border-glass)" : undefined }}>
+                                <AccountingRow entry={entry} />
+                            </div>
                         ))}
                     </div>
                 )}

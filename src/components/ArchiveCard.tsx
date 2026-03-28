@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from "react";
-import { TagBadge } from "./TagBadge";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 import type { ArchiveEntryView } from "@/models/schema";
-import { FileText, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { FileText, ExternalLink, Pencil, Trash2, Link2, ChevronDown, ChevronUp } from "lucide-react";
 
 interface ArchiveCardProps {
     entry: ArchiveEntryView;
@@ -18,140 +17,224 @@ const EDIT_FIELDS = [
     { key: "url", label: "連結", type: "text" as const },
 ];
 
+function getDomain(url: string): string {
+    try { return new URL(url).hostname.replace(/^www\./, ""); }
+    catch { return url; }
+}
+
+function getFaviconUrl(url: string): string {
+    try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=16`; }
+    catch { return ""; }
+}
+
+function formatDate(dateStr?: string): string {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const KEYWORD_COLORS = [
+    "#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#eab308",
+    "#22c55e", "#14b8a6", "#3b82f6", "#64748b",
+];
+function getKwColor(kw: string): string {
+    let h = 0;
+    for (let i = 0; i < kw.length; i++) h = (h * 31 + kw.charCodeAt(i)) % KEYWORD_COLORS.length;
+    return KEYWORD_COLORS[Math.abs(h)];
+}
+
 export function ArchiveCard({ entry }: ArchiveCardProps) {
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [expanded, setExpanded] = useState(false);
+    const [hovered, setHovered] = useState(false);
 
-    let displayTitle = entry.title || "知識存檔";
-    if (!entry.title && entry.url) {
-        try { displayTitle = new URL(entry.url).hostname; } catch { /* invalid URL */ }
-    }
-
-    // Show original text preferentially if it exists, otherwise summary.
-    const contentToDisplay = entry.originalText || entry.summary;
+    const displayTitle = entry.title || (entry.url ? getDomain(entry.url) : "筆記");
+    const summary = entry.summary || entry.originalText || "";
+    const isLong = summary.length > 120;
+    const displaySummary = expanded || !isLong ? summary : summary.slice(0, 120) + "…";
 
     return (
         <>
             <div
-                className="glass-card archive-card"
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
                 style={{
-                    transition: "all 0.3s ease",
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border-glass)",
+                    borderRadius: "14px",
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    transition: "border-color 0.2s, box-shadow 0.2s",
+                    boxShadow: hovered ? "0 4px 24px rgba(0,0,0,0.12)" : "none",
+                    borderColor: hovered ? "var(--border-glass-hover)" : "var(--border-glass)",
                     position: "relative",
-                    overflow: "hidden"
                 }}
             >
+                {/* Header row: source + date + actions */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                        {entry.url ? (
+                            <>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={getFaviconUrl(entry.url)} alt="" width={14} height={14} style={{ flexShrink: 0, opacity: 0.8 }} />
+                                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {getDomain(entry.url)}
+                                </span>
+                                <Link2 size={11} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                            </>
+                        ) : (
+                            <>
+                                <FileText size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>筆記</span>
+                            </>
+                        )}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                        {entry.createdAt && (
+                            <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                                {formatDate(entry.createdAt)}
+                            </span>
+                        )}
+                        <div style={{ display: "flex", gap: "2px", opacity: hovered ? 1 : 0, transition: "opacity 0.15s" }}>
+                            <button
+                                className="card-action-btn"
+                                onClick={() => setEditOpen(true)}
+                                style={{ padding: "4px" }}
+                                title="編輯"
+                            >
+                                <Pencil size={12} />
+                            </button>
+                            <button
+                                className="card-action-btn danger"
+                                onClick={() => setDeleteOpen(true)}
+                                style={{ padding: "4px" }}
+                                title="刪除"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Image */}
                 {entry.imageUrl && (
-                    <a
-                        href={entry.imageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ alignSelf: "flex-start", width: "100%" }}
-                    >
+                    <a href={entry.imageUrl} target="_blank" rel="noopener noreferrer">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={entry.imageUrl}
                             alt="截圖"
                             style={{
                                 width: "100%",
-                                height: 140,
+                                height: 120,
                                 objectFit: "cover",
-                                backgroundColor: "rgba(0,0,0,0.5)",
-                                borderRadius: 12,
-                                marginBottom: 4,
+                                borderRadius: 8,
                                 border: "1px solid var(--border-glass)",
-                                transition: "transform 0.3s ease, border-color 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                                e.currentTarget.style.borderColor = "var(--border-glass-hover)";
-                            }}
-                            onMouseOut={(e) => {
-                                e.currentTarget.style.borderColor = "var(--border-glass)";
                             }}
                         />
                     </a>
                 )}
 
-                <div className="archive-card-title" title={displayTitle} style={{
-                    fontSize: "1.125rem",
+                {/* Title */}
+                <div style={{
+                    fontSize: "0.9375rem",
                     fontWeight: 700,
                     color: "var(--text-primary)",
+                    lineHeight: 1.4,
                     display: "-webkit-box",
                     WebkitLineClamp: "2",
                     WebkitBoxOrient: "vertical",
-                    overflow: "hidden"
+                    overflow: "hidden",
                 }}>
                     {displayTitle}
                 </div>
 
-                <div className="custom-scrollbar" style={{
-                    fontSize: "0.9375rem",
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.6,
-                    maxHeight: "150px",
-                    overflowY: "auto",
-                    paddingRight: "8px",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word"
-                }}>
-                    {contentToDisplay && (
-                        <>
-                            {entry.originalText && (
-                                <strong style={{ color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                                    <FileText size={16} /> 原始內容：
-                                </strong>
-                            )}
-                            {contentToDisplay}
-                        </>
-                    )}
-                </div>
-
-                <div className="archive-card-keywords" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "auto" }}>
-                    {entry.keywords.slice(0, 6).map((kw) => (
-                        <TagBadge key={kw} tag={kw} />
-                    ))}
-                    {entry.keywords.length > 6 && (
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center" }}>+{entry.keywords.length - 6}</span>
-                    )}
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", paddingTop: "12px", borderTop: "1px solid var(--border-glass)" }}>
-                    {entry.url ? (
-                        <a
-                            href={entry.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="archive-card-link"
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                fontSize: "0.8125rem",
-                                fontWeight: 500,
-                                color: "var(--accent-light)",
-                                textDecoration: "none",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
-                                background: "rgba(161,100,255,0.1)",
-                                transition: "all 0.2s ease"
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(161,100,255,0.2)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "rgba(161,100,255,0.1)")}
-                        >
-                            原始連結 <ExternalLink size={14} />
-                        </a>
-                    ) : <span />}
-
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        <div className="card-actions" style={{ opacity: 1 }}>
-                            <button className="card-action-btn" onClick={() => setEditOpen(true)} title="編輯" style={{ padding: "6px" }}>
-                                <Pencil size={14} />
+                {/* Summary */}
+                {summary && (
+                    <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                        {displaySummary}
+                        {isLong && (
+                            <button
+                                onClick={() => setExpanded(v => !v)}
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "2px",
+                                    marginLeft: "6px",
+                                    fontSize: "0.75rem",
+                                    color: "var(--accent-light)",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                    fontWeight: 500,
+                                }}
+                            >
+                                {expanded ? <><ChevronUp size={12} /> 收起</> : <><ChevronDown size={12} /> 展開</>}
                             </button>
-                            <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)} title="刪除" style={{ padding: "6px" }}>
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
+                        )}
                     </div>
-                </div>
+                )}
+
+                {/* Keywords */}
+                {entry.keywords.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "2px" }}>
+                        {entry.keywords.slice(0, 7).map((kw) => {
+                            const color = getKwColor(kw);
+                            return (
+                                <span
+                                    key={kw}
+                                    style={{
+                                        fontSize: "0.69rem",
+                                        padding: "2px 8px",
+                                        borderRadius: "10px",
+                                        background: `${color}18`,
+                                        border: `1px solid ${color}33`,
+                                        color: color,
+                                        fontWeight: 500,
+                                        letterSpacing: "0.01em",
+                                    }}
+                                >
+                                    {kw}
+                                </span>
+                            );
+                        })}
+                        {entry.keywords.length > 7 && (
+                            <span style={{ fontSize: "0.69rem", color: "var(--text-muted)", alignSelf: "center" }}>
+                                +{entry.keywords.length - 7}
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Footer link */}
+                {entry.url && (
+                    <a
+                        href={entry.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            fontSize: "0.78rem",
+                            color: "var(--accent-light)",
+                            textDecoration: "none",
+                            marginTop: "auto",
+                            paddingTop: "8px",
+                            borderTop: "1px solid var(--border-glass)",
+                            fontWeight: 500,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                        onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                    >
+                        前往原始連結 <ExternalLink size={12} />
+                    </a>
+                )}
             </div>
 
             <EditModal
