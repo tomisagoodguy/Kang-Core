@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { lineService } from "@/services/line.service";
 import { getGeminiModel, safeExecute } from "@/lib/gemini/client";
+import { getAllLineUserIds } from "@/lib/userRegistry";
 
 /**
  * Threads 每日彙整推播
@@ -14,9 +15,9 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = process.env.LINE_USER_ID;
-    if (!userId) {
-        return NextResponse.json({ error: "LINE_USER_ID not set" }, { status: 500 });
+    const userIds = getAllLineUserIds();
+    if (userIds.length === 0) {
+        return NextResponse.json({ error: "LINE_USER_IDS not set" }, { status: 500 });
     }
 
     try {
@@ -82,7 +83,7 @@ export async function GET(req: Request) {
 
         // 推播至 LINE
         // 將推播送出 (非同步或是 awaiting)
-        await lineService.pushText(userId, finalMessage);
+        await Promise.all(userIds.map(uid => lineService.pushText(uid, finalMessage)));
 
         // --- 🤖 自動清理機制 ---
         // 刪除 超過 7 天 且「未被釘選保留 (isSaved)」的廢文
