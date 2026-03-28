@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db as adminDb } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { AccountingEntryView } from "@/models/schema";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 export async function GET(request: NextRequest) {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
         const { searchParams } = new URL(request.url);
         const limit = parseInt(searchParams.get("limit") || "20", 10);
@@ -11,6 +16,7 @@ export async function GET(request: NextRequest) {
 
         let query = adminDb
             .collection("accounting")
+            .where("userId", "==", userId)
             .orderBy("createdAt", "desc")
             .limit(limit);
 

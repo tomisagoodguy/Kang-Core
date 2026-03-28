@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { RecurringExpenseSchema } from "@/models/schema";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 export async function GET() {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
-        const snapshot = await db.collection("recurring_expenses").orderBy("createdAt", "desc").get();
+        const snapshot = await db.collection("recurring_expenses")
+            .where("userId", "==", userId)
+            .orderBy("createdAt", "desc")
+            .get();
         const docs = snapshot.docs.map((doc) => {
             const data = doc.data();
             return {
@@ -21,6 +29,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
         const body = await request.json();
 
@@ -36,6 +48,7 @@ export async function POST(request: Request) {
         const data = result.data;
         const insertData = {
             ...data,
+            userId,
             createdAt: new Date(),
         };
 

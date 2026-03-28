@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { z } from "zod";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 const RuleSchema = z.object({
     keyword: z.string(),
@@ -9,8 +10,15 @@ const RuleSchema = z.object({
 });
 
 export async function GET() {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
-        const snapshot = await db.collection("classification_rules").orderBy("lastUsed", "desc").get();
+        const snapshot = await db.collection("classification_rules")
+            .where("userId", "==", userId)
+            .orderBy("lastUsed", "desc")
+            .get();
         const rules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return NextResponse.json(rules);
     } catch (error) {
@@ -19,12 +27,17 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
         const body = await req.json();
         const validated = RuleSchema.parse(body);
 
         const docRef = await db.collection("classification_rules").add({
             ...validated,
+            userId,
             count: 0,
             lastUsed: new Date(),
             createdAt: new Date()
