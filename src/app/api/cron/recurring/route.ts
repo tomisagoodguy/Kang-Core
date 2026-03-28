@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { AccountingEntry } from "@/models/schema";
 import { lineService } from "@/services/line.service";
+import { getAllLineUserIds } from "@/lib/userRegistry";
 
 /**
  * 處理定期支出
@@ -11,6 +12,11 @@ export async function GET(req: Request) {
     const authHeader = req.headers.get("authorization");
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userIds = getAllLineUserIds();
+    if (userIds.length === 0) {
+        return NextResponse.json({ error: "LINE_USER_IDS not set" }, { status: 500 });
     }
 
     try {
@@ -23,78 +29,85 @@ export async function GET(req: Request) {
         // 判斷今天是否為該月最後一天 (處理 29, 30, 31 號的邊界情況)
         const isLastDayOfMonth = new Date(now.getFullYear(), currentMonth, 0).getDate() === currentDayOfMonth;
 
-        const recurringSnap = await db.collection("recurring_expenses")
-            .where("isActive", "==", true)
-            .get();
+        const results: Array<{ userId: string; triggeredCount: number }> = [];
 
-        const triggeredList: string[] = [];
+        for (const userId of userIds) {
+            const recurringSnap = await db.collection("recurring_expenses")
+                .where("userId", "==", userId)
+                .where("isActive", "==", true)
+                .get();
 
-        for (const doc of recurringSnap.docs) {
-            const data = doc.data();
-            const { frequency, dayOfMonth, dayOfWeek, monthOfYear, lastTriggeredAt, amount, tag, description } = data;
+            const triggeredList: string[] = [];
 
-            // 防重複觸發
-            if (lastTriggeredAt === todayStr) {
-                continue;
+            for (const doc of recurringSnap.docs) {
+                const data = doc.data();
+                const { frequency, dayOfMonth, dayOfWeek, monthOfYear, lastTriggeredAt, amount, tag, description } = data;
+
+                // 防重複觸發
+                if (lastTriggeredAt === todayStr) {
+                    continue;
+                }
+
+                let shouldTrigger = false;
+
+                if (frequency === "daily") {
+                    shouldTrigger = true;
+                } else if (frequency === "weekly") {
+                    if (dayOfWeek === currentDayOfWeek) {
+                        shouldTrigger = true;
+                    }
+                } else if (frequency === "monthly") {
+                    if (dayOfMonth === currentDayOfMonth) {
+                        shouldTrigger = true;
+                    } else if (isLastDayOfMonth && typeof dayOfMonth === "number" && dayOfMonth > currentDayOfMonth) {
+                        // 例如設定 31 號，但該月只有 30 天，就會在 30 號（當月最後一天）觸發
+                        shouldTrigger = true;
+                    }
+                } else if (frequency === "yearly") {
+                    if (monthOfYear === currentMonth && dayOfMonth === currentDayOfMonth) {
+                        shouldTrigger = true;
+                    } else if (monthOfYear === currentMonth && isLastDayOfMonth && typeof dayOfMonth === "number" && dayOfMonth > currentDayOfMonth) {
+                        shouldTrigger = true;
+                    }
+                }
+
+                if (shouldTrigger) {
+                    // 寫入 accounting（帶 userId）
+                    const entry: AccountingEntry = {
+                        userId,
+                        amount,
+                        tag,
+                        description: `${description} [定期]`,
+                        date: todayStr,
+                        source: "system",
+                        originalText: `System: recurring ${doc.id}`,
+                        createdAt: new Date(),
+                    };
+
+                    await db.collection("accounting").add(entry);
+
+                    // 更新 recurring_expenses
+                    await doc.ref.update({
+                        lastTriggeredAt: todayStr,
+                    });
+
+                    triggeredList.push(`- $${amount} [${tag}] ${description}`);
+                }
             }
 
-            let shouldTrigger = false;
-
-            if (frequency === "daily") {
-                shouldTrigger = true;
-            } else if (frequency === "weekly") {
-                if (dayOfWeek === currentDayOfWeek) {
-                    shouldTrigger = true;
-                }
-            } else if (frequency === "monthly") {
-                if (dayOfMonth === currentDayOfMonth) {
-                    shouldTrigger = true;
-                } else if (isLastDayOfMonth && typeof dayOfMonth === "number" && dayOfMonth > currentDayOfMonth) {
-                    // 例如設定 31 號，但該月只有 30 天，就會在 30 號（當月最後一天）觸發
-                    shouldTrigger = true;
-                }
-            } else if (frequency === "yearly") {
-                if (monthOfYear === currentMonth && dayOfMonth === currentDayOfMonth) {
-                    shouldTrigger = true;
-                } else if (monthOfYear === currentMonth && isLastDayOfMonth && typeof dayOfMonth === "number" && dayOfMonth > currentDayOfMonth) {
-                    shouldTrigger = true;
-                }
+            // 有觸發才推播給當前用戶
+            if (triggeredList.length > 0) {
+                await lineService.pushText(userId, [
+                    "🔄 定期支出已入帳",
+                    "━━━━━━━━━━━━",
+                    ...triggeredList
+                ].join("\n"));
             }
 
-            if (shouldTrigger) {
-                // 寫入 accounting
-                const entry: AccountingEntry = {
-                    amount,
-                    tag,
-                    description: `${description} [定期]`,
-                    date: todayStr,
-                    source: "system",
-                    originalText: `System: recurring ${doc.id}`,
-                    createdAt: new Date(),
-                };
-
-                await db.collection("accounting").add(entry);
-
-                // 更新 recurring_expenses
-                await doc.ref.update({
-                    lastTriggeredAt: todayStr,
-                });
-
-                triggeredList.push(`- $${amount} [${tag}] ${description}`);
-            }
+            results.push({ userId, triggeredCount: triggeredList.length });
         }
 
-        // 如果有觸發且設定 LINE_USER_ID，主動推播通知 (可選)
-        const userId = process.env.LINE_USER_ID;
-        if (triggeredList.length > 0 && userId) {
-            await lineService.pushText(userId, [
-                "🔄 定期支出已入帳",
-                "━━━━━━━━━━━━",
-                ...triggeredList
-            ].join("\n"));
-        }
-
-        return NextResponse.json({ status: "ok", triggeredCount: triggeredList.length });
+        return NextResponse.json({ status: "ok", results });
     } catch (error) {
         console.error("[cron-recurring] Error:", error);
         return NextResponse.json({ error: "Failed" }, { status: 500 });

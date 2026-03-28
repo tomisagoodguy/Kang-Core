@@ -16,6 +16,7 @@ export const SourceEnum = z.enum(["line", "manual", "system", "line-rule", "line
 
 export const BaseEntrySchema = z.object({
     id: z.string().optional(), // Provided by Firestore Document ID usually
+    userId: z.string().optional(), // LINE user ID for multi-user isolation
     createdAt: z.date().optional(), // Added at creation time
     source: SourceEnum.default("line"),
     originalText: z.string(), // Keep original text for reference
