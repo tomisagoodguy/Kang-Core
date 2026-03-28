@@ -37,8 +37,9 @@ export async function GET(req: Request) {
         const monthStart = `${ym}-01`;
         const monthEnd = `${ym}-${String(lastDayOfMonth).padStart(2, "0")}`;
 
-        // 查詢當月所有帳目
+        // 查詢當月所有帳目（管理員專屬）
         const snap = await db.collection("accounting")
+            .where("userId", "==", userId)
             .where("date", ">=", monthStart)
             .where("date", "<=", monthEnd)
             .orderBy("date", "asc")
