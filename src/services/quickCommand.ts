@@ -62,19 +62,19 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
     // /記 {金額} {描述}
     const expenseMatch = trimmed.match(/^\/記\s+(\d+)\s*(.*)$/);
     if (expenseMatch) {
-        return await handleQuickExpense(Number(expenseMatch[1]), expenseMatch[2].trim());
+        return await handleQuickExpense(Number(expenseMatch[1]), expenseMatch[2].trim(), userId);
     }
 
     // /查 {時間}
     const queryMatch = trimmed.match(/^\/查\s+(.+)$/);
     if (queryMatch) {
-        return await handleQuickQuery(queryMatch[1].trim());
+        return await handleQuickQuery(queryMatch[1].trim(), userId);
     }
 
     // /待 {標題}
     const todoMatch = trimmed.match(/^\/待\s+(.+)$/);
     if (todoMatch) {
-        return await handleQuickTodo(todoMatch[1].trim());
+        return await handleQuickTodo(todoMatch[1].trim(), userId);
     }
 
     // /完成 {關鍵字}
@@ -129,12 +129,13 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
 }
 
 /** /記 — 快速記帳 */
-async function handleQuickExpense(amount: number, description: string): Promise<QuickCommandResult> {
+async function handleQuickExpense(amount: number, description: string, userId: string): Promise<QuickCommandResult> {
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10);
     const tag = guessTag(description);
 
     const entry = {
+        userId,
         amount,
         tag,
         date: dateStr,
@@ -165,7 +166,7 @@ async function handleQuickExpense(amount: number, description: string): Promise<
 }
 
 /** /查 — 快速查詢 */
-async function handleQuickQuery(period: string): Promise<QuickCommandResult> {
+async function handleQuickQuery(period: string, userId: string): Promise<QuickCommandResult> {
     const range = parsePeriod(period);
     if (!range) {
         return {
@@ -176,6 +177,7 @@ async function handleQuickQuery(period: string): Promise<QuickCommandResult> {
 
     const snapshot = await db
         .collection("accounting")
+        .where("userId", "==", userId)
         .where("date", ">=", range.from)
         .where("date", "<=", range.to)
         .get();
@@ -214,8 +216,9 @@ async function handleQuickQuery(period: string): Promise<QuickCommandResult> {
 }
 
 /** /待 — 快速待辦 */
-async function handleQuickTodo(title: string): Promise<QuickCommandResult> {
+async function handleQuickTodo(title: string, userId: string): Promise<QuickCommandResult> {
     const entry = {
+        userId,
         title,
         status: "pending",
         source: "line-quick",
@@ -381,6 +384,7 @@ async function handleBudgetQuery(userId: string): Promise<QuickCommandResult> {
         }
 
         const accSnap = await db.collection("accounting")
+            .where("userId", "==", userId)
             .where("date", ">=", monthStart)
             .where("date", "<=", monthEnd)
             .get();

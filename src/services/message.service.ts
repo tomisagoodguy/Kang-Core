@@ -76,6 +76,7 @@ export class MessageService {
                 if (amountMatch) {
                     const amount = Number(amountMatch[1]);
                     const entry: AccountingEntry = {
+                        userId,
                         amount,
                         tag: ruleMatch.tag as AccountingEntry["tag"],
                         subTag: ruleMatch.subTag ?? undefined,
@@ -119,6 +120,7 @@ export class MessageService {
                 const docRef = db.collection("accounting").doc();
                 const entry: AccountingEntry = {
                     ...item,
+                    userId,
                     originalText: userText,
                     source: "line",
                     createdAt: new Date(),
@@ -165,6 +167,7 @@ export class MessageService {
 
             const entry: ArchiveEntry & { embedding?: number[] } = {
                 ...parsedData.archiveData,
+                userId,
                 originalText: userText,
                 source: "line",
                 createdAt: new Date(),
@@ -187,6 +190,7 @@ export class MessageService {
         } else if (parsedData.type === "calendar" && parsedData.calendarData) {
             const entry: CalendarEntry = {
                 ...parsedData.calendarData,
+                userId,
                 originalText: userText,
                 source: "line",
                 createdAt: new Date(),
@@ -218,6 +222,7 @@ export class MessageService {
         } else if (parsedData.type === "recurring" && parsedData.recurringData) {
             const entry: RecurringExpense = {
                 ...parsedData.recurringData,
+                userId,
                 originalText: userText,
                 source: "line",
                 createdAt: new Date(),
@@ -236,7 +241,7 @@ export class MessageService {
             await discordService.sendDiscordNotification(replyText);
 
         } else if (parsedData.type === "query" && parsedData.queryData) {
-            const queryResult = await executeQuery(parsedData.queryData);
+            const queryResult = await executeQuery({ ...parsedData.queryData, userId });
             await this.sendReply(userId, state, queryResult.replyText);
 
         } else if (parsedData.type === "clear_memory") {
@@ -286,6 +291,7 @@ export class MessageService {
         if (parsedData.type === "accounting" && parsedData.accountingData) {
             const entry: AccountingEntry = {
                 ...parsedData.accountingData,
+                userId,
                 originalText: "[圖片分析]",
                 imageUrl: driveUrl,
                 source: "line-image",
@@ -311,6 +317,7 @@ export class MessageService {
 
             const entry: ArchiveEntry & { embedding?: number[], imageUrl?: string } = {
                 ...parsedData.archiveData,
+                userId,
                 originalText: "[圖片分析]",
                 imageUrl: driveUrl,
                 source: "line-image",
@@ -369,6 +376,7 @@ export class MessageService {
             });
 
             const entry: ArchiveEntry & { embedding?: number[] } = {
+                userId,
                 title: fileName,
                 summary: `此檔案由 LINE 機器人上傳。(${aiStatusStr})`,
                 keywords: ["file", "document"],

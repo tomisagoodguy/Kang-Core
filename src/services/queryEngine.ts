@@ -5,6 +5,7 @@ import { getEventsFromGoogleCalendar } from "@/lib/calendar/client";
 import type { AccountingEntry, ArchiveEntry, CalendarEntry } from "@/models/schema";
 
 interface QueryFilter {
+    userId: string;
     queryType: "expense" | "archive" | "calendar" | "semantic_search";
     tag?: string;
     period?: string;
@@ -24,13 +25,13 @@ export async function executeQuery(filters: QueryFilter): Promise<QueryResult> {
         return queryExpense(filters);
     }
     if (filters.queryType === "archive") {
-        return queryArchive(filters.limit ?? 5);
+        return queryArchive(filters.limit ?? 5, filters.userId);
     }
     if (filters.queryType === "calendar") {
-        return queryCalendar(filters.period);
+        return queryCalendar(filters.period, filters.userId);
     }
     if (filters.queryType === "semantic_search" && filters.semanticQuery) {
-        return querySemantic(filters.semanticQuery, filters.limit ?? 3);
+        return querySemantic(filters.semanticQuery, filters.limit ?? 3, filters.userId);
     }
     return { replyText: "❓ 不支援的查詢類型" };
 }
@@ -40,6 +41,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
 
     const query = db
         .collection("accounting")
+        .where("userId", "==", filters.userId)
         .where("date", ">=", range.from)
         .where("date", "<=", range.to) as FirebaseFirestore.Query;
 
@@ -100,9 +102,10 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
     };
 }
 
-async function queryArchive(limit: number): Promise<QueryResult> {
+async function queryArchive(limit: number, userId: string): Promise<QueryResult> {
     const snapshot = await db
         .collection("archive")
+        .where("userId", "==", userId)
         .orderBy("createdAt", "desc")
         .limit(limit)
         .get();
@@ -126,8 +129,8 @@ async function queryArchive(limit: number): Promise<QueryResult> {
     };
 }
 
-async function querySemantic(semanticQuery: string, limit: number): Promise<QueryResult> {
-    const results = await RAGService.search(semanticQuery, limit);
+async function querySemantic(semanticQuery: string, limit: number, userId: string): Promise<QueryResult> {
+    const results = await RAGService.search(semanticQuery, limit, userId);
     if (results.length === 0) {
         return { replyText: `🔍 找不到與「${semanticQuery}」相關的筆記。` };
     }
@@ -147,7 +150,7 @@ async function querySemantic(semanticQuery: string, limit: number): Promise<Quer
     };
 }
 
-async function queryCalendar(period?: string): Promise<QueryResult> {
+async function queryCalendar(period: string | undefined, userId: string): Promise<QueryResult> {
     const target = period === "tomorrow"
         ? new Date(Date.now() + 86400000).toISOString().slice(0, 10)
         : new Date().toISOString().slice(0, 10);
@@ -156,12 +159,14 @@ async function queryCalendar(period?: string): Promise<QueryResult> {
 
     const snapshot = await db
         .collection("calendar")
+        .where("userId", "==", userId)
         .where("actionDate", "==", target)
         .get();
 
     // 也查沒有日期的 pending 待辦
     const pendingSnapshot = await db
         .collection("calendar")
+        .where("userId", "==", userId)
         .where("status", "==", "pending")
         .get();
 

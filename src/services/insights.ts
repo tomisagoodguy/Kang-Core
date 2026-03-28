@@ -14,18 +14,19 @@ export async function generateFinancialInsights(userId: string): Promise<string>
         // 1b. Check Persistent Cache (Firestore) - limit to 1 hour (3600s)
         const oneHourAgo = new Date(Date.now() - 3600000);
         const cachedSnapshot = await db.collection("insights")
+            .where("userId", "==", userId)
             .where("createdAt", ">=", oneHourAgo)
             .orderBy("createdAt", "desc")
+            .limit(1)
             .get();
 
-        const userCache = cachedSnapshot.docs.find(doc => doc.data().userId === userId);
-
-        if (userCache) {
+        if (!cachedSnapshot.empty) {
             console.log(`[Insight] Using cached result from Firestore`);
-            return userCache.data().content;
+            return cachedSnapshot.docs[0].data().content;
         }
 
         const snapshot = await db.collection("accounting")
+            .where("userId", "==", userId)
             .where("date", ">=", dateStr)
             .orderBy("date", "desc")
             .get();

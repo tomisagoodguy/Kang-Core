@@ -15,19 +15,59 @@ if (!admin.apps.length) {
     });
 }
 
-const INDEXES = [
+interface IndexField {
+    fieldPath: string;
+    order: "ASCENDING" | "DESCENDING";
+}
+
+interface IndexDef {
+    collection: string;
+    name: string;
+    fields: IndexField[];
+}
+
+const INDEXES: IndexDef[] = [
+    // accounting
     {
-        name: "userId(ASC) + createdAt(DESC)",
+        collection: "accounting",
+        name: "accounting: userId(ASC) + date(ASC)",
+        fields: [
+            { fieldPath: "userId", order: "ASCENDING" },
+            { fieldPath: "date", order: "ASCENDING" },
+        ],
+    },
+    // archive
+    {
+        collection: "archive",
+        name: "archive: userId(ASC) + createdAt(DESC)",
         fields: [
             { fieldPath: "userId", order: "ASCENDING" },
             { fieldPath: "createdAt", order: "DESCENDING" },
         ],
     },
+    // calendar
     {
-        name: "userId(ASC) + tag(ASC) + createdAt(DESC)",
+        collection: "calendar",
+        name: "calendar: userId(ASC) + actionDate(ASC)",
         fields: [
             { fieldPath: "userId", order: "ASCENDING" },
-            { fieldPath: "tag", order: "ASCENDING" },
+            { fieldPath: "actionDate", order: "ASCENDING" },
+        ],
+    },
+    {
+        collection: "calendar",
+        name: "calendar: userId(ASC) + status(ASC)",
+        fields: [
+            { fieldPath: "userId", order: "ASCENDING" },
+            { fieldPath: "status", order: "ASCENDING" },
+        ],
+    },
+    // insights
+    {
+        collection: "insights",
+        name: "insights: userId(ASC) + createdAt(DESC)",
+        fields: [
+            { fieldPath: "userId", order: "ASCENDING" },
             { fieldPath: "createdAt", order: "DESCENDING" },
         ],
     },
@@ -38,21 +78,16 @@ async function getAccessToken(): Promise<string> {
     return token.access_token;
 }
 
-async function createIndex(accessToken: string, fields: object[]): Promise<string> {
-    const body = JSON.stringify({
-        queryScope: "COLLECTION",
-        fields,
-    });
-
+function apiRequest(method: string, urlPath: string, accessToken: string, body?: string): Promise<string> {
     return new Promise((resolve, reject) => {
         const options = {
             hostname: "firestore.googleapis.com",
-            path: `/v1/projects/${PROJECT_ID}/databases/(default)/collectionGroups/accounting/indexes`,
-            method: "POST",
+            path: urlPath,
+            method,
             headers: {
                 Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
-                "Content-Length": Buffer.byteLength(body),
+                ...(body ? { "Content-Length": Buffer.byteLength(body) } : {}),
             },
         };
 
@@ -63,67 +98,68 @@ async function createIndex(accessToken: string, fields: object[]): Promise<strin
         });
 
         req.on("error", reject);
-        req.write(body);
+        if (body) req.write(body);
         req.end();
     });
 }
 
-async function listIndexes(accessToken: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const options = {
-            hostname: "firestore.googleapis.com",
-            path: `/v1/projects/${PROJECT_ID}/databases/(default)/collectionGroups/accounting/indexes`,
-            method: "GET",
-            headers: { Authorization: `Bearer ${accessToken}` },
-        };
+async function getExistingIndexKeys(accessToken: string, collection: string): Promise<Set<string>> {
+    const urlPath = `/v1/projects/${PROJECT_ID}/databases/(default)/collectionGroups/${collection}/indexes`;
+    const raw = await apiRequest("GET", urlPath, accessToken);
+    const parsed = JSON.parse(raw);
+    const keys = new Set<string>();
+    for (const idx of parsed.indexes || []) {
+        const key = (idx.fields || []).map((f: IndexField) => `${f.fieldPath}:${f.order}`).join("+");
+        keys.add(key);
+    }
+    return keys;
+}
 
-        const req = https.request(options, (res) => {
-            let data = "";
-            res.on("data", (chunk) => (data += chunk));
-            res.on("end", () => resolve(data));
-        });
-
-        req.on("error", reject);
-        req.end();
-    });
+async function createIndex(accessToken: string, collection: string, fields: IndexField[]): Promise<string> {
+    const urlPath = `/v1/projects/${PROJECT_ID}/databases/(default)/collectionGroups/${collection}/indexes`;
+    const body = JSON.stringify({ queryScope: "COLLECTION", fields });
+    return apiRequest("POST", urlPath, accessToken, body);
 }
 
 async function main() {
     console.log(`專案：${PROJECT_ID}\n`);
     const accessToken = await getAccessToken();
 
-    // 先列出現有索引
-    console.log("查詢現有索引...");
-    const existing = JSON.parse(await listIndexes(accessToken));
-    const existingFields = (existing.indexes || []).map((idx: any) =>
-        (idx.fields || []).map((f: any) => `${f.fieldPath}:${f.order}`).join("+")
-    );
-    console.log(`現有索引數量：${existingFields.length}`);
-
+    // 依集合分組
+    const byCollection = new Map<string, IndexDef[]>();
     for (const idx of INDEXES) {
-        const key = idx.fields.map((f) => `${f.fieldPath}:${f.order}`).join("+");
-        if (existingFields.includes(key)) {
-            console.log(`✓ 已存在：${idx.name}`);
-            continue;
-        }
+        const list = byCollection.get(idx.collection) ?? [];
+        list.push(idx);
+        byCollection.set(idx.collection, list);
+    }
 
-        console.log(`建立索引：${idx.name} ...`);
-        const result = JSON.parse(await createIndex(accessToken, idx.fields));
+    for (const [collection, indexes] of byCollection) {
+        const existing = await getExistingIndexKeys(accessToken, collection);
 
-        if (result.error) {
-            if (result.error.code === 409) {
-                console.log(`✓ 已存在（衝突）：${idx.name}`);
-            } else {
-                console.error(`✗ 失敗：${idx.name}`, result.error.message);
+        for (const idx of indexes) {
+            const key = idx.fields.map(f => `${f.fieldPath}:${f.order}`).join("+");
+
+            if (existing.has(key)) {
+                console.log(`✓ 已存在：${idx.name}`);
+                continue;
             }
-        } else {
-            console.log(`✓ 已提交：${idx.name}`);
-            console.log(`  狀態：${result.state || "CREATING"}`);
-            console.log(`  操作 ID：${result.name?.split("/").pop()}`);
+
+            console.log(`建立索引：${idx.name} ...`);
+            const result = JSON.parse(await createIndex(accessToken, collection, idx.fields));
+
+            if (result.error) {
+                if (result.error.code === 409) {
+                    console.log(`✓ 已存在（衝突）：${idx.name}`);
+                } else {
+                    console.error(`✗ 失敗：${idx.name}`, result.error.message);
+                }
+            } else {
+                console.log(`✓ 已提交：${idx.name}（狀態：${result.state ?? "CREATING"}）`);
+            }
         }
     }
 
-    console.log("\n索引建立後需要數分鐘才能生效。");
+    console.log("\n索引建立後需要 1-5 分鐘才能生效。");
 }
 
 main().catch(console.error);

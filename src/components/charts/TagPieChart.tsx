@@ -66,10 +66,10 @@ function renderActiveShape(props: any) {
             <text x={cx} y={cy - 12} textAnchor="middle" fill={fill} fontSize={13} fontWeight={700}>
                 {payload.tag || payload.name}
             </text>
-            <text x={cx} y={cy + 10} textAnchor="middle" fill="#9ca3af" fontSize={11}>
+            <text x={cx} y={cy + 10} textAnchor="middle" fill="var(--text-secondary)" fontSize={11}>
                 ${Number(value).toLocaleString()}
             </text>
-            <text x={cx} y={cy + 28} textAnchor="middle" fill="#9ca3af" fontSize={10}>
+            <text x={cx} y={cy + 28} textAnchor="middle" fill="var(--text-muted)" fontSize={10}>
                 {(percent * 100).toFixed(1)}%
             </text>
             <Sector
@@ -238,10 +238,10 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                             pointerEvents: "none",
                             zIndex: 1,
                         }}>
-                            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
                                 {drillTag ?? (viewType === "expense" ? "當月支出" : "當月收入")}
                             </div>
-                            <div style={{ fontSize: 17, fontWeight: 700, color: "#f3f4f6" }}>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
                                 ${total.toLocaleString()}
                             </div>
                         </div>

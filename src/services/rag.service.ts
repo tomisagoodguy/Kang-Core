@@ -28,14 +28,16 @@ export class RAGService {
     /**
      * 從 Archive 搜尋語意最相關的筆記
      */
-    static async search(queryText: string, topK: number = 3): Promise<RAGDocument[]> {
+    static async search(queryText: string, topK: number = 3, userId?: string): Promise<RAGDocument[]> {
         const queryEmbedding = await getEmbedding(queryText).catch(() => null);
         if (!queryEmbedding) {
             console.error("[RAGService] Failed to generate query embedding.");
             return [];
         }
 
-        const snapshot = await db.collection("archive").get();
+        const snapshot = userId
+            ? await db.collection("archive").where("userId", "==", userId).get()
+            : await db.collection("archive").get();
         const results: RAGDocument[] = [];
 
         for (const doc of snapshot.docs) {
