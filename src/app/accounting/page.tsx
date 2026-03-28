@@ -20,15 +20,6 @@ import {
     CalendarDays
 } from "lucide-react";
 
-const ALL_MONTHS = () => {
-    const months = [];
-    const now = new Date();
-    for (let i = 0; i < 6; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        months.push(d.toISOString().slice(0, 7));
-    }
-    return months;
-};
 
 export default function AccountingPage() {
     const [entries, setEntries] = useState<AccountingEntryView[]>([]);
@@ -80,6 +71,11 @@ export default function AccountingPage() {
     }, [filtered]);
 
     const netBalance = useMemo(() => totalIncome - totalExpenses, [totalIncome, totalExpenses]);
+
+    const availableMonths = useMemo(() => {
+        const months = new Set(entries.map((e) => e.date?.slice(0, 7)).filter(Boolean));
+        return Array.from(months).sort().reverse();
+    }, [entries]);
 
     // 聚合：月度支出趨勢（僅顯示有資料的月份）
     const monthlyTrend = useMemo(() => {
@@ -213,7 +209,7 @@ export default function AccountingPage() {
                         style={{ paddingLeft: "36px", width: "100%" }}
                     >
                         <option value="all">全部月份</option>
-                        {ALL_MONTHS().map((m) => (
+                        {availableMonths.map((m) => (
                             <option key={m} value={m}>{m}</option>
                         ))}
                     </select>

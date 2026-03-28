@@ -14,29 +14,38 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get("limit") || "20", 10);
         const tag = searchParams.get("tag");
 
-        let query = adminDb
+        // 不使用 orderBy 避免需要複合索引；排序改在 JS 端
+        // 有 tag 過濾時先取全量再篩，避免分頁數量不足
+        let baseQuery = adminDb
             .collection("accounting")
-            .where("userId", "==", userId)
-            .orderBy("createdAt", "desc")
-            .limit(limit);
+            .where("userId", "==", userId);
 
         if (tag && tag !== "all") {
-            query = query.where("tag", "==", tag) as typeof query;
+            baseQuery = baseQuery.where("tag", "==", tag) as typeof baseQuery;
         }
+
+        const query = tag && tag !== "all" ? baseQuery : baseQuery.limit(limit);
 
         const snapshot = await query.get();
 
-        const entries: AccountingEntryView[] = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                createdAt:
-                    data.createdAt instanceof Timestamp
-                        ? data.createdAt.toDate().toISOString()
-                        : data.createdAt ?? null,
-            } as AccountingEntryView;
-        });
+        const entries: AccountingEntryView[] = snapshot.docs
+            .map((doc) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt:
+                        data.createdAt instanceof Timestamp
+                            ? data.createdAt.toDate().toISOString()
+                            : data.createdAt ?? null,
+                } as AccountingEntryView;
+            })
+            .sort((a, b) => {
+                const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return tb - ta;
+            })
+            .slice(0, limit);
 
         return NextResponse.json({ entries, total: entries.length });
     } catch (error) {

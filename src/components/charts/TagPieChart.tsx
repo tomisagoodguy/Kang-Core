@@ -9,9 +9,7 @@ import {
     Tooltip,
     Legend,
     Sector,
-    Label,
 } from "recharts";
-import type { PieLabelRenderProps } from "recharts";
 
 interface TagData {
     tag: string;
@@ -229,6 +227,25 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
             )}
 
             {(!drillTag || subTagData.length > 0) && (
+                <div style={{ position: "relative" }}>
+                    {activeIndex === -1 && (
+                        <div style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: "50%",
+                            transform: "translate(-50%, -60%)",
+                            textAlign: "center",
+                            pointerEvents: "none",
+                            zIndex: 1,
+                        }}>
+                            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>
+                                {drillTag ?? (viewType === "expense" ? "當月支出" : "當月收入")}
+                            </div>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: "#f3f4f6" }}>
+                                ${total.toLocaleString()}
+                            </div>
+                        </div>
+                    )}
                 <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
                         <Pie
@@ -261,23 +278,6 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                                     : TAG_COLORS[(entry as TagData).tag] || TAG_COLORS.Other;
                                 return <Cell key={`cell-${index}`} fill={baseColor} />;
                             })}
-                            <Label
-                                position="center"
-                                content={({ viewBox }) => {
-                                    if (activeIndex !== -1) return null;
-                                    const { cx, cy } = viewBox as { cx: number; cy: number };
-                                    return (
-                                        <g>
-                                            <text x={cx} y={cy - 10} textAnchor="middle" fill="#9ca3af" fontSize={11}>
-                                                {drillTag ?? (viewType === "expense" ? "當月支出" : "當月收入")}
-                                            </text>
-                                            <text x={cx} y={cy + 14} textAnchor="middle" fill="#f3f4f6" fontSize={17} fontWeight={700}>
-                                                ${total.toLocaleString()}
-                                            </text>
-                                        </g>
-                                    );
-                                }}
-                            />
                         </Pie>
                         <Tooltip
                             contentStyle={{
@@ -298,6 +298,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                         />
                     </PieChart>
                 </ResponsiveContainer>
+                </div>
             )}
         </div>
     );

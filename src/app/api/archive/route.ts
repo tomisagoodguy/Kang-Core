@@ -13,24 +13,29 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get("limit") || "20", 10);
         const q = searchParams.get("q")?.toLowerCase();
 
+        // 不使用 orderBy 避免需要複合索引；排序改在 JS 端
         const snapshot = await adminDb
             .collection("archive")
             .where("userId", "==", userId)
-            .orderBy("createdAt", "desc")
-            .limit(q ? 100 : limit) // fetch more for client-side keyword filter
             .get();
 
-        let entries = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                createdAt:
-                    data.createdAt instanceof Timestamp
-                        ? data.createdAt.toDate().toISOString()
-                        : data.createdAt ?? null,
-            };
-        });
+        let entries = snapshot.docs
+            .map((doc) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt:
+                        data.createdAt instanceof Timestamp
+                            ? data.createdAt.toDate().toISOString()
+                            : data.createdAt ?? null,
+                };
+            })
+            .sort((a, b) => {
+                const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return tb - ta;
+            });
 
         // Filter by keyword if provided
         if (q) {
@@ -42,9 +47,9 @@ export async function GET(request: NextRequest) {
                 const summaryMatch = entry.summary?.toLowerCase().includes(q);
                 return keywordsMatch || titleMatch || summaryMatch;
             });
-            // Re-apply limit after filter
-            entries = entries.slice(0, limit);
         }
+
+        entries = entries.slice(0, limit);
 
         return NextResponse.json({ entries, total: entries.length });
     } catch (error) {
