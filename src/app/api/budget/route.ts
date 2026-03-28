@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 /**
  * 預算 CRUD
@@ -10,14 +11,15 @@ import { db } from "@/lib/firebase/admin";
  * 此 API 供 Web Dashboard 使用，LINE Bot 透過指令觸發
  */
 
-const USER_ID = process.env.LINE_USER_ID ?? "default_user";
-
 export async function GET() {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
         const snap = await db.collection("budgets")
-            .where("userId", "==", USER_ID)
+            .where("userId", "==", userId)
             .get();
-
         const budgets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         return NextResponse.json({ budgets });
     } catch (err) {
@@ -27,6 +29,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
         const body = await req.json() as { tag?: string; monthlyLimit: number };
         const { tag, monthlyLimit } = body;
@@ -36,7 +42,7 @@ export async function POST(req: Request) {
         }
 
         // 查詢是否已存在同 tag 的預算（tag 為 null/undefined 代表總預算）
-        let query = db.collection("budgets").where("userId", "==", USER_ID) as FirebaseFirestore.Query;
+        let query = db.collection("budgets").where("userId", "==", userId) as FirebaseFirestore.Query;
         if (tag) {
             query = query.where("tag", "==", tag);
         } else {
@@ -49,7 +55,7 @@ export async function POST(req: Request) {
             await existing.docs[0].ref.update({ monthlyLimit, updatedAt: new Date() });
         } else {
             await db.collection("budgets").add({
-                userId: USER_ID,
+                userId,
                 tag: tag ?? null,
                 monthlyLimit,
                 createdAt: new Date(),
@@ -65,12 +71,22 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     try {
         const { searchParams } = new URL(req.url);
         const id = searchParams.get("id");
 
         if (!id) {
             return NextResponse.json({ error: "缺少 id 參數" }, { status: 400 });
+        }
+
+        // 驗證此 budget 屬於當前用戶
+        const doc = await db.collection("budgets").doc(id).get();
+        if (!doc.exists || doc.data()?.userId !== userId) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
         }
 
         await db.collection("budgets").doc(id).delete();
