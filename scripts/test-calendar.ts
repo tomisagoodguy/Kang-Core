@@ -24,8 +24,9 @@ async function test() {
         } else {
             console.log("❌ 建立行事曆事件失敗 (回傳 null)");
         }
-    } catch (e: any) {
-        console.error("❌ 發生例外:", e.message || e);
+    } catch (e) {
+        const error = e as Error;
+        console.error("❌ 發生例外:", error.message || error);
     }
 }
 

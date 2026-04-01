@@ -1,7 +1,5 @@
 import { google } from "googleapis";
 import * as dotenv from "dotenv";
-import fs from "fs";
-import { resolve } from "path";
 
 dotenv.config({ path: ".env.local" });
 
@@ -27,8 +25,7 @@ async function test() {
         });
         console.log("Success:", res.data.files);
     } catch (e) {
-        console.error("Error:", e.message);
-        console.error(e.response?.data);
+        console.error("❌ 發生例外:", e.message || e);
     }
 }
 

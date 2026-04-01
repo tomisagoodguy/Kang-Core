@@ -1,6 +1,5 @@
 import puppeteer from 'puppeteer';
 import * as dotenv from 'dotenv';
-import * as fs from 'fs';
 import * as path from 'path';
 
 // 載入環境變數
@@ -12,9 +11,9 @@ const LINE_API_BASE = "https://api.line.me/v2/bot";
 async function lineRequest(
     method: "GET" | "POST" | "DELETE",
     endpoint: string,
-    body?: any,
+    body?: Record<string, unknown>,
     isMultipart = false
-): Promise<any> {
+): Promise<unknown> {
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) throw new Error("Missing LINE_CHANNEL_ACCESS_TOKEN in env");
 
@@ -115,7 +114,7 @@ async function main() {
     }
 
     console.log("[3/4] 建立並上傳新的 Rich Menu...");
-    const created = await lineRequest("POST", "/richmenu", RICH_MENU_BODY) as { richMenuId: string };
+    const created = await lineRequest("POST", "/richmenu", RICH_MENU_BODY as unknown as Record<string, unknown>) as { richMenuId: string };
     const richMenuId = created.richMenuId;
 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -135,7 +134,7 @@ async function main() {
     console.log("✅ 成功！您的 LINE Bot 已經有自動選單了！");
 }
 
-main().catch(err => {
+main().catch((err: Error) => {
     console.error("❌ 錯誤:", err.message);
     process.exit(1);
 });

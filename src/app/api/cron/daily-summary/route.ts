@@ -35,10 +35,13 @@ export async function GET(req: Request) {
                 .where("date", "==", today)
                 .get();
 
+            // 今日數據
             const todayEntries = todaySnap.docs.map((d) => d.data());
-            const todayTotal = todayEntries.reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const todayIncome = todayEntries.filter(e => e.tag === "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const todayExpense = todayEntries.filter(e => e.tag !== "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const todayBalance = todayIncome - todayExpense;
 
-            // 本月累計
+            // 本月數據
             const monthSnap = await db
                 .collection("accounting")
                 .where("userId", "==", userId)
@@ -46,7 +49,10 @@ export async function GET(req: Request) {
                 .where("date", "<=", today)
                 .get();
 
-            const monthTotal = monthSnap.docs.reduce((s, d) => s + ((d.data().amount as number) || 0), 0);
+            const monthEntries = monthSnap.docs.map(d => d.data());
+            const monthIncome = monthEntries.filter(e => e.tag === "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const monthExpense = monthEntries.filter(e => e.tag !== "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const monthBalance = monthIncome - monthExpense;
 
             // 標籤統計
             const tagMap = new Map<string, number>();
@@ -63,22 +69,27 @@ export async function GET(req: Request) {
                 await lineService.pushText(userId, [
                     "📊 今日消費摘要",
                     "━━━━━━━━━━━━",
-                    "🎉 今天零消費！",
+                    "🎉 今天零收支記錄！",
                     "",
-                    `📅 本月累計: $${monthTotal.toLocaleString()}`,
+                    `📅 本月結餘: $${monthBalance.toLocaleString()}`,
+                    `📈 收入: $${monthIncome.toLocaleString()}`,
+                    `📉 支出: $${monthExpense.toLocaleString()}`,
                 ].join("\n"));
             } else {
                 await lineService.pushText(userId, [
                     "📊 今日消費摘要",
                     "━━━━━━━━━━━━",
-                    `💰 今日共 ${todayEntries.length} 筆，合計 $${todayTotal.toLocaleString()}`,
+                    `💰 今日筆數: ${todayEntries.length} 筆`,
+                    `⚖️ 當日結餘: $${todayBalance.toLocaleString()}`,
                     ...tagLines,
                     "",
-                    `📅 本月累計: $${monthTotal.toLocaleString()}`,
+                    `📅 本月結餘: $${monthBalance.toLocaleString()}`,
+                    `📈 收入: $${monthIncome.toLocaleString()}`,
+                    `📉 支出: $${monthExpense.toLocaleString()}`,
                 ].join("\n"));
             }
 
-            results.push({ userId, todayTotal, monthTotal });
+            results.push({ userId, todayTotal: todayBalance, monthTotal: monthBalance });
         } catch (err) {
             console.error(`[daily-summary] Error for user ${userId}:`, err);
         }

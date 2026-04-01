@@ -1,5 +1,21 @@
 import { google } from "googleapis";
 
+export interface GCalEvent {
+    id: string;
+    summary?: string;
+    description?: string;
+    start?: {
+        dateTime?: string;
+        date?: string;
+        timeZone?: string;
+    };
+    end?: {
+        dateTime?: string;
+        date?: string;
+        timeZone?: string;
+    };
+}
+
 function getCalendarClient() {
     const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_OAUTH_CLIENT_ID?.trim(),
@@ -14,7 +30,7 @@ function getCalendarClient() {
     return google.calendar({ version: "v3", auth: oauth2Client });
 }
 
-export async function getEventsFromGoogleCalendar(dateStr: string) {
+export async function getEventsFromGoogleCalendar(dateStr: string): Promise<GCalEvent[]> {
     const calendar = getCalendarClient();
     const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -30,14 +46,15 @@ export async function getEventsFromGoogleCalendar(dateStr: string) {
             orderBy: "startTime",
         });
 
-        return res.data.items || [];
-    } catch (e: any) {
-        console.error("Failed to fetch events from Google Calendar:", e.message || e);
+        return (res.data.items as GCalEvent[]) || [];
+    } catch (e) {
+        const error = e as Error;
+        console.error("Failed to fetch events from Google Calendar:", error.message || error);
         return [];
     }
 }
 
-export async function getUpcomingEventsFromGoogleCalendar(days: number = 7) {
+export async function getUpcomingEventsFromGoogleCalendar(days: number = 7): Promise<GCalEvent[]> {
     const calendar = getCalendarClient();
     const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -57,14 +74,15 @@ export async function getUpcomingEventsFromGoogleCalendar(days: number = 7) {
             orderBy: "startTime",
         });
 
-        return res.data.items || [];
-    } catch (e: any) {
-        console.error("Failed to fetch upcoming events from Google Calendar:", e.message || e);
+        return (res.data.items as GCalEvent[]) || [];
+    } catch (e) {
+        const error = e as Error;
+        console.error("Failed to fetch upcoming events from Google Calendar:", error.message || error);
         return [];
     }
 }
 
-export async function getMonthlyEventsFromGoogleCalendar(year: number, month: number) {
+export async function getMonthlyEventsFromGoogleCalendar(year: number, month: number): Promise<GCalEvent[]> {
     const calendar = getCalendarClient();
     const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -85,9 +103,10 @@ export async function getMonthlyEventsFromGoogleCalendar(year: number, month: nu
             orderBy: "startTime",
         });
 
-        return res.data.items || [];
-    } catch (e: any) {
-        console.error("Failed to fetch monthly events from Google Calendar:", e.message || e);
+        return (res.data.items as GCalEvent[]) || [];
+    } catch (e) {
+        const error = e as Error;
+        console.error("Failed to fetch monthly events from Google Calendar:", error.message || error);
         return [];
     }
 }
@@ -97,7 +116,7 @@ export async function addEventToGoogleCalendar(entry: {
     description?: string;
     actionDate?: string; // YYYY-MM-DD
     actionTime?: string; // HH:mm
-}) {
+}): Promise<string | null> {
     const calendar = getCalendarClient();
     const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -107,8 +126,8 @@ export async function addEventToGoogleCalendar(entry: {
     // 如果沒有 date，預設為明天 (依使用者邏輯)
     const dateStr = entry.actionDate || new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
-    let start: any = {};
-    let end: any = {};
+    let start: Record<string, string> = {};
+    let end: Record<string, string> = {};
 
     if (hasTime) {
         // 設定精確時間
@@ -136,14 +155,15 @@ export async function addEventToGoogleCalendar(entry: {
                 end,
             },
         });
-        return res.data.id;
-    } catch (e: any) {
-        console.error("Failed to add event to Google Calendar:", e.message || e);
+        return res.data.id || null;
+    } catch (e) {
+        const error = e as Error;
+        console.error("Failed to add event to Google Calendar:", error.message || error);
         return null; // Don't crash the whole bot
     }
 }
 
-export async function deleteEventFromGoogleCalendar(eventId: string) {
+export async function deleteEventFromGoogleCalendar(eventId: string): Promise<boolean> {
     const calendar = getCalendarClient();
     const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
@@ -154,7 +174,8 @@ export async function deleteEventFromGoogleCalendar(eventId: string) {
         });
         return true;
     } catch (e) {
-        console.error("Failed to delete event from Google Calendar", e);
+        const error = e as Error;
+        console.error("Failed to delete event from Google Calendar", error.message || error);
         return false;
     }
 }

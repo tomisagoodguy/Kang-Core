@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
-import { getMonthlyEventsFromGoogleCalendar } from "@/lib/calendar/client";
+import { getMonthlyEventsFromGoogleCalendar, type GCalEvent } from "@/lib/calendar/client";
 import type { CalendarEntryView } from "@/models/schema";
 
 export const dynamic = "force-dynamic";
@@ -38,11 +38,12 @@ export async function GET(request: NextRequest) {
         });
 
         // Fetch from Google Calendar
-        let gcalEvents: any[] = [];
+        let gcalEvents: GCalEvent[] = [];
         try {
             gcalEvents = await getMonthlyEventsFromGoogleCalendar(year, month);
         } catch (e) {
-            console.error("[API/calendar/month] Failed to fetch Google Calendar:", e);
+            const error = e as Error;
+            console.error("[API/calendar/month] Failed to fetch Google Calendar:", error.message || error);
         }
 
         const gcalEntries: CalendarEntryView[] = gcalEvents.map((event) => {

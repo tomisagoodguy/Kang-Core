@@ -4,7 +4,7 @@ import { ArchiveCard } from "@/components/ArchiveCard";
 import { CalendarCard } from "@/components/CalendarCard";
 import { ThreadsCard } from "@/components/ThreadsCard";
 import Link from "next/link";
-import { LayoutDashboard, Coins, CreditCard, Scale, Receipt, BookMarked, CalendarDays, LineChart, Library, Search, MessageCircle, Inbox } from "lucide-react";
+import { LayoutDashboard, Coins, CreditCard, Scale, Receipt, BookMarked, CalendarDays, Library, MessageCircle, Inbox } from "lucide-react";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { AccountingEntryView, ArchiveEntryView, CalendarEntryView, ThreadsEntryView } from "@/models/schema";
@@ -61,7 +61,7 @@ async function getCalendarEntries(limit = 10): Promise<CalendarEntryView[]> {
         });
 
         // Fetch from Google Calendar
-        let gcalEvents: any[] = [];
+        let gcalEvents: Array<{ id: string; summary?: string; description?: string; start?: { dateTime?: string; date?: string } }> = [];
         try {
             gcalEvents = await getUpcomingEventsFromGoogleCalendar(7);
         } catch (e) {
