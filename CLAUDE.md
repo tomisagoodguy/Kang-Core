@@ -97,8 +97,11 @@ yarn lint         # ESLint 檢查 src/**/*.ts[x]
 ### 工具腳本
 ```bash
 # 執行維護腳本（使用 tsx，非 ts-node）
-npx tsx scripts/backfill-embeddings.ts   # 為舊知識庫項目補建 Embedding
-npx tsx scripts/setup-rich-menu.ts       # 設定 LINE Rich Menu
+npx tsx scripts/backfill-embeddings.ts      # 為舊知識庫項目補建 Embedding
+npx tsx scripts/backfill-userId.ts          # 舊資料遷移：補填 userId 欄位（一次性）
+npx tsx scripts/create-firestore-indexes.ts # 部署 Firestore 複合索引
+npx tsx scripts/refresh-google-token.ts     # 更新 Google OAuth Refresh Token
+npx tsx scripts/setup-rich-menu.ts          # 設定 LINE Rich Menu
 ```
 
 ### Python 爬蟲（threads-scraper）
@@ -173,6 +176,8 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 # LINE
 LINE_CHANNEL_ACCESS_TOKEN
 LINE_CHANNEL_SECRET
+LINE_USER_IDS             # 逗號分隔多用戶 LINE ID，例如 "Uxxx,Uyyy"（Cron Jobs 迭代用）
+                          # 單用戶舊版 fallback：LINE_USER_ID
 
 # Google Gemini
 GEMINI_API_KEY
@@ -187,9 +192,36 @@ GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 GOOGLE_REFRESH_TOKEN
 
+# 多用戶 Dashboard
+EMAIL_LINE_MAP            # Google Email → LINE ID 映射，例如 "admin@gmail.com:Uxxx,mom@gmail.com:Uyyy"
+AUTHORIZED_EMAILS         # 允許登入 Dashboard 的 Google Email 白名單
+
 # 系統
 CRON_SECRET               # Cron Job 驗證金鑰
 NEXT_PUBLIC_FIREBASE_*    # 前端 Firebase 設定（7 個變數）
+```
+
+---
+
+## 認證架構（Multi-User）
+
+Dashboard 採 Firebase Google OAuth + Session Cookie 機制：
+
+1. 前端登入 → `POST /api/auth/session`（建立 5 天 httpOnly Cookie `firebase-session`）
+2. `src/middleware.ts` 保護 `/`, `/accounting`, `/archive` 等路徑（Cookie 不存在 → 導向 `/login`）
+3. API Route 中呼叫 `getSessionUserId()`（`src/lib/auth/getSessionUserId.ts`）驗證 Cookie 並透過 `EMAIL_LINE_MAP` 取得 LINE userId
+4. 所有 Firestore 查詢**必須**帶 `userId`，資料隔離在 API 層而非 Middleware 層
+
+公開路徑（不驗證）：`/login`, `/api/webhook`, `/api/auth`
+
+---
+
+## Firestore 索引
+
+所有複合索引定義於 `firestore.indexes.json`，首欄位均為 `userId`。初次部署或新增索引後須執行：
+
+```bash
+npx tsx scripts/create-firestore-indexes.ts
 ```
 
 ---

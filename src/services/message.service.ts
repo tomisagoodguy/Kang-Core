@@ -20,6 +20,11 @@ import * as os from "os";
 import * as path from "path";
 import type { AccountingEntry, ArchiveEntry, CalendarEntry, RecurringExpense } from "@/models/schema";
 
+function cleanUndefined<T extends Record<string, unknown>>(obj: T): T {
+    Object.keys(obj).forEach(key => obj[key] === undefined && delete obj[key]);
+    return obj;
+}
+
 export class MessageService {
     /** 內部發送訊息並紀錄到短記憶 */
     private async sendReply(userId: string, state: { token?: string, used?: boolean } | undefined, replyText: string): Promise<void> {
@@ -89,7 +94,7 @@ export class MessageService {
                     const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
 
                     await this.sendReply(userId, state, replyText);
-                    await db.collection("accounting").add(entry);
+                    await db.collection("accounting").add(cleanUndefined(entry));
                     await discordService.sendDiscordNotification(replyText);
                     return;
                 }
@@ -128,7 +133,7 @@ export class MessageService {
                 const isIncome = entry.tag === "Income";
                 const replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
 
-                batch.set(docRef, entry);
+                batch.set(docRef, cleanUndefined(entry));
 
                 if (!isIncome) {
                     totalExpense += entry.amount;
@@ -179,7 +184,7 @@ export class MessageService {
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
             await this.sendReply(userId, state, replyText);
-            await db.collection("archive").add(entry);
+            await db.collection("archive").add(cleanUndefined(entry));
             await discordService.sendDiscordNotification(replyText);
 
             // 學習新標籤
@@ -216,7 +221,7 @@ export class MessageService {
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
             await this.sendReply(userId, state, replyText);
-            await db.collection("calendar").add(entry);
+            await db.collection("calendar").add(cleanUndefined(entry));
             await discordService.sendDiscordNotification(replyText);
 
         } else if (parsedData.type === "recurring" && parsedData.recurringData) {
@@ -237,7 +242,7 @@ export class MessageService {
             if (parsedData.explanation) replyText += `\n🤖 AI: ${parsedData.explanation}`;
 
             await this.sendReply(userId, state, replyText);
-            await db.collection("recurring_expenses").add(entry);
+            await db.collection("recurring_expenses").add(cleanUndefined(entry));
             await discordService.sendDiscordNotification(replyText);
 
         } else if (parsedData.type === "query" && parsedData.queryData) {
@@ -300,7 +305,7 @@ export class MessageService {
             const replyText = `✅ 收據記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}\n📁 圖片: 已存 Drive`;
 
             await this.sendReply(userId, state, replyText);
-            await db.collection("accounting").add(entry);
+            await db.collection("accounting").add(cleanUndefined(entry));
             await discordService.sendDiscordNotification(replyText);
 
             // 學習新規則 (C9)
@@ -329,7 +334,7 @@ export class MessageService {
             const replyText = `📦 圖片收納成功！\n📋 摘要: ${entry.summary}\n🏷️ 關鍵字: ${entry.keywords.join(", ")}\n📁 圖片: 已存 Drive`;
 
             await this.sendReply(userId, state, replyText);
-            await db.collection("archive").add(entry);
+            await db.collection("archive").add(cleanUndefined(entry));
             await discordService.sendDiscordNotification(replyText);
 
             // 學習新標籤
@@ -391,7 +396,7 @@ export class MessageService {
 
             const replyText = `✅ 檔案儲存成功！\n📁 標題：${fileName}\n🔗 存檔位置：已存 Drive\n🤖 AI 知識庫：${aiStatusStr}\n💡 您現在可以直接詢問我檔案內容了！`;
 
-            await db.collection("archive").add(entry);
+            await db.collection("archive").add(cleanUndefined(entry));
             await this.sendReply(userId, state, replyText);
             await discordService.sendDiscordNotification(replyText);
 
