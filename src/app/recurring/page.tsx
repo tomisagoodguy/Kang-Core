@@ -101,7 +101,7 @@ export default function RecurringPage() {
             } else {
                 alert("儲存失敗");
             }
-        } catch (err) {
+        } catch {
             alert("Error");
         }
     };
@@ -114,8 +114,8 @@ export default function RecurringPage() {
                 body: JSON.stringify({ isActive: !currentStatus }),
             });
             fetchRecurring();
-        } catch (err) {
-            console.error(err);
+        } catch {
+            console.error("Fetch error");
         }
     };
 
@@ -124,8 +124,8 @@ export default function RecurringPage() {
         try {
             await fetch(`/api/recurring/${id}`, { method: "DELETE" });
             fetchRecurring();
-        } catch (err) {
-            console.error(err);
+        } catch {
+            console.error("Fetch error");
         }
     };
 
@@ -250,7 +250,7 @@ export default function RecurringPage() {
 
                             <select
                                 value={frequency}
-                                onChange={e => setFrequency(e.target.value as any)}
+                                onChange={e => setFrequency(e.target.value as "daily" | "weekly" | "monthly" | "yearly")}
                                 style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-color)", color: "var(--text-primary)" }}
                             >
                                 <option value="daily">每天</option>

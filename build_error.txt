@@ -1,0 +1,24 @@
+yarn run v1.22.22
+$ next build
+??Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+??The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+??Compiled successfully in 13.7s
+  Running TypeScript ...
+Failed to compile.
+
+.next/dev/types/validator.ts:251:39
+Type error: Cannot find module '../../../src/app/api/cron/diary-prompt/route.js' or its corresponding type declarations.
+
+  249 | {
+  250 |   type __IsExpected<Specific extends RouteHandlerConfig<"/api/cron/diary-prompt">> = Specific
+> 251 |   const handler = {} as typeof import("../../../src/app/api/cron/diary-prompt/route.js")
+      |                                       ^
+  252 |   type __Check = __IsExpected<typeof handler>
+  253 |   // @ts-ignore
+  254 |   type __Unused = __Check
+Next.js build worker exited with code: 1 and signal: null
+error Command failed with exit code 1.
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.

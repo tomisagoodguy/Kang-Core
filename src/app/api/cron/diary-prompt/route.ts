@@ -45,8 +45,8 @@ export async function GET(req: Request) {
         }
 
         return NextResponse.json({ status: "ok", usersNotified: userIds.length });
-    } catch (err) {
-        console.error("[diary-prompt] Error:", err);
+    } catch {
+        console.error("[diary-prompt] Error");
         return NextResponse.json({ error: "Failed" }, { status: 500 });
     }
 }

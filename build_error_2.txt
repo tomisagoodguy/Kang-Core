@@ -1,0 +1,112 @@
+yarn run v1.22.22
+$ next build
+??Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+??The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+??Compiled successfully in 12.6s
+  Running TypeScript ...
+  Collecting page data using 23 workers ...
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+Firebase Admin init with projectId: kang-core
+Firebase Admin initialized with explicit credentials.
+  Generating static pages using 23 workers (0/33) ...
+  Generating static pages using 23 workers (8/33) 
+  Generating static pages using 23 workers (16/33) 
+  Generating static pages using 23 workers (24/33) 
+??Generating static pages using 23 workers (33/33) in 1461.5ms
+  Finalizing page optimization ...
+
+Route (app)
+??? /
+????/_not-found
+????/accounting
+??? /api/accounting
+??? /api/accounting/[id]
+??? /api/admin/setup-richmenu
+??? /api/archive
+??? /api/archive/[id]
+??? /api/auth/session
+??? /api/budget
+??? /api/calendar/[id]
+??? /api/calendar/[id]/toggle
+??? /api/calendar/month
+??? /api/cron/calendar-remind
+??? /api/cron/cleanup-messages
+??? /api/cron/daily-summary
+??? /api/cron/diary-prompt
+??? /api/cron/monthly-report
+??? /api/cron/monthly-sheet
+??? /api/cron/recurring
+??? /api/cron/threads-summary
+??? /api/export/accounting
+??? /api/insights
+??? /api/recurring
+??? /api/recurring/[id]
+??? /api/rules
+??? /api/rules/[id]
+??? /api/tags
+??? /api/tags/[id]
+??? /api/threads
+??? /api/threads/config
+??? /api/webhook/line-bot
+??? /api/webhooks/threads
+????/archive
+????/calendar
+????/login
+????/recurring
+????/settings/rules
+????/settings/tags
+????/threads
+
+
+? Proxy (Middleware)
+
+?? (Static)   prerendered as static content
+?  (Dynamic)  server-rendered on demand
+
+Done in 37.58s.

@@ -28,9 +28,17 @@ export async function queryArchiveWithAI(question: string): Promise<string> {
             const summary = d.summary || "";
             const keywords = d.keywords?.join(", ") || "";
             const url = d.url || "";
-            const date = d.createdAt instanceof Date
-                ? d.createdAt.toISOString().slice(0, 10)
-                : (d.createdAt as any)?.toDate?.()?.toISOString().slice(0, 10) || "";
+            const dateRaw = d.createdAt;
+            let date = "";
+            if (dateRaw instanceof Date) {
+                date = dateRaw.toISOString().slice(0, 10);
+            } else if (dateRaw && typeof dateRaw === "object" && "toDate" in dateRaw) {
+                const toDateFn = (dateRaw as Record<string, unknown>).toDate;
+                if (typeof toDateFn === "function") {
+                    date = (toDateFn.call(dateRaw) as Date).toISOString().slice(0, 10);
+                }
+            }
+
             return `[${i + 1}] ${title || "（無標題）"}\n摘要: ${summary}\n關鍵字: ${keywords}${url ? `\n連結: ${url}` : ""}${date ? `\n日期: ${date}` : ""}`;
         }).join("\n\n");
 
@@ -51,8 +59,7 @@ ${context}
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const result = await safeExecute(() => model.generateContent(prompt));
         return result.response.text();
-    } catch (err) {
-        console.error("[archiveQuery] error:", err);
+    } catch {
         return "⚠️ 查詢失敗，請稍後再試";
     }
 }

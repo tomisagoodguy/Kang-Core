@@ -58,19 +58,26 @@ src/
 ├── components/                 # 可複用 React 元件
 │   └── charts/                 # Recharts 圖表元件
 ├── lib/
-│   ├── firebase/               # admin.ts（後端）/ client.ts（前端）
-│   ├── gemini/                 # Gemini API 封裝（client、embedding、vision、parser）
+│   ├── firebase/               # admin.ts（後端）/ client.ts（前端）/ auth.ts
+│   ├── gemini/                 # client.ts、embedding.ts、vision.ts、parser.ts、sessionManager.ts、fileManager.ts
+│   ├── auth/                   # getSessionUserId.ts（Session Cookie → LINE userId）
 │   ├── calendar/               # Google Calendar API
 │   ├── drive/                  # Google Drive API
 │   └── sheets/                 # Google Sheets API
 ├── services/                   # 業務邏輯（核心）
 │   ├── message.service.ts      # 訊息路由中樞（4 階段 Pipeline）
-│   ├── classificationEngine.ts # ML 分類學習引擎
+│   ├── classificationEngine.ts # ML 分類學習引擎（per-userId 隔離）
 │   ├── quickCommand.ts         # 快速指令（/記 /查 /預算 等）
 │   ├── queryEngine.ts          # 自然語言查詢解析
 │   ├── archiveQuery.service.ts # RAG 向量搜尋
+│   ├── archiveTagEngine.ts     # 知識庫標籤自動推斷
+│   ├── rag.service.ts          # Embedding 相似度搜尋
 │   ├── insights.ts             # AI 摘要快取管理
-│   └── session.service.ts      # 對話記憶（5 訊息 / 15 分鐘 TTL）
+│   ├── budget.service.ts       # 預算超支警報
+│   ├── session.service.ts      # 對話記憶（5 訊息 / 15 分鐘 TTL）
+│   ├── line.service.ts         # LINE API 封裝（reply/push）
+│   ├── drive.service.ts        # Google Drive 上傳封裝
+│   └── discord.service.ts      # Discord 通知
 ├── models/
 │   └── schema.ts               # TypeScript 型別 + Zod Schema（**單一事實來源**）
 └── utils/
@@ -129,7 +136,8 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
 - **信心度規則**：新規則 0.8 → 每次命中 +0.02 → 使用者手動修正 0.95
 - **觸發門檻**：≥ 0.7 自動分類；< 0.7 在設定頁面標示待確認
-- **快取**：Firestore `classification_rules` + 5 分鐘記憶體快取
+- **快取**：Firestore `classification_rules` + 5 分鐘記憶體快取（per-userId Map，不同用戶互不干擾）
+- **API 簽名**：`ClassificationEngine.match(text, userId)` / `ClassificationEngine.learn(text, tag, userId, subTag?, isManual?)`，兩個方法都**必須傳入 userId**，規則完全按用戶隔離
 - **禁止**：勿直接寫死分類關鍵字，應透過此引擎讓系統自主學習
 
 ---
@@ -143,7 +151,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `calendar` | startTime, title, type(event/todo), completed, syncedToGCal |
 | `recurring_expenses` | frequency, dayOfMonth, amount, tag, enabled |
 | `budgets` | monthYear, limit, notifiedAt80/100 |
-| `classification_rules` | keyword, tag, confidence, hitCount, source |
+| `classification_rules` | userId, keyword, tag, confidence, hitCount, source |
 | `custom_tags` | parentTag, subtags[] |
 | `sessions` | userId, messages[], TTL: 15 分鐘 |
 | `insights` | monthYear, insight, TTL: 1 小時 |

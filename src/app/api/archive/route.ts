@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
             .where("userId", "==", userId)
             .get();
 
+        interface ArchiveItem {
+            id: string;
+            keywords?: string[];
+            title?: string;
+            summary?: string;
+            createdAt: string | null;
+        }
+
         let entries = snapshot.docs
             .map((doc) => {
                 const data = doc.data();
@@ -29,7 +37,7 @@ export async function GET(request: NextRequest) {
                         data.createdAt instanceof Timestamp
                             ? data.createdAt.toDate().toISOString()
                             : data.createdAt ?? null,
-                };
+                } as ArchiveItem;
             })
             .sort((a, b) => {
                 const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -39,7 +47,7 @@ export async function GET(request: NextRequest) {
 
         // Filter by keyword if provided
         if (q) {
-            entries = entries.filter((entry: any) => {
+            entries = entries.filter((entry: ArchiveItem) => {
                 const keywordsMatch =
                     Array.isArray(entry.keywords) &&
                     entry.keywords.some((kw: string) => kw.toLowerCase().includes(q));

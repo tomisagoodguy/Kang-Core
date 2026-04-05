@@ -21,7 +21,7 @@ export async function GET() {
             .get();
         const rules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return NextResponse.json(rules);
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Failed to fetch rules" }, { status: 500 });
     }
 }
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         });
 
         return NextResponse.json({ id: docRef.id, ...validated });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 }

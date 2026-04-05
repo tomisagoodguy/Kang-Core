@@ -7,7 +7,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         const body = await req.json();
         await db.collection("classification_rules").doc(id).update(body);
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Failed to update" }, { status: 500 });
     }
 }
@@ -17,7 +17,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     try {
         await db.collection("classification_rules").doc(id).delete();
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
     }
 }

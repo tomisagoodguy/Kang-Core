@@ -1,25 +1,26 @@
 import { db } from "@/lib/firebase/admin";
 import type { ClassificationRule } from "@/models/schema";
 
-// ─── 記憶體快取（模組級，TTL 5 分鐘）────────────────────────────
+// ─── 記憶體快取（per-userId，TTL 5 分鐘）────────────────────────
 interface CacheEntry {
     rules: ClassificationRule[];
     expiresAt: number;
 }
-let _cache: CacheEntry | null = null;
+const _cacheMap = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分鐘
 
-function getCachedRules(): ClassificationRule[] | null {
-    if (_cache && Date.now() < _cache.expiresAt) return _cache.rules;
+function getCachedRules(userId: string): ClassificationRule[] | null {
+    const entry = _cacheMap.get(userId);
+    if (entry && Date.now() < entry.expiresAt) return entry.rules;
     return null;
 }
 
-function setCachedRules(rules: ClassificationRule[]): void {
-    _cache = { rules, expiresAt: Date.now() + CACHE_TTL_MS };
+function setCachedRules(userId: string, rules: ClassificationRule[]): void {
+    _cacheMap.set(userId, { rules, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-function invalidateCache(): void {
-    _cache = null;
+function invalidateCache(userId: string): void {
+    _cacheMap.delete(userId);
 }
 
 // ─── 輸入清理 ────────────────────────────────────────────────────
@@ -39,15 +40,17 @@ export class ClassificationEngine {
      * 嘗試匹配已知的分類規則（含記憶體快取）
      * @param text 使用者輸入的文字
      */
-    static async match(text: string): Promise<{ tag: string; subTag?: string } | null> {
+    static async match(text: string, userId: string): Promise<{ tag: string; subTag?: string } | null> {
         const trimmed = text.trim().toLowerCase();
 
         // 1. 優先使用快取，避免每條訊息都全量讀取 Firestore
-        let rules = getCachedRules();
+        let rules = getCachedRules(userId);
         if (!rules) {
-            const snapshot = await db.collection("classification_rules").get();
+            const snapshot = await db.collection("classification_rules")
+                .where("userId", "==", userId)
+                .get();
             rules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassificationRule));
-            setCachedRules(rules);
+            setCachedRules(userId, rules);
         }
 
         // 2. 匹配規則（關鍵字包含），優先匹配較長的關鍵字，且 confidence >= 0.7
@@ -77,19 +80,22 @@ export class ClassificationEngine {
     /**
      * @param isManual 是否為使用者手動修改 tag（true → confidence 提升至 0.95）
      */
-    static async learn(text: string, tag: string, subTag?: string, isManual = false): Promise<void> {
+    static async learn(text: string, tag: string, userId: string, subTag?: string, isManual = false): Promise<void> {
         if (!text || text.length < 2) return;
 
         const keyword = sanitizeKeyword(text);
         if (!keyword) return; // 清理後為空則跳過
 
-        const q = db.collection("classification_rules").where("keyword", "==", keyword);
+        const q = db.collection("classification_rules")
+            .where("keyword", "==", keyword)
+            .where("userId", "==", userId);
         const snapshot = await q.get();
 
         if (snapshot.empty) {
             await db.collection("classification_rules").add({
                 keyword,
                 tag,
+                userId,
                 subTag: subTag || null,
                 confidence: isManual ? 0.95 : 0.8,
                 hitCount: 1,
@@ -115,6 +121,6 @@ export class ClassificationEngine {
         }
 
         // 學習後使快取失效，確保下次 match() 取得最新規則
-        invalidateCache();
+        invalidateCache(userId);
     }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ClassificationEngine } from "@/services/classificationEngine";
 import { db } from "@/lib/firebase/admin";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 export async function DELETE(
     request: NextRequest,
@@ -45,9 +46,12 @@ export async function PUT(
 
         // Tag 修改時，觸發分類規則學習（使用者的修正即是最高品質的訓練訊號）
         if (tag !== undefined && description) {
-            ClassificationEngine.learn(description, tag, subTag, true).catch(() => {
-                // 非關鍵路徑，不影響主流程
-            });
+            const userId = await getSessionUserId();
+            if (userId) {
+                ClassificationEngine.learn(description, tag, userId, subTag, true).catch(() => {
+                    // 非關鍵路徑，不影響主流程
+                });
+            }
         }
 
         return NextResponse.json({ success: true });

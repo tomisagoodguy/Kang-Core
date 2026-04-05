@@ -36,12 +36,21 @@ function getNiceTicks(maxVal: number, base = 100): number[] {
     return Array.from({ length: count + 1 }, (_, i) => i * step);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label }: any) {
+interface CustomTooltipProps {
+    active?: boolean;
+    payload?: Array<{
+        dataKey: string | number;
+        value: number;
+        name: string;
+    }>;
+    label?: string;
+}
+
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
     if (!active || !payload?.length) return null;
-    const expense = payload.find((p: any) => p.dataKey === "expense")?.value ?? 0;
-    const income = payload.find((p: any) => p.dataKey === "income")?.value ?? 0;
-    const avg = payload.find((p: any) => p.dataKey === "avg")?.value;
+    const expense = payload.find(p => p.dataKey === "expense")?.value ?? 0;
+    const income = payload.find(p => p.dataKey === "income")?.value ?? 0;
+    const avg = payload.find(p => p.dataKey === "avg")?.value;
     return (
         <div style={{
             background: "var(--bg-card, #16161e)",

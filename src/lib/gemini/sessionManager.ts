@@ -28,6 +28,7 @@ class ChatSessionManager {
 
         console.log(`[SessionManager] Creating new session for user: ${userId}`);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tools: any[] = [];
         if (enableFileSearch && storeName) {
             tools.push({

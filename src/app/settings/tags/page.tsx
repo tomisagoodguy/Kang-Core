@@ -73,7 +73,7 @@ export default function SettingsTagsPage() {
             } else {
                 alert("儲存失敗");
             }
-        } catch (err) {
+        } catch {
             alert("Error");
         }
     };

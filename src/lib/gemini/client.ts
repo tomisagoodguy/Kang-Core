@@ -3,13 +3,6 @@ import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 const API_KEY = process.env.GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-interface GeminiResponse {
-    text: string;
-    isError: boolean;
-    errorMessage?: string;
-    retryCount: number;
-}
-
 /**
  * 延遲函數 (ms)
  */
@@ -29,9 +22,10 @@ export async function safeExecute<T>(
     for (let i = 0; i <= maxRetries; i++) {
         try {
             return await fn();
-        } catch (error: any) {
-            const status = error?.status;
-            const message = error?.message || "";
+        } catch (error: unknown) {
+            const err = error as Record<string, unknown>;
+            const status = typeof err?.status === 'number' ? err.status : 429;
+            const message = typeof err?.message === 'string' ? err.message : "";
             const isRetryable = status === 429 || status === 500 || status === 503 || message.includes("429");
 
             if (isRetryable && i < maxRetries) {

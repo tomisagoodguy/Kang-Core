@@ -1,11 +1,5 @@
 import { db } from "@/lib/firebase/admin";
 
-interface ArchiveKeyword {
-    keyword: string;
-    count: number;
-    lastUsed: Date;
-}
-
 // ─── 記憶體快取（模組級，TTL 5 分鐘）────────────────────────────
 interface CacheEntry {
     keywords: string[];

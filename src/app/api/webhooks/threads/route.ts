@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
-import { lineService } from "@/services/line.service";
 import { ThreadsEntrySchema } from "@/models/schema";
 
 export async function POST(req: Request) {

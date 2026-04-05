@@ -70,17 +70,16 @@ export async function uploadFileToDrive(
 
     // 上傳檔案
     const stream = Readable.from(fileBuffer);
-    const media: any = { body: stream };
-    if (mimeType) {
-        media.mimeType = mimeType;
-    }
 
     const uploadRes = await drive.files.create({
         requestBody: {
             name: filename,
             parents: [monthFolderId],
         },
-        media,
+        media: {
+            mimeType,
+            body: stream,
+        },
         fields: "id",
     });
 

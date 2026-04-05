@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ThreadsEntryView } from "@/models/schema";
 import { deleteThreadAction, toggleThreadSaveAction } from "@/app/actions/threads";
-import { Star, Trash2, Heart, MessageCircle, ExternalLink, Sparkles, Pin, LoaderCircle } from "lucide-react";
+import { Trash2, Heart, MessageCircle, ExternalLink, Sparkles, Pin, LoaderCircle } from "lucide-react";
 
 interface ThreadsCardProps {
     entry: ThreadsEntryView;

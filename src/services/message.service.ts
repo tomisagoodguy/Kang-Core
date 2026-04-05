@@ -74,7 +74,7 @@ export class MessageService {
         // 若句子包含多個數字，可能有多筆記帳或特定日期，跳過規則引擎讓 Gemini 精確解析
         const numMatches = userText.match(/\d+/g);
         if (!numMatches || numMatches.length <= 1) {
-            const ruleMatch = await ClassificationEngine.match(userText);
+            const ruleMatch = await ClassificationEngine.match(userText, userId);
             if (ruleMatch) {
                 // 提取金額（正規表達式輔助）
                 const amountMatch = userText.match(/(\d+)/);
@@ -142,7 +142,7 @@ export class MessageService {
 
                 // 學習新規則 (C9) - 使用 catch 不等待
                 if (entry.tag && entry.tag !== "Other") {
-                    ClassificationEngine.learn(entry.description || userText, entry.tag, entry.subTag).catch(() => { });
+                    ClassificationEngine.learn(entry.description || userText, entry.tag, userId, entry.subTag).catch(() => { });
                 }
 
                 totalReplyText += replyText + "\n\n";
@@ -310,7 +310,7 @@ export class MessageService {
 
             // 學習新規則 (C9)
             if (entry.tag && entry.tag !== "Other" && entry.description) {
-                await ClassificationEngine.learn(entry.description, entry.tag, entry.subTag);
+                await ClassificationEngine.learn(entry.description, entry.tag, userId, entry.subTag);
             }
 
         } else if (parsedData.type === "archive" && parsedData.archiveData) {

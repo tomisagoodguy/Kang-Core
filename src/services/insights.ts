@@ -31,14 +31,21 @@ export async function generateFinancialInsights(userId: string): Promise<string>
             .orderBy("date", "desc")
             .get();
 
-        const expenses = snapshot.docs.map(doc => doc.data());
+        const expenses = snapshot.docs.map(doc => doc.data() as AccountingEntry);
 
         if (expenses.length === 0) {
             return "目前沒有足夠的消費資料進行分析。建議多記錄幾筆支出！";
         }
 
+        interface Summary {
+            netBalance: number;
+            income: number;
+            expenses: number;
+            distribution: Record<string, number>;
+        }
+
         // 2. Prepare data for Prompt
-        const summary = expenses.reduce((acc: any, curr) => {
+        const summary = expenses.reduce((acc: Summary, curr) => {
             const tag = curr.tag || 'Other';
             const amount = curr.amount || 0;
             acc.distribution[tag] = (acc.distribution[tag] || 0) + amount;

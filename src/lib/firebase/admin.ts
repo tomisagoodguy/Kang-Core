@@ -1,7 +1,5 @@
 import * as admin from "firebase-admin";
 
-const MOCK_AI_MODE = process.env.MOCK_AI === "true";
-
 if (!admin.apps.length) {
     try {
         // If we have an explicit private key (e.g., local dev or Vercel env variables)

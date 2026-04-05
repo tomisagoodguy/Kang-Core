@@ -6,7 +6,7 @@ import { ClassificationEngine } from "./classificationEngine";
 import { queryArchiveWithAI } from "./archiveQuery.service";
 import { completeTodo } from "./todoComplete.service";
 import { listRecentDriveFiles } from "@/lib/drive/client";
-import type { AccountingEntry, CalendarEntry, Budget } from "@/models/schema";
+import type { AccountingEntry, Budget } from "@/models/schema";
 
 interface QuickCommandResult {
     handled: boolean;
@@ -149,7 +149,7 @@ async function handleQuickExpense(amount: number, description: string, userId: s
 
     // 學習規則（非同步不等待，不阻塞回覆）
     if (description && tag !== "Other") {
-        ClassificationEngine.learn(description, tag).catch(() => { /* 失敗不影響主流程 */ });
+        ClassificationEngine.learn(description, tag, userId).catch(() => { /* 失敗不影響主流程 */ });
     }
 
     return {

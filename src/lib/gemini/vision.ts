@@ -5,7 +5,6 @@ import { safeExecute } from "./client";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 const TODAY = () => new Date().toISOString().split("T")[0];
-const YESTERDAY = () => new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
 const VISION_PROMPT = () => `
 You are an AI assistant for Kang-Core. Today is ${TODAY()}.
@@ -60,7 +59,7 @@ export async function analyzeImage(
         "gemini-3-flash-preview",
     ];
 
-    let lastError: any = null;
+    let lastError: Error | null = null;
 
     for (const modelName of VISION_MODELS) {
         try {
@@ -88,9 +87,10 @@ export async function analyzeImage(
             console.log(`[Vision] ✅ ${modelName} succeeded, type=${parsed.type}`);
             return { ...parsed, isError: false };
 
-        } catch (err: any) {
-            console.warn(`[Vision] ❌ ${modelName} failed: ${err?.message}`);
-            lastError = err;
+        } catch (err) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            console.warn(`[Vision] ❌ ${modelName} failed: ${error.message}`);
+            lastError = error;
         }
     }
 

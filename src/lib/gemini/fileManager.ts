@@ -21,7 +21,7 @@ export class FileManager {
             const resList = await fetch(`https://generativelanguage.googleapis.com/v1beta/corpora?key=` + API_KEY);
             const dataList = await resList.json();
 
-            let targetStore = (dataList.corpora || []).find((c: any) => c.displayName === displayName);
+            let targetStore = (dataList.corpora || []).find((c: { displayName: string; name: string }) => c.displayName === displayName);
 
             if (!targetStore) {
                 // If not exist, try to use corporas 
