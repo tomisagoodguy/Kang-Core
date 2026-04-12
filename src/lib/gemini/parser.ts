@@ -28,7 +28,7 @@ const outputSchema: Schema = {
                 amount: { type: SchemaType.NUMBER, nullable: false },
                 tag: {
                     type: SchemaType.STRING,
-                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Income, Other",
+                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Income, Other",
                 },
                 subTag: {
                     type: SchemaType.STRING,
@@ -144,7 +144,9 @@ JSON schema:
 Financial Concepts:
 - Balance (結餘) = Income (收入) - Expenses (支出).
 - IncomeTags: 'Income'
-- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Other'
+- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Subscription', 'Other'
+- Subscription 用於：定期訂閱服務（YouTube Premium、ChatGPT、Claude、iCloud、Notion、Adobe 等月費/年費）
+- Education 用於：才藝課、語言課、線上學習課（Hahow、Coursera 等）、補習費、學費
 
 Rules:
 - If user mentions spending money, food, transport, shopping, insurance, health, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income'). If user inputs MULTIPLE expenses in one sentence (e.g. "健身50沙拉95"), fill 'accountingDataList' with multiple items instead.
@@ -158,7 +160,7 @@ Rules:
 - Otherwise → type = "unknown"
 - For dates, use today (${TODAY()}) as reference. Key relative dates: 昨天=${new Date(Date.now() - 86400000).toISOString().split("T")[0]}, 前天=${new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0]}, 大前天=${new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0]}, 明天=${new Date(Date.now() + 86400000).toISOString().split("T")[0]}. For dates like "X月Y號" or "X/Y", assume current year ${new Date().getFullYear()} (use last year if the resulting date is in the future).
 - CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary' and 'keywords' arrays.
-- CRITICAL TIP: User has existing fixed monthly expenses on the 10th: "家裡伙食費" (amount: 7000, tag: "Food"), "電話費" (amount: 488, tag: "Utilities"). If the user mentions setting these up, or paying them without an amount, YOU CAN INFER the amount and description.
+- CRITICAL TIP: User has existing fixed monthly expenses on the 10th: "家裡伙食費分攤" (amount: 7000, tag: "Utilities", description: "家裡伙食費分攤"), "電話費" (amount: 488, tag: "Utilities"). Note: "家裡伙食費" / "家裡伙食費分攤" / "家裡" + 金額 都是指房租性質的家庭分攤費用，一律用 tag: "Utilities"。If the user mentions setting these up, or paying them without an amount, YOU CAN INFER the amount and description.
 - For archive keywords, priorities choosing from these frequently used tags if applicable: [${archiveTags.join(", ")}]. You may create new ones ONLY if these don't fit well.
 - ONLY output valid JSON, nothing else`;
 

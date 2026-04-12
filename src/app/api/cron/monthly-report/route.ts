@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 
     const tagEmoji: Record<string, string> = {
         Food: "🍽", Transport: "🚗", Entertainment: "🎬", Utilities: "💡",
-        Shopping: "🛒", Health: "🏥", Education: "📚", Other: "📦",
+        Shopping: "🛒", Health: "🏥", Education: "📚", Insurance: "🛡️", Subscription: "🔖", Other: "📦",
     };
 
     const results: Array<{ userId: string; total: number }> = [];

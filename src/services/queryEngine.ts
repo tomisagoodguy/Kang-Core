@@ -77,10 +77,11 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
             return `\u3000${prefix} ${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`;
         });
 
-    // 最高一筆
-    const maxEntry = entries.reduce((max, e) =>
-        (e.amount || 0) > (max.amount || 0) ? e : max
-    );
+    // 最高一筆（僅計支出）
+    const expenseEntries = entries.filter(e => e.tag !== "Income");
+    const maxEntry = expenseEntries.length > 0
+        ? expenseEntries.reduce((max, e) => (e.amount || 0) > (max.amount || 0) ? e : max)
+        : null;
 
     const totalEntriesCount = entries.length;
     const avgAmount = totalEntriesCount > 0 ? Math.round(totalExpense / Math.max(1, entries.filter(e => e.tag !== "Income").length)) : 0;
@@ -95,7 +96,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
             `💸 總支出: $${totalExpense.toLocaleString()}`,
             `⚖️ 淨結餘: $${netBalance.toLocaleString()}`,
             `📈 平均支出/筆: $${avgAmount.toLocaleString()}`,
-            `🏆 最高支出: $${(maxEntry.amount || 0).toLocaleString()} (${maxEntry.description || "—"})`,
+            `🏆 最高支出: ${maxEntry ? `$${(maxEntry.amount || 0).toLocaleString()} (${maxEntry.description || "—"})` : "無支出記錄"}`,
             "",
             ...tagLines,
         ].join("\n"),

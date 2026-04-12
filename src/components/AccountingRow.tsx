@@ -28,6 +28,7 @@ const TAG_COLOR_MAP: Record<string, string> = {
     Health: "#22c55e",
     Education: "#6366f1",
     Insurance: "#64748b",
+    Subscription: "#8b5cf6",
     Income: "#10b981",
     Other: "#94a3b8",
 };

@@ -273,10 +273,13 @@ function guessTag(desc: string): string {
         [["早餐", "午餐", "晚餐", "吃", "餐", "飯", "麵", "便當", "火鍋", "壽司", "拉麵", "咖啡", "飲料", "手搖", "茶", "奶茶", "雞排", "滷味", "pizza", "food"], "Food"],
         [["uber", "計程", "加油", "捷運", "公車", "停車", "高鐵", "台鐵", "機票", "油費", "taxi", "transport"], "Transport"],
         [["電影", "遊戲", "netflix", "spotify", "ktv", "唱歌", "演唱會", "門票", "switch"], "Entertainment"],
-        [["水費", "電費", "瓦斯", "網路", "手機", "電信", "帳單", "房租", "管理費"], "Utilities"],
+        [["水費", "電費", "瓦斯", "網路", "手機", "電信", "帳單", "房租", "房租費", "管理費", "家裡伙食費", "伙食費分攤", "伙食費", "家裡分攤"], "Utilities"],
         [["衣服", "鞋", "包", "蝦皮", "momo", "pchome", "購物", "買", "日用品"], "Shopping"],
         [["看醫", "掛號", "藥", "醫院", "診所", "牙醫", "health", "保健"], "Health"],
         [["書", "課程", "學費", "udemy", "補習", "考試", "文具"], "Education"],
+        [["保險", "保費", "保險費", "壽險", "車險", "產險", "醫療險", "意外險"], "Insurance"],
+        [["訂閱", "subscription", "youtube premium", "youtube music", "chatgpt", "claude", "notion", "adobe", "apple one", "icloud", "會員費", "月費", "年費"], "Subscription"],
+        [["才藝", "鋼琴", "吉他", "畫畫", "舞蹈", "游泳課", "烹飪課", "語言課", "英文課", "日文課", "線上課", "線上學習", "coursera", "hahow", "skillshare"], "Education"],
     ];
 
     for (const [keywords, tag] of rules) {
