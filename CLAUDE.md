@@ -234,6 +234,55 @@ npx tsx scripts/create-firestore-indexes.ts
 
 ---
 
+## 標籤系統
+
+### 現有標籤（單一事實來源：`src/models/schema.ts` + `src/utils/constants.ts`）
+
+| Tag | Emoji | 說明 |
+|-----|-------|------|
+| `Food` | 🍽 | 餐飲 |
+| `Transport` | 🚗 | 交通 |
+| `Entertainment` | 🎬 | 娛樂 |
+| `Utilities` | 💡 | 水電瓦斯、房租、家裡伙食費分攤 |
+| `Shopping` | 🛒 | 購物 |
+| `Health` | 🏥 | 醫療保健 |
+| `Education` | 📚 | 學費、才藝課、線上學習 |
+| `Insurance` | 🛡️ | 各類保險費 |
+| `Subscription` | 🔖 | 訂閱服務（YouTube、ChatGPT、Claude 等月費/年費）|
+| `Income` | — | 收入（統計時**不計入支出**）|
+| `Other` | 📦 | 未分類 |
+
+### 新增標籤時必須同步的 7 個檔案
+
+1. `src/models/schema.ts` — `TagEnum` Zod enum
+2. `src/utils/constants.ts` — `ALL_TAGS` 陣列
+3. `src/utils/tagEmoji.ts` — `TAG_EMOJI_MAP`（emoji）
+4. `src/components/AccountingRow.tsx` — `TAG_COLOR_MAP`（列表顏色）
+5. `src/components/charts/TagPieChart.tsx` — `TAG_COLORS`（圖表顏色）
+6. `src/services/quickCommand.ts` — `guessTag()` 關鍵字規則
+7. `src/lib/gemini/parser.ts` — Gemini prompt 中的 tag 清單與說明
+8. `src/app/api/cron/monthly-report/route.ts` — 月報本地 emoji map（未使用 `tagEmoji.ts`）
+
+### 分類三層架構
+
+```
+快速指令關鍵字 (guessTag)        → ~50ms，離線比對
+  ↓ 未命中
+ClassificationEngine.match()    → ~300ms，Firestore 學習規則（信心度 ≥ 0.7）
+  ↓ 未命中
+Gemini parser.ts                 → ~2s，AI 解析（消耗 API quota）
+```
+
+`guessTag()` 在 `src/services/quickCommand.ts` 是**靜態關鍵字表**，與 `ClassificationEngine` 的動態學習規則分開——前者是硬編碼兜底，後者是用戶行為學習。
+
+### Income 與支出的統計邏輯
+
+- 統計「支出」時必須 `filter(e => e.tag !== "Income")`
+- 「最高支出」、「平均支出」等指標同樣需排除 Income
+- `queryEngine.ts` 的 `buildSummaryReply()` 是計算統計的核心函式
+
+---
+
 ## 常見陷阱
 
 | ❌ 錯誤 | ✅ 正確 |
@@ -245,3 +294,5 @@ npx tsx scripts/create-firestore-indexes.ts
 | 新增 Firestore 查詢未加 `userId` 過濾 | **所有查詢必須加 userId 隔離**，否則資料洩漏 |
 | 直接呼叫 Gemini 產生摘要 | 先檢查 `insights` 集合快取（1 小時 TTL）|
 | 忽略訊息去重機制 | 所有 Webhook 處理前須檢查 `processed_messages` |
+| 新增標籤只改 `schema.ts` | 必須同步更新上方列出的 8 個檔案 |
+| `monthly-report/route.ts` 用 `getTagEmoji()` | 該檔案有本地 hardcode emoji map，需手動同步 |
