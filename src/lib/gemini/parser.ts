@@ -28,7 +28,7 @@ const outputSchema: Schema = {
                 amount: { type: SchemaType.NUMBER, nullable: false },
                 tag: {
                     type: SchemaType.STRING,
-                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Income, Other",
+                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Investment, Income, Other",
                 },
                 subTag: {
                     type: SchemaType.STRING,
@@ -144,7 +144,8 @@ JSON schema:
 Financial Concepts:
 - Balance (結餘) = Income (收入) - Expenses (支出).
 - IncomeTags: 'Income'
-- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Subscription', 'Other'
+- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Subscription', 'Investment', 'Other'
+- Investment 用於：買股票、定期定額、ETF、基金、存股、證券下單等投資行為
 - Subscription 用於：定期訂閱服務（YouTube Premium、ChatGPT、Claude、iCloud、Notion、Adobe 等月費/年費）
 - Education 用於：才藝課、語言課、線上學習課（Hahow、Coursera 等）、補習費、學費
 

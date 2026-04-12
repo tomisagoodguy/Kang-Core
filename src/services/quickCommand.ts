@@ -279,6 +279,7 @@ function guessTag(desc: string): string {
         [["書", "課程", "學費", "udemy", "補習", "考試", "文具"], "Education"],
         [["保險", "保費", "保險費", "壽險", "車險", "產險", "醫療險", "意外險"], "Insurance"],
         [["訂閱", "subscription", "youtube premium", "youtube music", "chatgpt", "claude", "notion", "adobe", "apple one", "icloud", "會員費", "月費", "年費"], "Subscription"],
+        [["買股", "股票", "定期定額", "etf", "基金", "投資", "證券", "定存股", "00878", "0050", "0056", "存股", "下單"], "Investment"],
         [["才藝", "鋼琴", "吉他", "畫畫", "舞蹈", "游泳課", "烹飪課", "語言課", "英文課", "日文課", "線上課", "線上學習", "coursera", "hahow", "skillshare"], "Education"],
     ];
 

@@ -249,6 +249,7 @@ npx tsx scripts/create-firestore-indexes.ts
 | `Education` | 📚 | 學費、才藝課、線上學習 |
 | `Insurance` | 🛡️ | 各類保險費 |
 | `Subscription` | 🔖 | 訂閱服務（YouTube、ChatGPT、Claude 等月費/年費）|
+| `Investment` | 📈 | 股票、定期定額、ETF、基金、存股 |
 | `Income` | — | 收入（統計時**不計入支出**）|
 | `Other` | 📦 | 未分類 |
 

@@ -10,6 +10,7 @@ export const TagEnum = z.enum([
     "Education",
     "Insurance",
     "Subscription",
+    "Investment",
     "Income",
     "Other",
 ]);
