@@ -18,6 +18,10 @@ export class LineService {
         await this.client.pushMessage(userId, { type: "text", text });
     }
 
+    async showLoadingAnimation(userId: string, loadingSeconds = 10): Promise<void> {
+        await this.client.showLoadingAnimation({ chatId: userId, loadingSeconds });
+    }
+
     async getMessageContentBuffer(messageId: string): Promise<Buffer> {
         const stream = await this.client.getMessageContent(messageId);
         return new Promise((resolve, reject) => {

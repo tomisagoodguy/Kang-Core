@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(bash \"C:\\\\Users\\\\user\\\\.claude\\\\skills\\\\git-pushing\\\\scripts\\\\smart_commit.sh\" \"docs: 新增 LINE Bot 用戶使用說明\")"
+      "Bash(bash \"C:\\\\Users\\\\user\\\\.claude\\\\skills\\\\git-pushing\\\\scripts\\\\smart_commit.sh\" \"docs: 新增 LINE Bot 用戶使用說明\")",
+      "Bash(bash skills/git-pushing/scripts/smart_commit.sh \"feat: 新增 LINE Bot Loading Animation\")",
+      "Bash(bash \"C:\\\\Users\\\\user\\\\.claude\\\\skills\\\\git-pushing\\\\scripts\\\\smart_commit.sh\" \"feat: 新增 LINE Bot Loading Animation\")"
     ]
   }
 }

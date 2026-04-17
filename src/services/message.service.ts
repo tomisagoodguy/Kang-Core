@@ -101,6 +101,8 @@ export class MessageService {
             }
         }
 
+        lineService.showLoadingAnimation(userId, 15).catch(() => { });
+
         const parsedData = await parseUserInput(userText, historyContext);
 
         if (parsedData.isError) {
