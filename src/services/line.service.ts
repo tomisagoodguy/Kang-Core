@@ -1,21 +1,29 @@
-import { Client } from "@line/bot-sdk";
+import { messagingApi } from "@line/bot-sdk";
 
 export class LineService {
-    private client: Client;
+    private client: messagingApi.MessagingApiClient;
+    private blobClient: messagingApi.MessagingApiBlobClient;
 
     constructor() {
-        this.client = new Client({
+        const config = {
             channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || "",
-            channelSecret: process.env.LINE_CHANNEL_SECRET || "",
-        });
+        };
+        this.client = new messagingApi.MessagingApiClient(config);
+        this.blobClient = new messagingApi.MessagingApiBlobClient(config);
     }
 
     async replyText(replyToken: string, text: string): Promise<void> {
-        await this.client.replyMessage(replyToken, { type: "text", text });
+        await this.client.replyMessage({
+            replyToken,
+            messages: [{ type: "text", text }]
+        });
     }
 
     async pushText(userId: string, text: string): Promise<void> {
-        await this.client.pushMessage(userId, { type: "text", text });
+        await this.client.pushMessage({
+            to: userId,
+            messages: [{ type: "text", text }]
+        });
     }
 
     async showLoadingAnimation(userId: string, loadingSeconds = 10): Promise<void> {
@@ -23,7 +31,7 @@ export class LineService {
     }
 
     async getMessageContentBuffer(messageId: string): Promise<Buffer> {
-        const stream = await this.client.getMessageContent(messageId);
+        const stream = await this.blobClient.getMessageContent(messageId);
         return new Promise((resolve, reject) => {
             const chunks: Buffer[] = [];
             stream.on("data", (chunk: Buffer) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
