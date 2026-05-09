@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(c['path'], c['schedule']\\) for c in d.get\\('crons',[]\\)]\")"
     ]
   }
 }

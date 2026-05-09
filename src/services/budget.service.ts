@@ -36,7 +36,7 @@ export async function checkBudgetAlert(
                 .where("date", "<=", monthEnd) as FirebaseFirestore.Query;
 
             const accSnap = await query.get();
-            let entries = accSnap.docs.map(d => d.data());
+            let entries = accSnap.docs.map(d => d.data()).filter(e => e.tag !== "Income");
             if (budgetTag) {
                 entries = entries.filter(e => e.tag === budgetTag);
             }

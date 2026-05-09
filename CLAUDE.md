@@ -37,8 +37,8 @@ Kang-Core 是一個**個人 AI 生活助理系統**，以 LINE Bot 作為自然�
 src/
 ├── app/
 │   ├── api/                    # 所有 API Routes
-│   │   ├── webhook/            # LINE Bot 接收入口
-│   │   ├── cron/               # Vercel Cron Jobs（8 個定時任務）
+│   │   ├── webhook/line-bot/   # LINE Bot 接收入口（實際路徑含子目錄）
+│   │   ├── cron/               # Vercel Cron Jobs（7 個定時任務）
 │   │   ├── accounting/         # 記帳 CRUD
 │   │   ├── archive/            # 知識庫 CRUD
 │   │   ├── calendar/           # 行事曆與待辦 CRUD
@@ -150,7 +150,8 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `archive` | title, content, embedding[], keywords, imageUrl |
 | `calendar` | startTime, title, type(event/todo), completed, syncedToGCal |
 | `recurring_expenses` | frequency, dayOfMonth, amount, tag, enabled |
-| `budgets` | monthYear, limit, notifiedAt80/100 |
+| `budgets` | monthYear, monthlyLimit, tag, notifiedAt80/100 |
+| `threads_users` | userId, username, platform, trackingEnabled |
 | `classification_rules` | userId, keyword, tag, confidence, hitCount, source |
 | `custom_tags` | parentTag, subtags[] |
 | `sessions` | userId, messages[], TTL: 15 分鐘 |
@@ -161,7 +162,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
 ## Cron Jobs
 
-`vercel.json` 定義 8 個定時任務（UTC 時間，台灣 = UTC+8）：
+`vercel.json` 定義 7 個定時任務（UTC 時間，台灣 = UTC+8）：
 
 | Cron | 台灣時間 | 用途 |
 |------|---------|------|
@@ -170,7 +171,6 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `0 1 1 * *` | 09:00 每月1日 | 月報 |
 | `5 16 * * *` | 00:05 | 定期支出自動插入 |
 | `0 2 * * 0` | 10:00 週日 | 舊訊息清理 |
-| `30 14 * * *` | 22:30 | 日記提示 |
 | `0 15 28-31 * *` | 23:00 月底 | Google Sheets 匯出 |
 | `0 12 * * *` | 20:00 | Threads 摘要 |
 
@@ -216,7 +216,7 @@ NEXT_PUBLIC_FIREBASE_*    # 前端 Firebase 設定（7 個變數）
 Dashboard 採 Firebase Google OAuth + Session Cookie 機制：
 
 1. 前端登入 → `POST /api/auth/session`（建立 5 天 httpOnly Cookie `firebase-session`）
-2. `src/middleware.ts` 保護 `/`, `/accounting`, `/archive` 等路徑（Cookie 不存在 → 導向 `/login`）
+2. `src/middleware.ts` 保護 `/`, `/accounting`, `/archive` 三條路徑（`PROTECTED_PATHS` 常數，Cookie 不存在 → 導向 `/login`）；`/calendar`、`/recurring`、`/threads`、`/settings` 等頁面**不在 middleware 保護範圍**，依賴 API 層 userId 隔離
 3. API Route 中呼叫 `getSessionUserId()`（`src/lib/auth/getSessionUserId.ts`）驗證 Cookie 並透過 `EMAIL_LINE_MAP` 取得 LINE userId
 4. 所有 Firestore 查詢**必須**帶 `userId`，資料隔離在 API 層而非 Middleware 層
 

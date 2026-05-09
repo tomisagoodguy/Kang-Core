@@ -52,10 +52,11 @@ export async function GET(req: Request) {
                 .where("date", "<=", to)
                 .get();
 
-            const entries = snap.docs.map((d) => d.data());
+            const allEntries = snap.docs.map((d) => d.data());
+            const entries = allEntries.filter((e) => e.tag !== "Income");
             const total = entries.reduce((s, e) => s + ((e.amount as number) || 0), 0);
 
-            // 上上月消費（對比用）
+            // 上上月消費（對比用，同樣排除 Income）
             const prevSnap = await db
                 .collection("accounting")
                 .where("userId", "==", userId)
@@ -63,7 +64,9 @@ export async function GET(req: Request) {
                 .where("date", "<=", prevTo)
                 .get();
 
-            const prevTotal = prevSnap.docs.reduce((s, d) => s + ((d.data().amount as number) || 0), 0);
+            const prevTotal = prevSnap.docs
+                .filter((d) => d.data().tag !== "Income")
+                .reduce((s, d) => s + ((d.data().amount as number) || 0), 0);
 
             // 月增減
             let comparison = "";
