@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { ThreadsEntryView } from "@/models/schema";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 export async function GET(req: Request) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const { searchParams } = new URL(req.url);
         const limitStr = searchParams.get("limit") || "100";
         const q = searchParams.get("q")?.toLowerCase() || "";
-        const limit = parseInt(limitStr, 10);
+        const limit = Math.min(parseInt(limitStr, 10) || 100, 200);
 
-        // Simplified fetch, filtering will be done mostly in-memory here if simple
         const snapshot = await db
             .collection("threads")
             .orderBy("publishedAt", "desc")

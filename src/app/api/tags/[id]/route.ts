@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase/admin";
 import { CustomTagSchema } from "@/models/schema";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
+import { requireOwnership } from "@/lib/auth/requireOwnership";
 
 export async function PUT(
     request: Request,
@@ -8,6 +9,12 @@ export async function PUT(
 ) {
     const { id } = await params;
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const snap = await requireOwnership("custom_tags", id, userId);
+        if (!snap) return NextResponse.json({ error: "Tag not found" }, { status: 404 });
+
         const body = await request.json();
         const result = CustomTagSchema.partial().safeParse(body);
 
@@ -15,14 +22,7 @@ export async function PUT(
             return NextResponse.json({ error: "Invalid data", details: result.error.format() }, { status: 400 });
         }
 
-        const docRef = db.collection("custom_tags").doc(id);
-        const docSnap = await docRef.get();
-
-        if (!docSnap.exists) {
-            return NextResponse.json({ error: "Tag not found" }, { status: 404 });
-        }
-
-        await docRef.update(result.data);
+        await snap.ref.update(result.data);
         return NextResponse.json({ id, ...result.data });
     } catch (error) {
         console.error("PUT /api/tags/[id] error:", error);
@@ -36,14 +36,13 @@ export async function DELETE(
 ) {
     const { id } = await params;
     try {
-        const docRef = db.collection("custom_tags").doc(id);
-        const docSnap = await docRef.get();
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        if (!docSnap.exists) {
-            return NextResponse.json({ error: "Tag not found" }, { status: 404 });
-        }
+        const snap = await requireOwnership("custom_tags", id, userId);
+        if (!snap) return NextResponse.json({ error: "Tag not found" }, { status: 404 });
 
-        await docRef.delete();
+        await snap.ref.delete();
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("DELETE /api/tags/[id] error:", error);

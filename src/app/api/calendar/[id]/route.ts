@@ -1,26 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { deleteEventFromGoogleCalendar } from "@/lib/calendar/client";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
+import { requireOwnership } from "@/lib/auth/requireOwnership";
 
 export async function DELETE(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await context.params;
-        if (!id) {
-            return NextResponse.json({ error: "Missing ID" }, { status: 400 });
-        }
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const docRef = db.collection("calendar").doc(id);
-        const doc = await docRef.get();
-        if (doc.exists) {
-            const data = doc.data();
-            if (data?.gcalEventId) {
-                await deleteEventFromGoogleCalendar(data.gcalEventId);
-            }
+        const { id } = await context.params;
+        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+
+        const snap = await requireOwnership("calendar", id, userId);
+        if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+        const gcalEventId = snap.data()?.gcalEventId;
+        if (gcalEventId) {
+            await deleteEventFromGoogleCalendar(gcalEventId);
         }
-        await docRef.delete();
+        await snap.ref.delete();
 
         return NextResponse.json({ success: true });
     } catch (error) {
@@ -34,10 +36,14 @@ export async function PUT(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const { id } = await context.params;
-        if (!id) {
-            return NextResponse.json({ error: "Missing ID" }, { status: 400 });
-        }
+        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+
+        const snap = await requireOwnership("calendar", id, userId);
+        if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
         const body = await request.json();
         const { title, actionDate, actionTime, description } = body;
@@ -48,8 +54,7 @@ export async function PUT(
         if (actionTime !== undefined) updateData.actionTime = actionTime;
         if (description !== undefined) updateData.description = description;
 
-        await db.collection("calendar").doc(id).update(updateData);
-
+        await snap.ref.update(updateData);
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[API/calendar/PUT] Error:", error);

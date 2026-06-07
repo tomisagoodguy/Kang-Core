@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase/admin";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
+import { requireOwnership } from "@/lib/auth/requireOwnership";
 
 export async function POST(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const { id } = await context.params;
-        if (!id) {
-            return NextResponse.json({ error: "Missing ID" }, { status: 400 });
-        }
+        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
-        const docRef = db.collection("calendar").doc(id);
-        const docSnap = await docRef.get();
+        const snap = await requireOwnership("calendar", id, userId);
+        if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-        if (!docSnap.exists) {
-            return NextResponse.json({ error: "Not found" }, { status: 404 });
-        }
-
-        const currentStatus = docSnap.data()?.status;
+        const currentStatus = snap.data()?.status;
         const newStatus = currentStatus === "pending" ? "done" : "pending";
 
-        await docRef.update({ status: newStatus });
-
+        await snap.ref.update({ status: newStatus });
         return NextResponse.json({ success: true, status: newStatus });
     } catch (error) {
         console.error("[API/calendar/toggle] Error:", error);

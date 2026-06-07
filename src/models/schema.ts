@@ -135,6 +135,7 @@ export type GeminiParseResult = z.infer<typeof GeminiParseResultSchema>;
 
 export const CustomTagSchema = z.object({
     id: z.string().optional(),
+    userId: z.string().optional(),
     name: z.string(),
     parentTag: TagEnum,
     createdAt: z.date().optional(),

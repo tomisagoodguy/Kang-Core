@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { CustomTagSchema } from "@/models/schema";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 export async function GET() {
     try {
-        const snapshot = await db.collection("custom_tags").orderBy("createdAt", "asc").get();
-        const tags = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-        }));
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const snapshot = await db
+            .collection("custom_tags")
+            .where("userId", "==", userId)
+            .orderBy("createdAt", "asc")
+            .get();
+        const tags = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return NextResponse.json(tags);
     } catch (error) {
         console.error("GET /api/tags error:", error);
@@ -18,6 +23,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const body = await request.json();
         const result = CustomTagSchema.safeParse(body);
 
@@ -27,6 +35,7 @@ export async function POST(request: Request) {
 
         const newTag = {
             ...result.data,
+            userId,
             createdAt: new Date(),
         };
 

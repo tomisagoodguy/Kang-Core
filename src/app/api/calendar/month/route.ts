@@ -3,11 +3,15 @@ import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { getMonthlyEventsFromGoogleCalendar, type GCalEvent } from "@/lib/calendar/client";
 import type { CalendarEntryView } from "@/models/schema";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ success: false, entries: [] }, { status: 401 });
+
         const { searchParams } = new URL(request.url);
         const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
         const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
@@ -21,6 +25,7 @@ export async function GET(request: NextRequest) {
         // Fetch from Firestore
         const snapshot = await db
             .collection("calendar")
+            .where("userId", "==", userId)
             .where("actionDate", ">=", monthStart)
             .where("actionDate", "<=", monthEnd)
             .get();

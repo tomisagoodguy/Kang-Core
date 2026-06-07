@@ -4,6 +4,12 @@ import { ThreadsEntrySchema } from "@/models/schema";
 
 export async function POST(req: Request) {
     try {
+        const authHeader = req.headers.get("Authorization");
+        const expectedToken = process.env.CRON_SECRET;
+        if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
 
         // webhook parser for threads-scraper

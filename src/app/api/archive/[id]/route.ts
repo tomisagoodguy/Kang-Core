@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
+import { requireOwnership } from "@/lib/auth/requireOwnership";
 
 export async function DELETE(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const { id } = await context.params;
-        if (!id) {
-            return NextResponse.json({ error: "Missing ID" }, { status: 400 });
-        }
+        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
-        await db.collection("archive").doc(id).delete();
+        const snap = await requireOwnership("archive", id, userId);
+        if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+        await snap.ref.delete();
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[API/archive/DELETE] Error:", error);
@@ -25,10 +30,14 @@ export async function PUT(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const { id } = await context.params;
-        if (!id) {
-            return NextResponse.json({ error: "Missing ID" }, { status: 400 });
-        }
+        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+
+        const snap = await requireOwnership("archive", id, userId);
+        if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
         const body = await request.json();
         const { title, summary, keywords, url } = body;
@@ -39,8 +48,7 @@ export async function PUT(
         if (keywords !== undefined) updateData.keywords = keywords;
         if (url !== undefined) updateData.url = url;
 
-        await db.collection("archive").doc(id).update(updateData);
-
+        await snap.ref.update(updateData);
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[API/archive/PUT] Error:", error);

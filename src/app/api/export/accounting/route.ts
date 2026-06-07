@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
+import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
 export async function GET(req: NextRequest) {
     try {
+        const userId = await getSessionUserId();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const { searchParams } = req.nextUrl;
         const month = searchParams.get("month");
         const from = searchParams.get("from");
         const to = searchParams.get("to");
 
-        let query = db.collection("accounting").orderBy("date", "desc") as FirebaseFirestore.Query;
+        let query = db
+            .collection("accounting")
+            .where("userId", "==", userId)
+            .orderBy("date", "desc") as FirebaseFirestore.Query;
 
-        // 篩選邏輯
         if (month) {
-            // e.g. month=2026-03 → date >= 2026-03-01, date < 2026-04-01
             const [year, mon] = month.split("-").map(Number);
             const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
             const nextMonth = mon === 12 ? `${year + 1}-01-01` : `${year}-${String(mon + 1).padStart(2, "0")}-01`;
@@ -20,7 +25,6 @@ export async function GET(req: NextRequest) {
         } else if (from && to) {
             query = query.where("date", ">=", from).where("date", "<=", to);
         } else {
-            // 預設當月
             const now = new Date();
             const y = now.getFullYear();
             const m = now.getMonth() + 1;
@@ -31,14 +35,12 @@ export async function GET(req: NextRequest) {
 
         const snapshot = await query.get();
 
-        // 建立 CSV
-        const BOM = "\uFEFF"; // UTF-8 BOM for Excel compatibility
+        const BOM = "﻿";
         const header = "日期,金額,標籤,說明,來源,建立時間";
         const rows = snapshot.docs.map((doc) => {
             const d = doc.data();
             const escapeCsv = (val: string | undefined) => {
                 if (!val) return "";
-                // 如果值包含逗號或雙引號，需要跳脫
                 if (val.includes(",") || val.includes('"') || val.includes("\n")) {
                     return `"${val.replace(/"/g, '""')}"`;
                 }

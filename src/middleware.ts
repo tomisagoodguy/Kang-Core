@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const COOKIE_NAME = "firebase-session";
 
 // 需要保護的頁面路徑
-const PROTECTED_PATHS = ["/", "/accounting", "/archive"];
+const PROTECTED_PATHS = ["/", "/accounting", "/archive", "/calendar", "/recurring", "/threads", "/settings"];
 
 // 不需要驗證的路徑
 const PUBLIC_PATHS = ["/login", "/api/webhook", "/api/auth"];
