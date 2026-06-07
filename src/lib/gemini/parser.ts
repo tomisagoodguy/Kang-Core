@@ -28,7 +28,7 @@ const outputSchema: Schema = {
                 amount: { type: SchemaType.NUMBER, nullable: false },
                 tag: {
                     type: SchemaType.STRING,
-                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Investment, Income, Other",
+                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Investment, Travel, Income, Other",
                 },
                 subTag: {
                     type: SchemaType.STRING,
@@ -144,10 +144,11 @@ JSON schema:
 Financial Concepts:
 - Balance (結餘) = Income (收入) - Expenses (支出).
 - IncomeTags: 'Income'
-- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Subscription', 'Investment', 'Other'
+- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Subscription', 'Investment', 'Travel', 'Other'
 - Investment 用於：買股票、定期定額、ETF、基金、存股、證券下單等投資行為
 - Subscription 用於：定期訂閱服務（YouTube Premium、ChatGPT、Claude、iCloud、Notion、Adobe 等月費/年費）
 - Education 用於：才藝課、語言課、線上學習課（Hahow、Coursera 等）、補習費、學費
+- Travel 用於：出國旅遊期間的所有消費，包含機票、eSIM、住宿（Airbnb/Agoda/hotel）、伴手禮、旅遊當地餐飲食物、景點門票、當地購物、行李箱、簽證費等。判斷依據：描述中有出國地名（日本、德國、東京、大阪、柏林等）或明確標示為旅遊消費。
 
 Rules:
 - If user mentions spending money, food, transport, shopping, insurance, health, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income'). If user inputs MULTIPLE expenses in one sentence (e.g. "健身50沙拉95"), fill 'accountingDataList' with multiple items instead.

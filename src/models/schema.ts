@@ -11,6 +11,7 @@ export const TagEnum = z.enum([
     "Insurance",
     "Subscription",
     "Investment",
+    "Travel",
     "Income",
     "Other",
 ]);

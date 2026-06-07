@@ -48,6 +48,7 @@ const TAG_COLORS: Record<string, string> = {
     Insurance: "#64748b",
     Subscription: "#a78bfa",
     Investment: "#38bdf8",
+    Travel: "#0d9488",
     Income: "#22c55e",
     Other: "#6b7280",
 };

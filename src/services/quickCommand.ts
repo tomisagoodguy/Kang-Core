@@ -271,7 +271,8 @@ function guessTag(desc: string): string {
     const lower = desc.toLowerCase();
     const rules: [string[], string][] = [
         [["早餐", "午餐", "晚餐", "吃", "餐", "飯", "麵", "便當", "火鍋", "壽司", "拉麵", "咖啡", "飲料", "手搖", "茶", "奶茶", "雞排", "滷味", "pizza", "food"], "Food"],
-        [["uber", "計程", "加油", "捷運", "公車", "停車", "高鐵", "台鐵", "機票", "油費", "taxi", "transport"], "Transport"],
+        [["uber", "計程", "加油", "捷運", "公車", "停車", "高鐵", "台鐵", "油費", "taxi", "transport"], "Transport"],
+        [["機票", "esim", "e-sim", "住宿", "airbnb", "agoda", "booking", "hotel", "hostel", "旅館", "飯店", "民宿", "青旅", "伴手禮", "旅遊", "出國", "行李箱", "簽證", "旅行"], "Travel"],
         [["電影", "遊戲", "netflix", "spotify", "ktv", "唱歌", "演唱會", "門票", "switch"], "Entertainment"],
         [["水費", "電費", "瓦斯", "網路", "手機", "電信", "帳單", "房租", "房租費", "管理費", "家裡伙食費", "伙食費分攤", "伙食費", "家裡分攤"], "Utilities"],
         [["衣服", "鞋", "包", "蝦皮", "momo", "pchome", "購物", "買", "日用品"], "Shopping"],
