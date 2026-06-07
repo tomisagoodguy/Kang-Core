@@ -59,7 +59,7 @@ export class MessageService {
         SessionService.addMessage(userId, "user", userText).catch(console.error);
 
         // ── Threads URL 口語化識別（最優先，在 Gemini 之前）────────────────
-        const threadsResult = await detectThreadsIntent(userText);
+        const threadsResult = await detectThreadsIntent(userText, userId);
         if (threadsResult) {
             await this.sendReply(userId, state, threadsResult);
             return;
@@ -289,6 +289,12 @@ export class MessageService {
         // 下載 LINE 圖片
         const imageBuffer = await lineService.getMessageContentBuffer(messageId);
 
+        const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+        if (imageBuffer.length > MAX_IMAGE_BYTES) {
+            await this.sendReply(userId, state, "⚠️ 圖片檔案過大（上限 10MB），請壓縮後再傳。");
+            return;
+        }
+
         // 並行：上傳 Drive + Gemini Vision 分析
         const [driveUrl, parsedData] = await Promise.all([
             driveService.uploadToDrive(
@@ -367,15 +373,24 @@ export class MessageService {
         try {
             const fileBuffer = await lineService.getMessageContentBuffer(messageId);
 
+            const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
+            if (fileBuffer.length > MAX_FILE_BYTES) {
+                await this.sendReply(userId, state, "⚠️ 檔案過大（上限 20MB），請壓縮後再傳。");
+                return;
+            }
+
+            // sanitize 檔名，防止路徑穿越攻擊
+            const safeFileName = path.basename(fileName).replace(/[^\w.\-]/g, "_");
+
             // 上傳到 Drive，自動判斷 MIME type -> (使用預設或省略)
-            const driveUrl = await driveService.uploadToDrive(fileName, "application/octet-stream", fileBuffer);
+            const driveUrl = await driveService.uploadToDrive(safeFileName, "application/octet-stream", fileBuffer);
 
             // 寫入本地 tmp 暫存區，然後交給 FileManager 上傳至 Gemini RAG
             let aiStatusStr = "已存入 AI 知識庫";
             try {
-                const tmpPath = path.join(os.tmpdir(), `${messageId}_${fileName}`);
+                const tmpPath = path.join(os.tmpdir(), `${messageId}_${safeFileName}`);
                 await fs.writeFile(tmpPath, fileBuffer);
-                const geminiSuccess = await FileManager.uploadToSearchStore(tmpPath, userId, fileName);
+                const geminiSuccess = await FileManager.uploadToSearchStore(tmpPath, userId, safeFileName);
                 await fs.unlink(tmpPath).catch(() => { });
                 if (!geminiSuccess) {
                     aiStatusStr = "寫入 AI 知識庫失敗";
@@ -434,11 +449,13 @@ export class MessageService {
             await db.collection("processed_messages").doc(event.message.id).create({ timestamp: new Date() });
         } catch (e: unknown) {
             const error = e as { code?: number; message?: string };
-            // 如果錯誤碼是 6 (ALREADY_EXISTS)，代表這個事件已經處理過了
             if (error.code === 6 || error.message?.includes("ALREADY_EXISTS")) {
                 console.log(`[Event ${event.message.id}] Already processed. Skipping.`);
-                return;
+            } else {
+                // Firestore 暫時不可用等非預期錯誤：中止處理以避免重複執行
+                console.error(`[Event ${event.message.id}] Failed to acquire dedup lock:`, e);
             }
+            return;
         }
 
         try {
@@ -460,7 +477,7 @@ export class MessageService {
             console.error(`[processEvent] userId=${userId}:`, error);
             try {
                 const replyToken = "replyToken" in event ? (event.replyToken as string) : undefined;
-                await this.sendReply(userId, { token: replyToken, used: false }, `⚠️ 處理失敗：${error?.message?.slice(0, 100) ?? "未知錯誤"}`);
+                await this.sendReply(userId, { token: replyToken, used: false }, "⚠️ 處理時發生問題，請稍後再試。");
             } catch {
                 // push message 失敗則靜默
             }
@@ -479,7 +496,7 @@ export const messageService = new MessageService();
  * 從各種輸入格式中識別 Threads 追蹤意圖
  * @returns 回覆文字，如果不是 Threads 相關則回 null
  */
-async function detectThreadsIntent(text: string): Promise<string | null> {
+async function detectThreadsIntent(text: string, lineUserId: string): Promise<string | null> {
     const lower = text.toLowerCase().trim();
 
     // ── Step 1: 嘗試從文字中提取 Threads username ──────────────────────────
@@ -509,9 +526,12 @@ async function detectThreadsIntent(text: string): Promise<string | null> {
     // ── Step 3: 處理邏輯 ─────────────────────────────────────────────────
     const { db } = await import("@/lib/firebase/admin");
 
-    // 查看清單
+    // 查看清單（只顯示該用戶自己加入的追蹤目標）
     if (isList && !extractedUsername) {
-        const snapshot = await db.collection("threads_users").orderBy("addedAt", "asc").get();
+        const snapshot = await db.collection("threads_users")
+            .where("userId", "==", lineUserId)
+            .orderBy("addedAt", "asc")
+            .get();
         if (snapshot.empty) {
             return "🧵 目前追蹤清單是空的\n\n傳 Threads 帳號連結給我，說「追蹤他」就能加入！";
         }
@@ -522,10 +542,12 @@ async function detectThreadsIntent(text: string): Promise<string | null> {
     // 有辨識到帳號
     if (extractedUsername) {
         const username = extractedUsername.toLowerCase();
+        // 使用 userId_username 複合 doc ID，確保每位用戶的追蹤目標互相隔離
+        const docId = `${lineUserId}_${username}`;
 
         // 明確取消
         if (isRemove) {
-            const docRef = db.collection("threads_users").doc(username);
+            const docRef = db.collection("threads_users").doc(docId);
             const doc = await docRef.get();
             if (!doc.exists) {
                 return `❌ 找不到追蹤的 @${username}\n\n輸入「/threads 清單」查看目前的追蹤名單`;
@@ -536,8 +558,9 @@ async function detectThreadsIntent(text: string): Promise<string | null> {
 
         // 只有明確有追蹤關鍵字才追蹤
         if (isAdd) {
-            await db.collection("threads_users").doc(username).set({
+            await db.collection("threads_users").doc(docId).set({
                 username,
+                userId: lineUserId,
                 maxPosts: 10,
                 addedAt: new Date(),
                 source: "line-natural",

@@ -22,6 +22,6 @@ export async function POST(req: Request) {
     } catch (err: unknown) {
         const error = err as Error;
         console.error("[setup-richmenu] Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Rich Menu 建立失敗，請查閱 server log" }, { status: 500 });
     }
 }

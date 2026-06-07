@@ -41,10 +41,13 @@ export async function GET(req: NextRequest) {
             const d = doc.data();
             const escapeCsv = (val: string | undefined) => {
                 if (!val) return "";
-                if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-                    return `"${val.replace(/"/g, '""')}"`;
+                // 防止 CSV 公式注入：前置單引號阻止 Excel/Sheets 執行 =、+、-、@ 開頭的公式
+                let v = val;
+                if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+                if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+                    return `"${v.replace(/"/g, '""')}"`;
                 }
-                return val;
+                return v;
             };
             return [
                 d.date || "",

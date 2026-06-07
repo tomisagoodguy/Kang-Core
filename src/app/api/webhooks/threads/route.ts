@@ -22,6 +22,9 @@ export async function POST(req: Request) {
 
         if (webhookType === "new_post") {
             const post = body.post;
+            if (!post) {
+                return NextResponse.json({ error: "Missing post data" }, { status: 400 });
+            }
 
             // Map incoming data to our schema
             const mappedData = {

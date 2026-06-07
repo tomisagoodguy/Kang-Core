@@ -1,14 +1,23 @@
 /**
  * 一次性腳本：取得 Google Drive OAuth2 Refresh Token
  * 執行：node scripts/get-drive-token.mjs
+ * 需要先在 .env.local 設定 GOOGLE_CLIENT_ID 與 GOOGLE_CLIENT_SECRET
  */
 import { createServer } from "http";
 import { google } from "googleapis";
 import { exec } from "child_process";
 import fs from "fs";
+import { config } from "dotenv";
 
-const CLIENT_ID = "672000974194-vcdrlc5uvi3fq2mg1le58ihuhpbvas95.apps.googleusercontent.com";
-const CLIENT_SECRET = "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";
+config({ path: ".env.local" });
+
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+
+if (!CLIENT_ID || !CLIENT_SECRET) {
+    console.error("❌ 缺少 GOOGLE_CLIENT_ID 或 GOOGLE_CLIENT_SECRET 環境變數，請先在 .env.local 設定");
+    process.exit(1);
+}
 const PORT = 3333;
 const REDIRECT_URI = `http://localhost:${PORT}`;
 

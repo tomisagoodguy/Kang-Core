@@ -7,9 +7,13 @@ export async function POST(req: Request) {
     // 1. 取得原始 body（簽章驗證需要未解析的原始字串）
     const rawBody = await req.text();
     const signature = req.headers.get("x-line-signature") ?? "";
-    const channelSecret = process.env.LINE_CHANNEL_SECRET ?? "";
+    const channelSecret = process.env.LINE_CHANNEL_SECRET;
 
     // 2. 驗證 LINE 簽章，防止偽造 Webhook 事件
+    if (!channelSecret) {
+        console.error("[Webhook] LINE_CHANNEL_SECRET is not configured");
+        return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+    }
     if (!validateSignature(rawBody, channelSecret, signature)) {
         console.warn("[Webhook] Invalid signature — rejected");
         return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
