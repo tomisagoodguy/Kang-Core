@@ -60,7 +60,8 @@ src/
 ├── lib/
 │   ├── firebase/               # admin.ts（後端）/ client.ts（前端）/ auth.ts
 │   ├── gemini/                 # client.ts、embedding.ts、vision.ts、parser.ts、sessionManager.ts、fileManager.ts
-│   ├── auth/                   # getSessionUserId.ts（Session Cookie → LINE userId）
+│   ├── auth/                   # getSessionUserId.ts（Session Cookie → LINE userId）、withAuth.ts（API Route wrapper）
+│   ├── userRegistry.ts         # getAllLineUserIds()（Cron 迭代）、getLineUserIdFromEmail()（Dashboard）
 │   ├── calendar/               # Google Calendar API
 │   ├── drive/                  # Google Drive API
 │   └── sheets/                 # Google Sheets API
@@ -77,7 +78,8 @@ src/
 │   ├── session.service.ts      # 對話記憶（5 訊息 / 15 分鐘 TTL）
 │   ├── line.service.ts         # LINE API 封裝（reply/push）
 │   ├── drive.service.ts        # Google Drive 上傳封裝
-│   └── discord.service.ts      # Discord 通知
+│   ├── discord.service.ts      # Discord 通知
+│   └── travelMode.service.ts   # 旅遊模式狀態管理（user_settings 集合）
 ├── models/
 │   └── schema.ts               # TypeScript 型別 + Zod Schema（**單一事實來源**）
 └── utils/
@@ -123,10 +125,11 @@ uv run python services/threads-scraper/main.py
 
 LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
-1. **快速指令**（`quickCommand.ts`）— 匹配 `/記`、`/查`、`/預算` 等前綴，直接回應（~50ms）
-2. **分類規則**（`classificationEngine.ts`）— 以學習到的關鍵字規則比對，信心度 ≥ 0.7 自動分類（~300ms）
-3. **Gemini 意圖解析**（`lib/gemini/parser.ts`）— AI 判斷 9 種意圖（記帳/查詢/存檔/行事曆等）（~2s）
-4. **Fallback**（`lib/gemini/client.ts`）— 帶入 Session 記憶的 Gemini 對話
+1. **Threads 口語化識別**（`detectThreadsIntent()`）— 偵測 `threads.net/@xxx` URL 或 `@帳號` + 追蹤關鍵字，直接處理 Threads 追蹤管理（最優先）
+2. **快速指令**（`quickCommand.ts`）— 匹配 `/記`、`/查`、`/預算` 等前綴，直接回應（~50ms）
+3. **分類規則**（`classificationEngine.ts`）— 以學習到的關鍵字規則比對，信心度 ≥ 0.7 自動分類（~300ms）；若訊息含多個數字則跳過此階段讓 Gemini 精確解析
+4. **Gemini 意圖解析**（`lib/gemini/parser.ts`）— AI 判斷 9 種意圖（記帳/查詢/存檔/行事曆等）（~2s）
+5. **Fallback**（`lib/gemini/sessionManager.ts`）— 帶入 Session 記憶的 Gemini 對話
 
 ---
 
@@ -157,6 +160,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `sessions` | userId, messages[], TTL: 15 分鐘 |
 | `insights` | monthYear, insight, TTL: 1 小時 |
 | `processed_messages` | messageId, TTL: 7 天（去重用）|
+| `user_settings` | userId, travelMode.{active, destination, startedAt}（旅遊模式狀態）|
 
 ---
 
@@ -216,8 +220,8 @@ NEXT_PUBLIC_FIREBASE_*    # 前端 Firebase 設定（7 個變數）
 Dashboard 採 Firebase Google OAuth + Session Cookie 機制：
 
 1. 前端登入 → `POST /api/auth/session`（建立 5 天 httpOnly Cookie `firebase-session`）
-2. `src/middleware.ts` 保護 `/`, `/accounting`, `/archive` 三條路徑（`PROTECTED_PATHS` 常數，Cookie 不存在 → 導向 `/login`）；`/calendar`、`/recurring`、`/threads`、`/settings` 等頁面**不在 middleware 保護範圍**，依賴 API 層 userId 隔離
-3. API Route 中呼叫 `getSessionUserId()`（`src/lib/auth/getSessionUserId.ts`）驗證 Cookie 並透過 `EMAIL_LINE_MAP` 取得 LINE userId
+2. `src/middleware.ts` 保護所有 Dashboard 路徑（`PROTECTED_PATHS`：`/`, `/accounting`, `/archive`, `/calendar`, `/recurring`, `/threads`, `/settings`），Cookie 不存在 → 導向 `/login`
+3. API Route 中呼叫 `getSessionUserId()`（`src/lib/auth/getSessionUserId.ts`）驗證 Cookie 並透過 `EMAIL_LINE_MAP` 取得 LINE userId；或使用 `withAuth` wrapper（`src/lib/auth/withAuth.ts`）自動注入 userId：`export const GET = withAuth(async (req, userId) => { ... })`
 4. 所有 Firestore 查詢**必須**帶 `userId`，資料隔離在 API 層而非 Middleware 層
 
 公開路徑（不驗證）：`/login`, `/api/webhook`, `/api/auth`
@@ -250,10 +254,11 @@ npx tsx scripts/create-firestore-indexes.ts
 | `Insurance` | 🛡️ | 各類保險費 |
 | `Subscription` | 🔖 | 訂閱服務（YouTube、ChatGPT、Claude 等月費/年費）|
 | `Investment` | 📈 | 股票、定期定額、ETF、基金、存股 |
+| `Travel` | ✈️ | 旅遊期間支出（旅遊模式自動標記，不受 `NON_TRAVEL_TAGS` 影響的支出會被覆蓋為此標籤）|
 | `Income` | — | 收入（統計時**不計入支出**）|
 | `Other` | 📦 | 未分類 |
 
-### 新增標籤時必須同步的 7 個檔案
+### 新增標籤時必須同步的 9 個檔案
 
 1. `src/models/schema.ts` — `TagEnum` Zod enum
 2. `src/utils/constants.ts` — `ALL_TAGS` 陣列
@@ -263,6 +268,7 @@ npx tsx scripts/create-firestore-indexes.ts
 6. `src/services/quickCommand.ts` — `guessTag()` 關鍵字規則
 7. `src/lib/gemini/parser.ts` — Gemini prompt 中的 tag 清單與說明
 8. `src/app/api/cron/monthly-report/route.ts` — 月報本地 emoji map（未使用 `tagEmoji.ts`）
+9. `src/services/travelMode.service.ts` — `NON_TRAVEL_TAGS`（若新標籤屬固定支出、不應被旅遊模式覆蓋，須加入此 Set）
 
 ### 分類三層架構
 
