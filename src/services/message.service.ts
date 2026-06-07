@@ -10,6 +10,7 @@ import { parseQuickCommand } from "./quickCommand";
 import { executeQuery } from "./queryEngine";
 import { ClassificationEngine } from "./classificationEngine";
 import { checkBudgetAlert } from "./budget.service";
+import { TravelModeService, NON_TRAVEL_TAGS } from "./travelMode.service";
 import { ArchiveTagEngine } from "./archiveTagEngine";
 import { SessionService } from "./session.service";
 import { getEmbedding } from "@/lib/gemini/embedding";
@@ -44,11 +45,15 @@ export class MessageService {
 
     /** 處理文字訊息 */
     async handleTextMessage(userText: string, userId: string, state?: { token?: string, used?: boolean }): Promise<void> {
-        // 先取得歷史對話
-        const history = await SessionService.getRecentHistory(userId);
+        // 先取得歷史對話 + 旅遊模式狀態（並行）
+        const [history, travelState] = await Promise.all([
+            SessionService.getRecentHistory(userId),
+            TravelModeService.getState(userId),
+        ]);
         const historyContext = history.length > 0
             ? history.map(m => `[${m.role === 'user' ? 'User' : 'Assistant'}]: ${m.text}`).join('\n')
             : undefined;
+        const travelContext = travelState.active ? travelState : undefined;
 
         // 寫入 User 紀錄（背景執行不阻擋）
         SessionService.addMessage(userId, "user", userText).catch(console.error);
@@ -80,10 +85,13 @@ export class MessageService {
                 const amountMatch = userText.match(/(\d+)/);
                 if (amountMatch) {
                     const amount = Number(amountMatch[1]);
+                    const resolvedTag = (travelState.active && !NON_TRAVEL_TAGS.has(ruleMatch.tag))
+                        ? "Travel"
+                        : ruleMatch.tag as AccountingEntry["tag"];
                     const entry: AccountingEntry = {
                         userId,
                         amount,
-                        tag: ruleMatch.tag as AccountingEntry["tag"],
+                        tag: resolvedTag as AccountingEntry["tag"],
                         subTag: ruleMatch.subTag ?? undefined,
                         date: new Date().toISOString().slice(0, 10),
                         description: userText,
@@ -91,7 +99,8 @@ export class MessageService {
                         source: "line-rule",
                         createdAt: new Date(),
                     };
-                    const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
+                    const travelNote = (travelState.active && resolvedTag === "Travel") ? " ✈️ 旅遊模式" : "";
+                    const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}${travelNote}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
 
                     await this.sendReply(userId, state, replyText);
                     await db.collection("accounting").add(cleanUndefined(entry));
@@ -103,7 +112,7 @@ export class MessageService {
 
         lineService.showLoadingAnimation(userId, 15).catch(() => { });
 
-        const parsedData = await parseUserInput(userText, historyContext);
+        const parsedData = await parseUserInput(userText, historyContext, travelContext);
 
         if (parsedData.isError) {
             await this.sendReply(userId, state, `⚠️ 解析失敗：\n${parsedData.errorMessage}`);

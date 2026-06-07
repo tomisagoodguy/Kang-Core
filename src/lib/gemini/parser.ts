@@ -182,10 +182,13 @@ const GEMMA_MODELS = [
     "gemma-3-1b-it",    // 最輕量備援
 ];
 
-async function tryGeminiModel(modelName: string, text: string, archiveTags: string[], historyContext?: string): Promise<GeminiParseResult> {
+async function tryGeminiModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null }): Promise<GeminiParseResult> {
+    const travelInstruction = travelContext?.active
+        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses (food, shopping, transport, entertainment, activities) MUST use tag='Travel'. Only keep original tags for: Utilities (house bills), Insurance, Subscription, Investment, Income.`
+        : "";
     const model = genAI.getGenerativeModel({
         model: modelName,
-        systemInstruction: `You are an AI assistant that parses user intent for the Kang-Core system. Today is ${TODAY()}. Key relative dates: 昨天=${new Date(Date.now() - 86400000).toISOString().split("T")[0]}, 前天=${new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0]}, 大前天=${new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0]}, 明天=${new Date(Date.now() + 86400000).toISOString().split("T")[0]}. For dates like "X月Y號" or "X/Y", assume year ${new Date().getFullYear()} (use last year if the date would be in the future). CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary', 'keywords', and any explanation. For archive keywords, please prioritize these: ${archiveTags.join(", ")}.\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}`,
+        systemInstruction: `You are an AI assistant that parses user intent for the Kang-Core system. Today is ${TODAY()}. Key relative dates: 昨天=${new Date(Date.now() - 86400000).toISOString().split("T")[0]}, 前天=${new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0]}, 大前天=${new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0]}, 明天=${new Date(Date.now() + 86400000).toISOString().split("T")[0]}. For dates like "X月Y號" or "X/Y", assume year ${new Date().getFullYear()} (use last year if the date would be in the future). CRITICAL: MUST use Traditional Chinese (繁體中文) for 'summary', 'keywords', and any explanation. For archive keywords, please prioritize these: ${archiveTags.join(", ")}.${travelInstruction}\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}`,
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: outputSchema,
@@ -196,9 +199,12 @@ async function tryGeminiModel(modelName: string, text: string, archiveTags: stri
     return { ...parsed, isError: false };
 }
 
-async function tryGemmaModel(modelName: string, text: string, archiveTags: string[], historyContext?: string): Promise<GeminiParseResult> {
+async function tryGemmaModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null }): Promise<GeminiParseResult> {
+    const travelInstruction = travelContext?.active
+        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses MUST use tag='Travel' except Utilities/Insurance/Subscription/Investment/Income.`
+        : "";
     const model = genAI.getGenerativeModel({ model: modelName });
-    const prompt = `${SYSTEM_PROMPT(archiveTags)}\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}\n\nUser input: "${text}"`;
+    const prompt = `${SYSTEM_PROMPT(archiveTags)}${travelInstruction}\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}\n\nUser input: "${text}"`;
     const result = await safeExecute(() => model.generateContent(prompt));
     const raw = result.response.text().trim();
 
@@ -210,7 +216,7 @@ async function tryGemmaModel(modelName: string, text: string, archiveTags: strin
     return { ...parsed, isError: false };
 }
 
-export async function parseUserInput(text: string, historyContext?: string): Promise<GeminiParseResult> {
+export async function parseUserInput(text: string, historyContext?: string, travelContext?: { active: boolean; destination: string | null }): Promise<GeminiParseResult> {
     if (MOCK_AI) {
         console.log(`[MOCK MODE] Parsing: "${text}", History length: ${historyContext?.length || 0}`);
         const isMoney = /\d/.test(text) && (text.includes("買") || text.includes("吃") || text.includes("花"));
@@ -248,7 +254,7 @@ export async function parseUserInput(text: string, historyContext?: string): Pro
     for (const modelName of GEMINI_MODELS) {
         try {
             console.log(`[AI] Trying Gemini: ${modelName}`);
-            const result = await tryGeminiModel(modelName, text, archiveTags, historyContext);
+            const result = await tryGeminiModel(modelName, text, archiveTags, historyContext, travelContext);
             console.log(`[AI] ✅ ${modelName} succeeded`);
             return result;
         } catch (err: unknown) {
@@ -262,7 +268,7 @@ export async function parseUserInput(text: string, historyContext?: string): Pro
     for (const modelName of GEMMA_MODELS) {
         try {
             console.log(`[AI] Trying Gemma: ${modelName}`);
-            const result = await tryGemmaModel(modelName, text, archiveTags, historyContext);
+            const result = await tryGemmaModel(modelName, text, archiveTags, historyContext, travelContext);
             console.log(`[AI] ✅ ${modelName} succeeded`);
             return result;
         } catch (err: unknown) {

@@ -6,6 +6,7 @@ import { ClassificationEngine } from "./classificationEngine";
 import { queryArchiveWithAI } from "./archiveQuery.service";
 import { completeTodo } from "./todoComplete.service";
 import { listRecentDriveFiles } from "@/lib/drive/client";
+import { TravelModeService } from "./travelMode.service";
 import type { AccountingEntry, Budget } from "@/models/schema";
 
 interface QuickCommandResult {
@@ -20,6 +21,11 @@ interface QuickCommandResult {
  */
 export async function parseQuickCommand(text: string, userId: string): Promise<QuickCommandResult> {
     const trimmed = text.trim();
+
+    // ── 旅遊模式偵測（自然語言，優先於 / 指令）────────────────────────────
+    const travelResult = await detectTravelModeToggle(trimmed, userId);
+    if (travelResult) return travelResult;
+
     if (!trimmed.startsWith("/")) return { handled: false };
 
     // /help
@@ -341,6 +347,45 @@ async function handleArchiveQuery(question: string): Promise<QuickCommandResult>
             answer,
         ].join("\n"),
     };
+}
+
+// ── 旅遊模式偵測 ─────────────────────────────────────────────────────────────
+
+const TRAVEL_START_RE = /旅遊模式.*(開|啟|始)|開始.*旅遊|旅遊.*(開始|啟動)|出發(了|去|囉)|抵達|人在.*(日本|德國|美國|韓國|泰國|新加坡|香港|澳門|澳洲|法國|英國)|到(日本|德國|美國|韓國|泰國|新加坡|香港|澳門|澳洲|法國|英國)了/;
+const TRAVEL_END_RE = /旅遊模式.*(關|閉|結束|停)|結束旅遊|旅遊.*(結束|關閉|停止)|回國(了|囉)?|回台灣(了|囉)?|到家了/;
+
+async function detectTravelModeToggle(text: string, userId: string): Promise<QuickCommandResult | null> {
+    if (TRAVEL_END_RE.test(text)) {
+        await TravelModeService.deactivate(userId);
+        return {
+            handled: true,
+            replyText: [
+                "✅ 旅遊模式已關閉",
+                "━━━━━━━━━━━━",
+                "歡迎回來！往後記帳恢復正常分類。",
+            ].join("\n"),
+        };
+    }
+
+    if (TRAVEL_START_RE.test(text)) {
+        const destination = TravelModeService.extractDestination(text);
+        await TravelModeService.activate(userId, destination ?? undefined);
+        return {
+            handled: true,
+            replyText: [
+                `✈️ 旅遊模式已開啟${destination ? `（${destination}）` : ""}`,
+                "━━━━━━━━━━━━",
+                "現在起所有消費自動歸類為 Travel，",
+                "包含餐飲、購物、交通、娛樂。",
+                "",
+                "房租/帳單/訂閱/保險/投資不受影響。",
+                "",
+                "回國後說「回國了」即可關閉。",
+            ].join("\n"),
+        };
+    }
+
+    return null;
 }
 
 /** /recent_files — 列出最近 5 筆上傳到 Drive 的檔案 */
