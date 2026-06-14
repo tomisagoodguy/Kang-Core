@@ -25,11 +25,18 @@ export async function signInWithGoogle() {
     const idToken = await result.user.getIdToken();
 
     // 設定 Server-side Session Cookie
-    await fetch("/api/auth/session", {
+    const res = await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
     });
+
+    // Session 建立失敗時清除 Firebase 端登入狀態，避免「已登入但無 cookie」導致被踢回登入頁
+    if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        await firebaseSignOut(auth);
+        throw new Error(data.error || "建立登入工作階段失敗");
+    }
 
     return result.user;
 }
