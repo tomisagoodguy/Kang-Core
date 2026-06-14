@@ -303,3 +303,4 @@ Gemini parser.ts                 → ~2s，AI 解析（消耗 API quota）
 | 忽略訊息去重機制 | 所有 Webhook 處理前須檢查 `processed_messages` |
 | 新增標籤只改 `schema.ts` | 必須同步更新上方列出的 8 個檔案 |
 | `monthly-report/route.ts` 用 `getTagEmoji()` | 該檔案有本地 hardcode emoji map，需手動同步 |
+| 修改 `next.config.ts` 安全標頭遺漏 Firebase 網域 | CSP 必須放行：`script-src` → `https://apis.google.com`（gapi，缺它 `signInWithPopup` 直接拋 `auth/internal-error`）；`connect-src`/`frame-src` → `*.firebaseapp.com`、`accounts.google.com`、`*.googleapis.com`；`style-src` → `https://fonts.googleapis.com`、`font-src` → `https://fonts.gstatic.com`（Google Fonts） |

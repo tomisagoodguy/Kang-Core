@@ -14,10 +14,10 @@ const securityHeaders = [
         key: "Content-Security-Policy",
         value: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'",
-            "style-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'unsafe-inline' https://apis.google.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: https:",
-            "font-src 'self'",
+            "font-src 'self' https://fonts.gstatic.com",
             "connect-src 'self' https://*.googleapis.com https://accounts.google.com https://*.firebaseapp.com",
             "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://*.google.com",
             "frame-ancestors 'none'",
