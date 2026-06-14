@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: 🧠
+      - heading "康 Core" [level=1] [ref=e6]
+      - paragraph [ref=e7]: AI 個人助理儀表板
+      - generic [ref=e15]: "Firebase: Error (auth/internal-error)."
+      - button "使用 Google 帳號登入" [ref=e8] [cursor=pointer]:
+        - img [ref=e16]
+        - text: 使用 Google 帳號登入
+  - alert [ref=e14]
