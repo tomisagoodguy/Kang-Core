@@ -37,7 +37,7 @@ const outputSchema: Schema = {
                 },
                 date: { type: SchemaType.STRING, description: "Format: YYYY-MM-DD" },
                 description: { type: SchemaType.STRING, nullable: true },
-                currency: { type: SchemaType.STRING, nullable: true, description: "ISO 4217 code (TWD/JPY/USD/EUR/KRW/THB/GBP/HKD/SGD/CNY...). Only set if user explicitly mentions a foreign currency (日幣/美金/歐元...). Otherwise leave null." },
+                currency: { type: SchemaType.STRING, nullable: true, description: "ISO 4217 code (TWD/JPY/USD/EUR/CZK/KRW/THB/GBP/HKD/SGD/CNY...). Only set if user explicitly mentions a foreign currency (日幣/美金/歐元/克朗...). Otherwise leave null." },
                 paymentMethod: { type: SchemaType.STRING, nullable: true, description: "One of: cash, credit_card, e_payment. Set from keywords (現金=cash; 刷卡/信用卡=credit_card; 悠遊卡/LinePay/街口/電子支付/行動支付=e_payment). Otherwise null." },
                 settlement: {
                     type: SchemaType.OBJECT,

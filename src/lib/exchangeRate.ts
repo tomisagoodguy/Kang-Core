@@ -17,6 +17,7 @@ const FALLBACK_RATES: Record<string, number> = {
     CNY: 4.5,
     AUD: 21,
     VND: 0.0013,
+    CZK: 1.5,
 };
 
 /**

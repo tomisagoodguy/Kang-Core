@@ -33,6 +33,7 @@ export const CURRENCIES: Record<string, CurrencyDef> = {
     CNY: { code: "CNY", symbol: "RMB", keywords: ["人民幣", "rmb", "cny"], decimals: 2 },
     AUD: { code: "AUD", symbol: "A$", keywords: ["澳幣", "澳元", "aud"], decimals: 2 },
     VND: { code: "VND", symbol: "₫", keywords: ["越南盾", "盾", "vnd"], decimals: 0 },
+    CZK: { code: "CZK", symbol: "Kč", keywords: ["克朗", "捷克克朗", "捷克幣", "czk"], decimals: 0 },
 };
 
 /** 目的地關鍵字 → 預設幣別（旅遊模式啟動時推斷用） */
@@ -44,6 +45,8 @@ const DESTINATION_CURRENCY: Record<string, string> = {
     德國: "EUR", 柏林: "EUR", 慕尼黑: "EUR", 法蘭克福: "EUR", 漢堡: "EUR",
     法國: "EUR", 巴黎: "EUR", 義大利: "EUR", 羅馬: "EUR", 米蘭: "EUR",
     西班牙: "EUR", 巴塞隆納: "EUR", 荷蘭: "EUR", 瑞士: "EUR", 葡萄牙: "EUR", 希臘: "EUR",
+    奧地利: "EUR", 維也納: "EUR", 薩爾斯堡: "EUR", 哈修塔特: "EUR",
+    捷克: "CZK", 布拉格: "CZK", 庫倫洛夫: "CZK",
     英國: "GBP", 倫敦: "GBP",
     香港: "HKD", 澳門: "HKD",
     新加坡: "SGD", 馬來西亞: "SGD", 吉隆坡: "SGD",
