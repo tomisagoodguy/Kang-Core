@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         const snapshot = await query.get();
 
         const BOM = "﻿";
-        const header = "日期,金額,標籤,說明,來源,建立時間";
+        const header = "日期,金額,幣別,台幣金額,標籤,說明,來源,建立時間";
         const rows = snapshot.docs.map((doc) => {
             const d = doc.data();
             const escapeCsv = (val: string | undefined) => {
@@ -52,6 +52,8 @@ export async function GET(req: NextRequest) {
             return [
                 d.date || "",
                 d.amount || 0,
+                d.currency || "TWD",
+                d.amountTWD ?? d.amount ?? 0,
                 d.tag || "",
                 escapeCsv(d.description),
                 d.source || "",

@@ -5,6 +5,7 @@ import { Pencil, Trash2, Camera } from "lucide-react";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 import { getTagEmoji } from "@/utils/tagEmoji";
+import { formatMoney, PAYMENT_LABELS, settlementNote } from "@/utils/currency";
 import type { AccountingEntryView } from "@/models/schema";
 
 interface AccountingRowProps {
@@ -44,7 +45,14 @@ export function AccountingRow({ entry }: AccountingRowProps) {
     const tagColor = TAG_COLOR_MAP[entry.tag ?? "Other"] ?? "#94a3b8";
     const emoji = getTagEmoji(entry.tag ?? "Other");
     const desc = entry.description || entry.originalText || "—";
-    const formattedAmount = `${isIncome ? "+" : "-"}$${(entry.amount ?? 0).toLocaleString()}`;
+    const currency = entry.currency || "TWD";
+    const isForeign = currency !== "TWD";
+    const formattedAmount = `${isIncome ? "+" : "-"}${formatMoney(entry.amount ?? 0, currency)}`;
+    const twdSub = isForeign && entry.amountTWD != null ? `≈ NT$${entry.amountTWD.toLocaleString()}` : null;
+    // 顏色門檻依台幣值判斷（外幣的原始數字大小無意義）
+    const twdValue = entry.amountTWD ?? entry.amount ?? 0;
+    const payment = entry.paymentMethod ? PAYMENT_LABELS[entry.paymentMethod] : null;
+    const settle = settlementNote(entry);
 
     return (
         <>
@@ -79,18 +87,32 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                     {emoji}
                 </div>
 
-                {/* Description */}
-                <span style={{
-                    flex: 1,
-                    fontSize: "0.9rem",
-                    fontWeight: 500,
-                    color: "var(--text-primary)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                }}>
-                    {desc}
-                </span>
+                {/* Description + secondary line */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <span style={{
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                    }}>
+                        {desc}
+                    </span>
+                    {(payment || settle) && (
+                        <span style={{
+                            fontSize: "0.7rem",
+                            color: settle && !entry.settlement?.settled ? "#fb923c" : "var(--text-muted)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}>
+                            {payment ? `${payment.emoji} ${payment.label}` : ""}
+                            {payment && settle ? "　" : ""}
+                            {settle ?? ""}
+                        </span>
+                    )}
+                </div>
 
                 {/* SubTag pill */}
                 {entry.subTag && (
@@ -122,16 +144,27 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                 )}
 
                 {/* Amount */}
-                <span style={{
-                    fontSize: "0.9375rem",
-                    fontWeight: 700,
-                    color: isIncome ? "var(--success)" : (entry.amount ?? 0) >= 1000 ? "#f87171" : (entry.amount ?? 0) >= 500 ? "#fb923c" : "var(--text-primary)",
+                <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
                     flexShrink: 0,
                     minWidth: "60px",
-                    textAlign: "right",
                 }}>
-                    {formattedAmount}
-                </span>
+                    <span style={{
+                        fontSize: "0.9375rem",
+                        fontWeight: 700,
+                        color: isIncome ? "var(--success)" : twdValue >= 1000 ? "#f87171" : twdValue >= 500 ? "#fb923c" : "var(--text-primary)",
+                        textAlign: "right",
+                    }}>
+                        {formattedAmount}
+                    </span>
+                    {twdSub && (
+                        <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", textAlign: "right" }}>
+                            {twdSub}
+                        </span>
+                    )}
+                </div>
 
                 {/* Actions (hover only) */}
                 <div style={{

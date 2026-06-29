@@ -18,6 +18,24 @@ export const TagEnum = z.enum([
 
 export const SourceEnum = z.enum(["line", "manual", "system", "line-rule", "line-image", "line-file", "threads"]);
 
+/** 付款方式：現金 / 信用卡 / 電子支付 */
+export const PaymentMethodEnum = z.enum(["cash", "credit_card", "e_payment"]);
+export type PaymentMethod = z.infer<typeof PaymentMethodEnum>;
+
+/**
+ * 代墊 / 借貸結算資訊。
+ * - paidBy="me"：我先付，counterparty 欠我（應收）
+ * - paidBy="other"：對方先付，我欠 counterparty（應付）
+ * - myShare：我實際該負擔的金額（原幣，統計支出只算這份）
+ */
+export const SettlementSchema = z.object({
+    paidBy: z.enum(["me", "other"]),
+    counterparty: z.string(), // 對方名稱
+    myShare: z.number().nonnegative(), // 我該負擔的金額（原幣）
+    settled: z.boolean().default(false),
+});
+export type Settlement = z.infer<typeof SettlementSchema>;
+
 export const BaseEntrySchema = z.object({
     id: z.string().optional(), // Provided by Firestore Document ID usually
     userId: z.string().optional(), // LINE user ID for multi-user isolation
@@ -27,12 +45,20 @@ export const BaseEntrySchema = z.object({
 });
 
 export const AccountingEntrySchema = BaseEntrySchema.extend({
-    amount: z.number().positive(),
+    amount: z.number().positive(), // 原幣金額（在當地實際付的數字）
     tag: TagEnum,
     subTag: z.string().optional(),
     date: z.string(), // ISO String YYYY-MM-DD
     description: z.string().optional(),
     imageUrl: z.string().url().optional(),
+    // ── 多幣別（出國模式）─────────────────────────────
+    currency: z.string().optional(), // ISO 4217，未設定視為 TWD
+    exchangeRate: z.number().positive().optional(), // 1 外幣 = ? 台幣（TWD 為 1）
+    amountTWD: z.number().optional(), // 整筆換算台幣 = amount * exchangeRate（統計基準）
+    // ── 付款方式 ─────────────────────────────────────
+    paymentMethod: PaymentMethodEnum.optional(),
+    // ── 代墊 / 借貸 ──────────────────────────────────
+    settlement: SettlementSchema.optional(),
 });
 
 export type AccountingEntry = z.infer<typeof AccountingEntrySchema>;

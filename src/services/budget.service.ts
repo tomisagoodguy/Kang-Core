@@ -1,5 +1,7 @@
 import { db } from "@/lib/firebase/admin";
 import { lineService } from "./line.service";
+import { myExpenseTWD } from "@/utils/currency";
+import type { AccountingEntry } from "@/models/schema";
 
 /**
  * 每次記帳後呼叫，檢查是否超過月預算門檻
@@ -36,11 +38,11 @@ export async function checkBudgetAlert(
                 .where("date", "<=", monthEnd) as FirebaseFirestore.Query;
 
             const accSnap = await query.get();
-            let entries = accSnap.docs.map(d => d.data()).filter(e => e.tag !== "Income");
+            let entries = accSnap.docs.map(d => d.data() as AccountingEntry).filter(e => e.tag !== "Income");
             if (budgetTag) {
                 entries = entries.filter(e => e.tag === budgetTag);
             }
-            const monthTotal = entries.reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const monthTotal = entries.reduce((s, e) => s + myExpenseTWD(e), 0);
 
             const ratio = monthTotal / monthlyLimit;
             const tagLabel = budgetTag ? `「${budgetTag}」` : "總";

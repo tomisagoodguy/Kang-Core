@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { myExpenseTWD } from "@/utils/currency";
 import {
     ResponsiveContainer,
     PieChart,
@@ -123,7 +124,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
             .filter(e => e.tag === drillTag)
             .forEach(e => {
                 const key = e.subTag || "（未分類）";
-                map.set(key, (map.get(key) || 0) + (e.amount || 0));
+                map.set(key, (map.get(key) || 0) + myExpenseTWD(e));
             });
 
         return Array.from(map.entries())

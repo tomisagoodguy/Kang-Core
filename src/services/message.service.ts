@@ -11,6 +11,7 @@ import { executeQuery } from "./queryEngine";
 import { ClassificationEngine } from "./classificationEngine";
 import { checkBudgetAlert } from "./budget.service";
 import { TravelModeService, NON_TRAVEL_TAGS } from "./travelMode.service";
+import { resolveCurrency, computeCurrencyFields, formatMoney, PAYMENT_LABELS, settlementNote, myExpenseTWD, detectPaymentMethod } from "@/utils/currency";
 import { ArchiveTagEngine } from "./archiveTagEngine";
 import { SessionService } from "./session.service";
 import { getEmbedding } from "@/lib/gemini/embedding";
@@ -88,6 +89,9 @@ export class MessageService {
                     const resolvedTag = (travelState.active && !NON_TRAVEL_TAGS.has(ruleMatch.tag))
                         ? "Travel"
                         : ruleMatch.tag as AccountingEntry["tag"];
+                    const currency = resolveCurrency(userText, travelState);
+                    const { exchangeRate, amountTWD } = await computeCurrencyFields(amount, currency, travelState);
+                    const paymentMethod = detectPaymentMethod(userText);
                     const entry: AccountingEntry = {
                         userId,
                         amount,
@@ -98,9 +102,15 @@ export class MessageService {
                         originalText: userText,
                         source: "line-rule",
                         createdAt: new Date(),
+                        currency,
+                        exchangeRate,
+                        amountTWD,
+                        paymentMethod,
                     };
                     const travelNote = (travelState.active && resolvedTag === "Travel") ? " ✈️ 旅遊模式" : "";
-                    const replyText = `✅ 規則自動匹配！\n💰 金額: $${amount}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}${travelNote}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
+                    const twdNote = currency !== "TWD" ? `（≈ NT$${amountTWD.toLocaleString()}）` : "";
+                    const payNote = paymentMethod ? `\n${PAYMENT_LABELS[paymentMethod].emoji} ${PAYMENT_LABELS[paymentMethod].label}` : "";
+                    const replyText = `✅ 規則自動匹配！\n💰 金額: ${formatMoney(amount, currency)}${twdNote}\n🏷️ 標籤: ${entry.tag}${entry.subTag ? ` (${entry.subTag})` : ""}${travelNote}${payNote}\n📅 日期: ${entry.date}\n🤖 AI: 此商店已知，自動套用分類。`;
 
                     await this.sendReply(userId, state, replyText);
                     await db.collection("accounting").add(cleanUndefined(entry));
@@ -134,20 +144,32 @@ export class MessageService {
 
             for (const item of list) {
                 const docRef = db.collection("accounting").doc();
+                const currency = item.currency || resolveCurrency(userText, travelState);
+                const { exchangeRate, amountTWD } = await computeCurrencyFields(item.amount, currency, travelState);
+                const paymentMethod = item.paymentMethod ?? detectPaymentMethod(userText);
+                const settlement = item.settlement ? { ...item.settlement, settled: false } : undefined;
                 const entry: AccountingEntry = {
                     ...item,
                     userId,
                     originalText: userText,
                     source: "line",
                     createdAt: new Date(),
+                    currency,
+                    exchangeRate,
+                    amountTWD,
+                    paymentMethod,
+                    settlement,
                 };
                 const isIncome = entry.tag === "Income";
-                const replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}`;
+                const twdNote = currency !== "TWD" ? `（≈ NT$${amountTWD.toLocaleString()}）` : "";
+                const payNote = paymentMethod ? `\n${PAYMENT_LABELS[paymentMethod].emoji} ${PAYMENT_LABELS[paymentMethod].label}` : "";
+                const settleNote = settlementNote(entry);
+                const replyText = `✅ ${isIncome ? "入帳記錄" : "記帳"}成功！\n💰 金額: ${formatMoney(entry.amount, currency)}${twdNote}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}${payNote}${settleNote ? `\n${settleNote}` : ""}`;
 
                 batch.set(docRef, cleanUndefined(entry));
 
                 if (!isIncome) {
-                    totalExpense += entry.amount;
+                    totalExpense += myExpenseTWD(entry);
                     if (!firstExpenseTag) firstExpenseTag = entry.tag;
                 }
 
@@ -311,15 +333,23 @@ export class MessageService {
         }
 
         if (parsedData.type === "accounting" && parsedData.accountingData) {
+            const travelState = await TravelModeService.getState(userId);
+            const acc = parsedData.accountingData;
+            const currency = acc.currency || (travelState.active && travelState.currency ? travelState.currency : "TWD");
+            const { exchangeRate, amountTWD } = await computeCurrencyFields(acc.amount, currency, travelState);
             const entry: AccountingEntry = {
-                ...parsedData.accountingData,
+                ...acc,
                 userId,
                 originalText: "[圖片分析]",
                 imageUrl: driveUrl,
                 source: "line-image",
                 createdAt: new Date(),
+                currency,
+                exchangeRate,
+                amountTWD,
             };
-            const replyText = `✅ 收據記帳成功！\n💰 金額: $${entry.amount}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}\n📁 圖片: 已存 Drive`;
+            const twdNote = currency !== "TWD" ? `（≈ NT$${amountTWD.toLocaleString()}）` : "";
+            const replyText = `✅ 收據記帳成功！\n💰 金額: ${formatMoney(entry.amount, currency)}${twdNote}\n🏷️ 標籤: ${entry.tag}\n📅 日期: ${entry.date}\n📁 圖片: 已存 Drive`;
 
             await this.sendReply(userId, state, replyText);
             await db.collection("accounting").add(cleanUndefined(entry));

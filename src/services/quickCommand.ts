@@ -7,6 +7,14 @@ import { queryArchiveWithAI } from "./archiveQuery.service";
 import { completeTodo } from "./todoComplete.service";
 import { listRecentDriveFiles } from "@/lib/drive/client";
 import { TravelModeService } from "./travelMode.service";
+import {
+    resolveCurrency,
+    computeCurrencyFields,
+    detectPaymentMethod,
+    formatMoney,
+    myExpenseTWD,
+    PAYMENT_LABELS,
+} from "@/utils/currency";
 import type { AccountingEntry, Budget } from "@/models/schema";
 
 interface QuickCommandResult {
@@ -50,6 +58,9 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
                 "　　例：/threads 取消 hogan.tech",
                 "� /threads 清單",
                 "　　查看目前追蹤的 Threads 創作者",
+                "",
+                "🤝 /欠款　　查看代墊／借貸",
+                "　　/結清 {對方}　結清款項",
                 "",
                 "🧠 /洞察　　AI 分析消費",
                 "📁 /recent_files　查看最近檔案",
@@ -101,6 +112,17 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
         return await handleArchiveQuery(askMatch[1].trim());
     }
 
+    // /欠款 — 查看未結清的代墊／借貸
+    if (/^\/欠款$/.test(trimmed)) {
+        return await handleDebtQuery(userId);
+    }
+
+    // /結清 {對方} — 將與某人未結清的代墊全部標記為已結清
+    const settleMatch = trimmed.match(/^\/結清\s+(.+)$/);
+    if (settleMatch) {
+        return await handleSettleDebt(userId, settleMatch[1].trim());
+    }
+
     // /預算 — 查看或設定預算
     if (/^\/預算$/.test(trimmed)) {
         return await handleBudgetQuery(userId);
@@ -140,6 +162,11 @@ async function handleQuickExpense(amount: number, description: string, userId: s
     const dateStr = today.toISOString().slice(0, 10);
     const tag = guessTag(description);
 
+    const travelState = await TravelModeService.getState(userId);
+    const currency = resolveCurrency(description, travelState);
+    const { exchangeRate, amountTWD } = await computeCurrencyFields(amount, currency, travelState);
+    const paymentMethod = detectPaymentMethod(description);
+
     const entry = {
         userId,
         amount,
@@ -149,6 +176,10 @@ async function handleQuickExpense(amount: number, description: string, userId: s
         originalText: `/記 ${amount} ${description}`,
         source: "line-quick",
         createdAt: new Date(),
+        currency,
+        exchangeRate,
+        amountTWD,
+        ...(paymentMethod ? { paymentMethod } : {}),
     };
 
     await db.collection("accounting").add(entry);
@@ -158,14 +189,19 @@ async function handleQuickExpense(amount: number, description: string, userId: s
         ClassificationEngine.learn(description, tag, userId).catch(() => { /* 失敗不影響主流程 */ });
     }
 
+    const twdLine = currency !== "TWD" ? `　≈ NT$${amountTWD.toLocaleString()}` : "";
+    const payLine = paymentMethod ? `${PAYMENT_LABELS[paymentMethod].emoji} ${PAYMENT_LABELS[paymentMethod].label}` : "";
+
     return {
         handled: true,
         replyText: [
             "✅ 快速記帳成功",
             "━━━━━━━━━━━━",
-            `💰 $${amount.toLocaleString()}`,
+            `💰 ${formatMoney(amount, currency)}`,
+            ...(twdLine ? [twdLine] : []),
             `📝 ${entry.description}`,
             `🏷 ${tag}`,
+            ...(payLine ? [payLine] : []),
             `📅 ${dateStr}`,
         ].join("\n"),
     };
@@ -190,14 +226,15 @@ async function handleQuickQuery(period: string, userId: string): Promise<QuickCo
 
     const entries = snapshot.docs.map((d) => d.data() as AccountingEntry);
 
-    const income = entries.filter((e) => e.tag === "Income").reduce((s, e) => s + (e.amount || 0), 0);
-    const expenses = entries.filter((e) => e.tag !== "Income").reduce((s, e) => s + (e.amount || 0), 0);
+    // 金額一律換算台幣、代墊只計自己份額
+    const income = entries.filter((e) => e.tag === "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
+    const expenses = entries.filter((e) => e.tag !== "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
 
     // 標籤統計（排除 Income）
     const tagMap = new Map<string, number>();
     entries.forEach((e) => {
         const tag = e.tag || "Other";
-        tagMap.set(tag, (tagMap.get(tag) || 0) + (e.amount || 0));
+        tagMap.set(tag, (tagMap.get(tag) || 0) + myExpenseTWD(e));
     });
 
     const tagLines = Array.from(tagMap.entries())
@@ -369,15 +406,18 @@ async function detectTravelModeToggle(text: string, userId: string): Promise<Qui
 
     if (TRAVEL_START_RE.test(text)) {
         const destination = TravelModeService.extractDestination(text);
-        await TravelModeService.activate(userId, destination ?? undefined);
+        const state = await TravelModeService.activate(userId, destination ?? undefined);
+        const currencyLine = state.currency
+            ? `💱 幣別：${state.currency}（1 ${state.currency} ≈ NT$${state.exchangeRate?.toFixed(state.exchangeRate < 1 ? 3 : 2)}）\n　記帳直接輸入當地金額即可自動換算`
+            : "💱 未偵測到當地幣別，金額預設為台幣\n　可在金額後標明幣別（如「拉麵 1200 日幣」）";
         return {
             handled: true,
             replyText: [
                 `✈️ 旅遊模式已開啟${destination ? `（${destination}）` : ""}`,
                 "━━━━━━━━━━━━",
-                "現在起所有消費自動歸類為 Travel，",
-                "包含餐飲、購物、交通、娛樂。",
+                currencyLine,
                 "",
+                "所有消費自動歸類為 Travel，",
                 "房租/帳單/訂閱/保險/投資不受影響。",
                 "",
                 "回國後說「回國了」即可關閉。",
@@ -438,7 +478,10 @@ async function handleBudgetQuery(userId: string): Promise<QuickCommandResult> {
             .where("date", ">=", monthStart)
             .where("date", "<=", monthEnd)
             .get();
-        const monthTotal = accSnap.docs.reduce((s, d) => s + ((d.data() as AccountingEntry).amount || 0), 0);
+        const monthTotal = accSnap.docs
+            .map((d) => d.data() as AccountingEntry)
+            .filter((e) => e.tag !== "Income")
+            .reduce((s, e) => s + myExpenseTWD(e), 0);
 
         const lines = budgetSnap.docs.map(d => {
             const b = d.data() as Budget;
@@ -487,6 +530,87 @@ async function handleBudgetSet(userId: string, amount: number): Promise<QuickCom
     } catch {
         return { handled: true, replyText: "⚠️ 設定預算失敗" };
     }
+}
+
+// ─── 代墊 / 借貸 ─────────────────────────────────
+
+/** /欠款 — 列出未結清的代墊／借貸（依對方、分幣別彙整） */
+async function handleDebtQuery(userId: string): Promise<QuickCommandResult> {
+    const snap = await db.collection("accounting").where("userId", "==", userId).get();
+    const debts = snap.docs
+        .map((d) => d.data() as AccountingEntry)
+        .filter((e) => e.settlement && !e.settlement.settled);
+
+    if (debts.length === 0) {
+        return { handled: true, replyText: "🤝 目前沒有未結清的代墊／借貸" };
+    }
+
+    type Bucket = Map<string, number>; // currency -> 金額
+    const owedToMe = new Map<string, Bucket>(); // 對方 -> 幣別 -> 金額（別人欠我）
+    const iOwe = new Map<string, Bucket>();      // 對方 -> 幣別 -> 金額（我欠別人）
+
+    for (const e of debts) {
+        const s = e.settlement!;
+        const cur = e.currency || "TWD";
+        const isMine = s.paidBy === "me";
+        const val = isMine ? Math.max(0, (e.amount || 0) - s.myShare) : s.myShare;
+        if (val <= 0) continue;
+        const target = isMine ? owedToMe : iOwe;
+        if (!target.has(s.counterparty)) target.set(s.counterparty, new Map());
+        const b = target.get(s.counterparty)!;
+        b.set(cur, (b.get(cur) || 0) + val);
+    }
+
+    const fmtBucket = (b: Bucket) =>
+        Array.from(b.entries()).map(([c, v]) => formatMoney(v, c)).join("、");
+
+    const lines: string[] = [];
+    if (owedToMe.size > 0) {
+        lines.push("💰 別人欠我");
+        for (const [name, b] of owedToMe) lines.push(`　${name}：${fmtBucket(b)}`);
+    }
+    if (iOwe.size > 0) {
+        if (lines.length > 0) lines.push("");
+        lines.push("💸 我欠別人");
+        for (const [name, b] of iOwe) lines.push(`　${name}：${fmtBucket(b)}`);
+    }
+
+    if (lines.length === 0) {
+        return { handled: true, replyText: "🤝 目前沒有未結清的代墊／借貸" };
+    }
+
+    return {
+        handled: true,
+        replyText: [
+            "🤝 未結清款項",
+            "━━━━━━━━━━━━",
+            ...lines,
+            "",
+            "結清後輸入「/結清 {對方}」",
+        ].join("\n"),
+    };
+}
+
+/** /結清 {對方} — 將與某人未結清的代墊全部標記為已結清 */
+async function handleSettleDebt(userId: string, counterparty: string): Promise<QuickCommandResult> {
+    const snap = await db.collection("accounting").where("userId", "==", userId).get();
+    const targets = snap.docs.filter((d) => {
+        const s = (d.data() as AccountingEntry).settlement;
+        return s && !s.settled && s.counterparty.includes(counterparty);
+    });
+
+    if (targets.length === 0) {
+        return { handled: true, replyText: `🤝 找不到與「${counterparty}」未結清的款項` };
+    }
+
+    const batch = db.batch();
+    targets.forEach((d) => batch.update(d.ref, { "settlement.settled": true }));
+    await batch.commit();
+
+    return {
+        handled: true,
+        replyText: `✅ 已結清與「${counterparty}」的 ${targets.length} 筆款項`,
+    };
 }
 
 // ─── Threads 管理指令 ─────────────────────────────

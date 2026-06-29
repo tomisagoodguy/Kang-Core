@@ -25,7 +25,7 @@ const outputSchema: Schema = {
             description: "Populate ONLY if type is 'accounting'",
             nullable: true,
             properties: {
-                amount: { type: SchemaType.NUMBER, nullable: false },
+                amount: { type: SchemaType.NUMBER, nullable: false, description: "Amount in ORIGINAL currency the user actually paid" },
                 tag: {
                     type: SchemaType.STRING,
                     description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Investment, Travel, Income, Other",
@@ -37,6 +37,19 @@ const outputSchema: Schema = {
                 },
                 date: { type: SchemaType.STRING, description: "Format: YYYY-MM-DD" },
                 description: { type: SchemaType.STRING, nullable: true },
+                currency: { type: SchemaType.STRING, nullable: true, description: "ISO 4217 code (TWD/JPY/USD/EUR/KRW/THB/GBP/HKD/SGD/CNY...). Only set if user explicitly mentions a foreign currency (日幣/美金/歐元...). Otherwise leave null." },
+                paymentMethod: { type: SchemaType.STRING, nullable: true, description: "One of: cash, credit_card, e_payment. Set from keywords (現金=cash; 刷卡/信用卡=credit_card; 悠遊卡/LinePay/街口/電子支付/行動支付=e_payment). Otherwise null." },
+                settlement: {
+                    type: SchemaType.OBJECT,
+                    nullable: true,
+                    description: "Only when this expense involves paying for someone else OR someone paying for the user (代墊/借錢/各付一半/我幫他付/他幫我付).",
+                    properties: {
+                        paidBy: { type: SchemaType.STRING, description: "'me' if the user paid up front, 'other' if someone else paid for the user" },
+                        counterparty: { type: SchemaType.STRING, description: "The other person's name" },
+                        myShare: { type: SchemaType.NUMBER, description: "The user's own portion in ORIGINAL currency (0 if user fully covered someone else). For 各付一半 it is amount/2." },
+                    },
+                    required: ["paidBy", "counterparty", "myShare"],
+                },
             },
             required: ["amount", "tag", "date"],
         },
@@ -52,6 +65,8 @@ const outputSchema: Schema = {
                     subTag: { type: SchemaType.STRING, nullable: true },
                     date: { type: SchemaType.STRING },
                     description: { type: SchemaType.STRING, nullable: true },
+                    currency: { type: SchemaType.STRING, nullable: true, description: "ISO 4217 code; only if foreign currency explicitly mentioned, else null" },
+                    paymentMethod: { type: SchemaType.STRING, nullable: true, description: "cash | credit_card | e_payment, else null" },
                 },
                 required: ["amount", "tag", "date"],
             }
@@ -133,8 +148,8 @@ JSON schema:
 {
   "type": "accounting" | "archive" | "calendar" | "recurring" | "query" | "clear_memory" | "unknown",
   "explanation": "string (brief reason)",
-  "accountingData": { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string" },
-  "accountingDataList": [ { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string" } ],
+  "accountingData": { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string", "currency": "TWD|JPY|USD|...", "paymentMethod": "cash|credit_card|e_payment", "settlement": { "paidBy": "me|other", "counterparty": "string", "myShare": number } },
+  "accountingDataList": [ { "amount": number, "tag": "...", "subTag": "...", "date": "YYYY-MM-DD", "description": "string", "currency": "...", "paymentMethod": "..." } ],
   "archiveData": { "url": "...", "title": "...", "summary": "...", "keywords": ["..."] },
   "calendarData": { "title": "...", "actionDate": "YYYY-MM-DD", "actionTime": "HH:mm", "description": "..." },
   "recurringData": { "amount": number, "tag": "...", "description": "...", "frequency": "monthly", "dayOfMonth": 10 },
@@ -152,6 +167,9 @@ Financial Concepts:
 
 Rules:
 - If user mentions spending money, food, transport, shopping, insurance, health, tracking expense, or earning money, salary, receiving cash → type = "accounting", fill accountingData (For income, set tag to 'Income'). If user inputs MULTIPLE expenses in one sentence (e.g. "健身50沙拉95"), fill 'accountingDataList' with multiple items instead.
+- Currency: 'amount' is ALWAYS the number the user literally said, in its ORIGINAL currency. Set 'currency' to an ISO 4217 code ONLY when the user explicitly names a foreign currency (日幣/円→JPY, 美金/美元/鎂→USD, 歐元/歐→EUR, 韓元→KRW, 泰銖/銖→THB, 英鎊→GBP, 港幣→HKD, 新加坡幣→SGD, 人民幣→CNY). Do NOT convert to TWD yourself and do NOT compute exchange rates — the server handles conversion. If no foreign currency is mentioned, leave currency null.
+- Payment method: set 'paymentMethod' from keywords — 現金=cash; 刷卡/信用卡/卡=credit_card; 悠遊卡/一卡通/LinePay/Line Pay/街口/Apple Pay/電子支付/行動支付/嗶=e_payment. If none mentioned, leave null.
+- Settlement (代墊/借貸): if the expense involves the user paying for others or others paying for the user, fill 'settlement'. "我幫小明付了X(各付一半)" → paidBy='me', counterparty='小明', myShare=X/2. "我幫小明全墊X" → paidBy='me', myShare=0. "小明先幫我付X" → paidBy='other', counterparty='小明', myShare=X. 'amount' stays the FULL amount paid at the register.
 - If user asks about 'Balance' or 'Net Profit', they are asking for 'Income - Expenses' for a specific period.
 - If user wants to schedule, plan, remind, to-do → type = "calendar", fill calendarData
 - If user wants to set up a regular, fixed, or scheduled expense (e.g. 每個月10號付錢, 每週花多少) → type = "recurring", fill recurringData
@@ -182,9 +200,9 @@ const GEMMA_MODELS = [
     "gemma-3-1b-it",    // 最輕量備援
 ];
 
-async function tryGeminiModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null }): Promise<GeminiParseResult> {
+async function tryGeminiModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null; currency?: string | null }): Promise<GeminiParseResult> {
     const travelInstruction = travelContext?.active
-        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses (food, shopping, transport, entertainment, activities) MUST use tag='Travel'. Only keep original tags for: Utilities (house bills), Insurance, Subscription, Investment, Income.`
+        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses (food, shopping, transport, entertainment, activities) MUST use tag='Travel'. Only keep original tags for: Utilities (house bills), Insurance, Subscription, Investment, Income.${travelContext.currency ? ` Local currency is ${travelContext.currency}; bare numbers are assumed ${travelContext.currency} (the server applies this), so leave 'currency' null unless the user names a DIFFERENT currency.` : ""}`
         : "";
     const model = genAI.getGenerativeModel({
         model: modelName,
@@ -199,9 +217,9 @@ async function tryGeminiModel(modelName: string, text: string, archiveTags: stri
     return { ...parsed, isError: false };
 }
 
-async function tryGemmaModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null }): Promise<GeminiParseResult> {
+async function tryGemmaModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null; currency?: string | null }): Promise<GeminiParseResult> {
     const travelInstruction = travelContext?.active
-        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses MUST use tag='Travel' except Utilities/Insurance/Subscription/Investment/Income.`
+        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses MUST use tag='Travel' except Utilities/Insurance/Subscription/Investment/Income.${travelContext.currency ? ` Local currency is ${travelContext.currency}; leave 'currency' null unless a different currency is named.` : ""}`
         : "";
     const model = genAI.getGenerativeModel({ model: modelName });
     const prompt = `${SYSTEM_PROMPT(archiveTags)}${travelInstruction}\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}\n\nUser input: "${text}"`;
@@ -216,7 +234,7 @@ async function tryGemmaModel(modelName: string, text: string, archiveTags: strin
     return { ...parsed, isError: false };
 }
 
-export async function parseUserInput(text: string, historyContext?: string, travelContext?: { active: boolean; destination: string | null }): Promise<GeminiParseResult> {
+export async function parseUserInput(text: string, historyContext?: string, travelContext?: { active: boolean; destination: string | null; currency?: string | null }): Promise<GeminiParseResult> {
     if (MOCK_AI) {
         console.log(`[MOCK MODE] Parsing: "${text}", History length: ${historyContext?.length || 0}`);
         const isMoney = /\d/.test(text) && (text.includes("買") || text.includes("吃") || text.includes("花"));
