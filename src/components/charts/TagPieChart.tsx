@@ -10,6 +10,11 @@ import {
     Tooltip,
     Legend,
     Sector,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    LabelList,
 } from "recharts";
 
 interface TagData {
@@ -103,6 +108,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const [drillTag, setDrillTag] = useState<string | null>(null);
     const [viewType, setViewType] = useState<"expense" | "income">("expense");
+    const [chartType, setChartType] = useState<"pie" | "bar">("pie");
 
     // 根據視圖類型過濾資料
     const filteredData = useMemo(() => {
@@ -142,6 +148,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
 
     const total = (drillTag ? subTagData : filteredData).reduce((sum, d) => sum + d.total, 0);
     const displayData = drillTag ? subTagData : filteredData;
+    const barData = [...displayData].sort((a, b) => b.total - a.total);
     const parentColor = drillTag ? TAG_COLORS[drillTag] || TAG_COLORS.Other : undefined;
 
     return (
@@ -158,6 +165,33 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                     )}
                 </h3>
                 <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{
+                        display: "flex",
+                        background: "rgba(255,255,255,0.05)",
+                        borderRadius: "6px",
+                        padding: "2px",
+                        border: "1px solid rgba(255,255,255,0.1)"
+                    }}>
+                        {(["pie", "bar"] as const).map(type => (
+                            <button
+                                key={type}
+                                onClick={() => { setChartType(type); setActiveIndex(-1); }}
+                                title={type === "pie" ? "圓餅圖" : "長條圖"}
+                                style={{
+                                    fontSize: "0.7rem",
+                                    padding: "4px 8px",
+                                    background: chartType === type ? "rgba(255,255,255,0.1)" : "transparent",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    color: chartType === type ? "var(--text-primary)" : "var(--text-muted)",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s"
+                                }}
+                            >
+                                {type === "pie" ? "🥧" : "📊"}
+                            </button>
+                        ))}
+                    </div>
                     {!drillTag && (
                         <div style={{
                             display: "flex",
@@ -220,7 +254,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
             {/* 提示（只在頂層且有 entries 時顯示） */}
             {!drillTag && entries && (
                 <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "8px", textAlign: "center" }}>
-                    點擊扇形可展開子標籤 🔍
+                    點擊{chartType === "pie" ? "扇形" : "長條"}可展開子標籤 🔍
                 </p>
             )}
 
@@ -231,7 +265,77 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                 </div>
             )}
 
-            {(!drillTag || subTagData.length > 0) && (
+            {(!drillTag || subTagData.length > 0) && chartType === "bar" && (
+                <div>
+                    <div style={{ textAlign: "center", marginBottom: "8px" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", marginRight: 8 }}>
+                            {drillTag ?? (viewType === "expense" ? "當月支出" : "當月收入")}
+                        </span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
+                            ${total.toLocaleString()}
+                        </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={Math.max(200, displayData.length * 36)}>
+                        <BarChart
+                            data={barData}
+                            layout="vertical"
+                            margin={{ top: 4, right: 56, bottom: 4, left: 8 }}
+                        >
+                            <XAxis type="number" hide />
+                            <YAxis
+                                type="category"
+                                dataKey={drillTag ? "name" : "tag"}
+                                width={92}
+                                tick={{ fontSize: 11, fill: "#9ca3af" }}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <Tooltip
+                                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                                contentStyle={{
+                                    background: "#16161e",
+                                    border: "1px solid rgba(255,255,255,0.1)",
+                                    borderRadius: "8px",
+                                    color: "#f3f4f6",
+                                    fontSize: "0.875rem",
+                                }}
+                                itemStyle={{ color: "#f3f4f6" }}
+                                formatter={(value) => [
+                                    `$${Number(value).toLocaleString()} (${total > 0 ? ((Number(value) / total) * 100).toFixed(1) : 0}%)`,
+                                ]}
+                            />
+                            <Bar
+                                dataKey="total"
+                                barSize={18}
+                                radius={[0, 6, 6, 0]}
+                                onClick={(barEntry) => {
+                                    const tag = (barEntry as unknown as { payload?: TagData }).payload?.tag;
+                                    if (!drillTag && entries && tag) {
+                                        setDrillTag(tag);
+                                        setActiveIndex(-1);
+                                    }
+                                }}
+                                style={{ cursor: (!drillTag && entries) ? "pointer" : "default" }}
+                            >
+                                {barData.map((entry, index) => {
+                                    const baseColor = drillTag
+                                        ? lightenColor(parentColor!, index * 20)
+                                        : TAG_COLORS[(entry as TagData).tag] || TAG_COLORS.Other;
+                                    return <Cell key={`bar-cell-${index}`} fill={baseColor} />;
+                                })}
+                                <LabelList
+                                    dataKey="total"
+                                    position="right"
+                                    formatter={(v: unknown) => `$${Number(v).toLocaleString()}`}
+                                    style={{ fontSize: 10, fill: "#9ca3af" }}
+                                />
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+
+            {(!drillTag || subTagData.length > 0) && chartType === "pie" && (
                 <div style={{ position: "relative" }}>
                     {activeIndex === -1 && (
                         <div style={{
