@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { AccountingRow } from "@/components/AccountingRow";
-import { InsightCard } from "@/components/InsightCard";
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { TagPieChart } from "@/components/charts/TagPieChart";
 import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
@@ -272,8 +271,6 @@ export default function AccountingPage() {
                 <Wallet className="text-accent" size={28} />
                 記帳記錄
             </h1>
-
-            <InsightCard />
 
             {/* 異常大額支出警示 */}
             {!loading && outliers.length > 0 && (

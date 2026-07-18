@@ -46,7 +46,6 @@ src/
 │   │   ├── budget/             # 預算 API
 │   │   ├── rules/              # 分類規則 CRUD
 │   │   ├── tags/               # 自訂標籤
-│   │   ├── insights/           # AI 摘要（1 小時快取）
 │   │   └── threads/            # Threads 追蹤
 │   ├── accounting/             # Dashboard：記帳頁面
 │   ├── archive/                # Dashboard：知識庫頁面
