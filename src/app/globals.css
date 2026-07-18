@@ -95,6 +95,14 @@
   --radius-sm: 6px;
   --radius: 12px;
   --radius-lg: 18px;
+
+  /* 別名：部分頁面誤用的變數名，統一指回正式 token（隨主題切換） */
+  --primary: var(--accent);
+  --card-bg: var(--bg-secondary);
+  --border-color: var(--border-glass);
+  --bg-color: var(--bg-primary);
+  --shadow-color: rgba(0, 0, 0, 0.25);
+  --hover-bg: var(--bg-glass-hover);
 }
 
 /* ═══════════════════════════════════════════════════════════
