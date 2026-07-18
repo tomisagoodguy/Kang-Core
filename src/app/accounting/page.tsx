@@ -8,7 +8,7 @@ import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
 import { SpendingHeatmap } from "@/components/charts/SpendingHeatmap";
 import { ALL_TAGS } from "@/utils/constants";
 import { myExpenseTWD } from "@/utils/currency";
-import type { AccountingEntryView, CustomTag, Budget } from "@/models/schema";
+import type { AccountingEntryView, CustomTag, Budget, RecurringExpenseView } from "@/models/schema";
 import { AccountingCalendarView } from "@/components/AccountingCalendarView";
 import {
     Wallet,
@@ -27,6 +27,7 @@ export default function AccountingPage() {
     const [entries, setEntries] = useState<AccountingEntryView[]>([]);
     const [customTags, setCustomTags] = useState<CustomTag[]>([]);
     const [budgets, setBudgets] = useState<Budget[]>([]);
+    const [recurring, setRecurring] = useState<RecurringExpenseView[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTag, setSelectedTag] = useState("all");
     const [selectedSubTag, setSelectedSubTag] = useState("all");
@@ -36,10 +37,11 @@ export default function AccountingPage() {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            const [accRes, tagRes, budgetRes] = await Promise.all([
+            const [accRes, tagRes, budgetRes, recurringRes] = await Promise.all([
                 fetch("/api/accounting?limit=200"),
                 fetch("/api/tags"),
                 fetch("/api/budget"),
+                fetch("/api/recurring"),
             ]);
 
             if (accRes.ok) {
@@ -53,6 +55,10 @@ export default function AccountingPage() {
             if (budgetRes.ok) {
                 const data = await budgetRes.json();
                 setBudgets(data.budgets ?? []);
+            }
+            if (recurringRes.ok) {
+                const data = await recurringRes.json();
+                setRecurring(Array.isArray(data) ? data : []);
             }
             setLoading(false);
         };
@@ -168,6 +174,8 @@ export default function AccountingPage() {
     }, [entries]);
 
     // 計算：本月結餘預測（只在選取當月時顯示）
+    // 預測 = 已花費 ＋ 變動日均 × 剩餘天數 ＋ 本月尚未入帳的定期支出
+    // 變動日均排除定期入帳（source === "system"），避免固定支出灌高日均又在月底重複計算
     const forecast = useMemo(() => {
         const currentMonth = new Date().toISOString().slice(0, 7);
         if (selectedMonth !== currentMonth) return null;
@@ -175,19 +183,45 @@ export default function AccountingPage() {
         const daysElapsed = today.getDate();
         const [y, m] = currentMonth.split("-").map(Number);
         const daysInMonth = new Date(y, m, 0).getDate();
-        const monthExpenses = entries
-            .filter(e => e.date?.startsWith(currentMonth) && e.tag !== "Income")
+        const monthExpenseEntries = entries.filter(e => e.date?.startsWith(currentMonth) && e.tag !== "Income");
+        const monthExpenses = monthExpenseEntries.reduce((sum, e) => sum + myExpenseTWD(e), 0);
+        const recurringSpent = monthExpenseEntries
+            .filter(e => e.source === "system")
             .reduce((sum, e) => sum + myExpenseTWD(e), 0);
         const monthIncome = entries
             .filter(e => e.date?.startsWith(currentMonth) && e.tag === "Income")
             .reduce((sum, e) => sum + myExpenseTWD(e), 0);
         if (daysElapsed === 0) return null;
-        const dailyExpenseAvg = monthExpenses / daysElapsed;
-        const projectedExpense = Math.round(dailyExpenseAvg * daysInMonth);
-        const projectedBalance = monthIncome - projectedExpense;
         const daysLeft = daysInMonth - daysElapsed;
-        return { projectedExpense, projectedBalance, daysLeft, daysInMonth, daysElapsed };
-    }, [entries, selectedMonth]);
+        const variableDailyAvg = Math.max(0, monthExpenses - recurringSpent) / daysElapsed;
+
+        // 本月剩餘天數內會觸發的定期支出（規則同 cron/recurring：超出當月天數的 dayOfMonth 在月底觸發）
+        const upcomingRecurring = recurring
+            .filter(r => r.isActive !== false && r.tag !== "Income")
+            .reduce((sum, r) => {
+                if (r.frequency === "daily") return sum + r.amount * daysLeft;
+                if (r.frequency === "weekly" && r.dayOfWeek != null) {
+                    let count = 0;
+                    for (let d = daysElapsed + 1; d <= daysInMonth; d++) {
+                        if (new Date(y, m - 1, d).getDay() === r.dayOfWeek) count++;
+                    }
+                    return sum + r.amount * count;
+                }
+                if (r.frequency === "monthly" && r.dayOfMonth != null) {
+                    const triggerDay = Math.min(r.dayOfMonth, daysInMonth);
+                    return triggerDay > daysElapsed ? sum + r.amount : sum;
+                }
+                if (r.frequency === "yearly" && r.monthOfYear === m && r.dayOfMonth != null) {
+                    const triggerDay = Math.min(r.dayOfMonth, daysInMonth);
+                    return triggerDay > daysElapsed ? sum + r.amount : sum;
+                }
+                return sum;
+            }, 0);
+
+        const projectedExpense = Math.round(monthExpenses + variableDailyAvg * daysLeft + upcomingRecurring);
+        const projectedBalance = monthIncome - projectedExpense;
+        return { projectedExpense, projectedBalance, daysLeft, daysInMonth, daysElapsed, upcomingRecurring };
+    }, [entries, recurring, selectedMonth]);
 
     // 聚合：本月預算進度
     const budgetProgress = useMemo(() => {
