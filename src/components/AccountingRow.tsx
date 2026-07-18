@@ -114,21 +114,20 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                     )}
                 </div>
 
-                {/* SubTag pill */}
-                {entry.subTag && (
-                    <span style={{
-                        fontSize: "0.7rem",
-                        padding: "2px 8px",
-                        background: "var(--bg-glass)",
-                        borderRadius: "10px",
-                        border: "1px solid var(--border-glass)",
-                        color: "var(--text-muted)",
-                        flexShrink: 0,
-                        whiteSpace: "nowrap",
-                    }}>
-                        {entry.subTag}
-                    </span>
-                )}
+                {/* Tag + SubTag pill（顯示分類文字，不用只憑 emoji 辨識） */}
+                <span style={{
+                    fontSize: "0.7rem",
+                    padding: "2px 8px",
+                    background: `${tagColor}18`,
+                    borderRadius: "10px",
+                    border: `1px solid ${tagColor}40`,
+                    color: tagColor,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                    whiteSpace: "nowrap",
+                }}>
+                    {entry.tag ?? "Other"}{entry.subTag ? ` · ${entry.subTag}` : ""}
+                </span>
 
                 {/* Receipt icon */}
                 {entry.imageUrl && (
@@ -149,11 +148,12 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                     flexDirection: "column",
                     alignItems: "flex-end",
                     flexShrink: 0,
-                    minWidth: "60px",
+                    minWidth: "92px",
                 }}>
                     <span style={{
                         fontSize: "0.9375rem",
                         fontWeight: 700,
+                        fontVariantNumeric: "tabular-nums",
                         color: isIncome ? "var(--success)" : twdValue >= 1000 ? "#f87171" : twdValue >= 500 ? "#fb923c" : "var(--text-primary)",
                         textAlign: "right",
                     }}>

@@ -174,7 +174,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
 ## Cron Jobs
 
-`vercel.json` 定義 7 個定時任務（UTC 時間，台灣 = UTC+8）：
+`vercel.json` 定義 8 個定時任務（UTC 時間，台灣 = UTC+8）：
 
 | Cron | 台灣時間 | 用途 |
 |------|---------|------|
@@ -185,8 +185,13 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `0 2 * * 0` | 10:00 週日 | 舊訊息清理 |
 | `0 15 28-31 * *` | 23:00 月底 | Google Sheets 匯出 |
 | `0 12 * * *` | 20:00 | Threads 摘要 |
+| `0 0 * * 1` | 08:00 週一 | 週報 Email（上週一～日收支明細） |
 
 每個 Cron 端點需要 `Authorization: Bearer ${CRON_SECRET}` 標頭驗證。
+
+### 週報 Email
+
+`/api/cron/weekly-email-report` 以 Gmail API（`src/lib/gmail/client.ts`）從授權帳號寄出 HTML 週報，收件者由 `EMAIL_LINE_MAP` 反查（`getEmailFromLineUserId()`，無對應 email 的用戶跳過）。**前提**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `gmail.send` scope——若寄信回 403/insufficient scopes，重跑 `npx tsx scripts/refresh-google-token.ts` 重新授權並更新 Vercel 環境變數。
 
 ---
 
