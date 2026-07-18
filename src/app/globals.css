@@ -1052,13 +1052,3 @@ a {
     min-width: 100%;
   }
 }
-/* 記帳明細列：窄螢幕收合次要欄位，避免擠壓描述欄 */
-@media (max-width: 640px) {
-    .row-col-payment {
-        display: none;
-    }
-    .row-col-tag {
-        width: auto !important;
-        max-width: 96px;
-    }
-}

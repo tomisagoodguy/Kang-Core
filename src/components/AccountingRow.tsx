@@ -87,60 +87,47 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                     {emoji}
                 </div>
 
-                {/* Description + secondary line */}
+                {/* Description（分類 pill 貼在說明旁，資訊集中靠左） */}
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <span style={{
-                        fontSize: "0.9rem",
-                        fontWeight: 500,
-                        color: "var(--text-primary)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                    }}>
-                        {desc}
-                    </span>
-                    {settle && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
                         <span style={{
-                            fontSize: "0.7rem",
-                            color: !entry.settlement?.settled ? "#fb923c" : "var(--text-muted)",
+                            fontSize: "0.9rem",
+                            fontWeight: 500,
+                            color: "var(--text-primary)",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                         }}>
-                            {settle}
+                            {desc}
+                        </span>
+                        <span style={{
+                            fontSize: "0.7rem",
+                            padding: "2px 8px",
+                            background: `${tagColor}18`,
+                            borderRadius: "10px",
+                            border: `1px solid ${tagColor}40`,
+                            color: tagColor,
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
+                        }}>
+                            {entry.tag ?? "Other"}{entry.subTag ? ` · ${entry.subTag}` : ""}
+                        </span>
+                    </div>
+                    {(payment || settle) && (
+                        <span style={{
+                            fontSize: "0.7rem",
+                            color: settle && !entry.settlement?.settled ? "#fb923c" : "var(--text-muted)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}>
+                            {payment ? `${payment.emoji} ${payment.label}` : ""}
+                            {payment && settle ? "　" : ""}
+                            {settle ?? ""}
                         </span>
                     )}
                 </div>
-
-                {/* Tag + SubTag pill（固定欄寬，各列垂直對齊） */}
-                <div style={{ width: "128px", flexShrink: 0, display: "flex" }} className="row-col-tag">
-                    <span style={{
-                        fontSize: "0.7rem",
-                        padding: "2px 8px",
-                        background: `${tagColor}18`,
-                        borderRadius: "10px",
-                        border: `1px solid ${tagColor}40`,
-                        color: tagColor,
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        maxWidth: "100%",
-                    }}>
-                        {entry.tag ?? "Other"}{entry.subTag ? ` · ${entry.subTag}` : ""}
-                    </span>
-                </div>
-
-                {/* Payment method（固定欄寬） */}
-                <span className="row-col-payment" style={{
-                    width: "84px",
-                    flexShrink: 0,
-                    fontSize: "0.72rem",
-                    color: "var(--text-muted)",
-                    whiteSpace: "nowrap",
-                }}>
-                    {payment ? `${payment.emoji} ${payment.label}` : "—"}
-                </span>
 
                 {/* Receipt icon */}
                 {entry.imageUrl && (

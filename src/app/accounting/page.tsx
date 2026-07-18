@@ -521,7 +521,7 @@ export default function AccountingPage() {
                     </div>
 
                     {viewMode === "list" ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px", maxWidth: "860px" }}>
                             {groupedEntries.map(([date, dailyEntries]) => {
                                 const dailyTotal = dailyEntries.reduce((sum, item) => {
                                     return item.tag === "Income" ? sum + myExpenseTWD(item) : sum - myExpenseTWD(item);
