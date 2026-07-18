@@ -62,26 +62,26 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                 style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "10px",
-                    padding: "8px 12px",
+                    gap: "8px",
+                    padding: "4px 10px",
                     borderRadius: "8px",
                     background: hovered ? "var(--bg-glass)" : "transparent",
                     transition: "background 0.15s",
                     cursor: "default",
-                    minHeight: "44px",
+                    minHeight: "32px",
                 }}
             >
                 {/* Tag emoji circle */}
                 <div style={{
-                    width: 32,
-                    height: 32,
+                    width: 24,
+                    height: 24,
                     borderRadius: "50%",
                     background: `${tagColor}22`,
                     border: `1px solid ${tagColor}44`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "0.875rem",
+                    fontSize: "0.7rem",
                     flexShrink: 0,
                 }}>
                     {emoji}
@@ -91,7 +91,7 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
                         <span style={{
-                            fontSize: "0.9rem",
+                            fontSize: "0.85rem",
                             fontWeight: 500,
                             color: "var(--text-primary)",
                             overflow: "hidden",
@@ -148,10 +148,10 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                     flexDirection: "column",
                     alignItems: "flex-end",
                     flexShrink: 0,
-                    minWidth: "92px",
+                    minWidth: "84px",
                 }}>
                     <span style={{
-                        fontSize: "0.9375rem",
+                        fontSize: "0.875rem",
                         fontWeight: 700,
                         fontVariantNumeric: "tabular-nums",
                         color: isIncome ? "var(--success)" : twdValue >= 1000 ? "#f87171" : twdValue >= 500 ? "#fb923c" : "var(--text-primary)",

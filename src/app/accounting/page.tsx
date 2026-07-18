@@ -521,7 +521,7 @@ export default function AccountingPage() {
                     </div>
 
                     {viewMode === "list" ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px", maxWidth: "860px" }}>
+                        <div className="accounting-day-list" style={{ marginTop: "16px" }}>
                             {groupedEntries.map(([date, dailyEntries]) => {
                                 const dailyTotal = dailyEntries.reduce((sum, item) => {
                                     return item.tag === "Income" ? sum + myExpenseTWD(item) : sum - myExpenseTWD(item);
@@ -536,12 +536,12 @@ export default function AccountingPage() {
                                             display: "flex",
                                             justifyContent: "space-between",
                                             alignItems: "center",
-                                            padding: "8px 12px",
+                                            padding: "5px 10px",
                                             background: "var(--bg-glass)",
                                             borderBottom: "1px solid var(--border-glass)",
                                         }}>
                                             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                                                <span style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text-primary)" }}>{mmdd}</span>
+                                                <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-primary)" }}>{mmdd}</span>
                                                 <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>週{weekday}</span>
                                             </div>
                                             <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: dailyTotal >= 0 ? "var(--success)" : "var(--danger)" }}>
