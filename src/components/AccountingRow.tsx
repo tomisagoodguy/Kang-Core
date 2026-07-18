@@ -99,34 +99,47 @@ export function AccountingRow({ entry }: AccountingRowProps) {
                     }}>
                         {desc}
                     </span>
-                    {(payment || settle) && (
+                    {settle && (
                         <span style={{
                             fontSize: "0.7rem",
-                            color: settle && !entry.settlement?.settled ? "#fb923c" : "var(--text-muted)",
+                            color: !entry.settlement?.settled ? "#fb923c" : "var(--text-muted)",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                         }}>
-                            {payment ? `${payment.emoji} ${payment.label}` : ""}
-                            {payment && settle ? "　" : ""}
-                            {settle ?? ""}
+                            {settle}
                         </span>
                     )}
                 </div>
 
-                {/* Tag + SubTag pill（顯示分類文字，不用只憑 emoji 辨識） */}
-                <span style={{
-                    fontSize: "0.7rem",
-                    padding: "2px 8px",
-                    background: `${tagColor}18`,
-                    borderRadius: "10px",
-                    border: `1px solid ${tagColor}40`,
-                    color: tagColor,
-                    fontWeight: 600,
+                {/* Tag + SubTag pill（固定欄寬，各列垂直對齊） */}
+                <div style={{ width: "128px", flexShrink: 0, display: "flex" }} className="row-col-tag">
+                    <span style={{
+                        fontSize: "0.7rem",
+                        padding: "2px 8px",
+                        background: `${tagColor}18`,
+                        borderRadius: "10px",
+                        border: `1px solid ${tagColor}40`,
+                        color: tagColor,
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: "100%",
+                    }}>
+                        {entry.tag ?? "Other"}{entry.subTag ? ` · ${entry.subTag}` : ""}
+                    </span>
+                </div>
+
+                {/* Payment method（固定欄寬） */}
+                <span className="row-col-payment" style={{
+                    width: "84px",
                     flexShrink: 0,
+                    fontSize: "0.72rem",
+                    color: "var(--text-muted)",
                     whiteSpace: "nowrap",
                 }}>
-                    {entry.tag ?? "Other"}{entry.subTag ? ` · ${entry.subTag}` : ""}
+                    {payment ? `${payment.emoji} ${payment.label}` : "—"}
                 </span>
 
                 {/* Receipt icon */}

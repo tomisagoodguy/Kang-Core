@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get("limit") || "20", 10);
         const tag = searchParams.get("tag");
 
-        // 不使用 orderBy 避免需要複合索引；排序改在 JS 端
-        // 有 tag 過濾時先取全量再篩，避免分頁數量不足
+        // 複合索引已建：userId+createdAt DESC、userId+tag+createdAt DESC（firestore.indexes.json）
+        // 必須先 orderBy 再 limit，否則 Firestore 按文件 ID 取前 N 筆，新資料會被截掉
         let baseQuery = adminDb
             .collection("accounting")
             .where("userId", "==", userId);
@@ -24,28 +24,19 @@ export async function GET(request: NextRequest) {
             baseQuery = baseQuery.where("tag", "==", tag) as typeof baseQuery;
         }
 
-        const query = tag && tag !== "all" ? baseQuery : baseQuery.limit(limit);
+        const snapshot = await baseQuery.orderBy("createdAt", "desc").limit(limit).get();
 
-        const snapshot = await query.get();
-
-        const entries: AccountingEntryView[] = snapshot.docs
-            .map((doc) => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    createdAt:
-                        data.createdAt instanceof Timestamp
-                            ? data.createdAt.toDate().toISOString()
-                            : data.createdAt ?? null,
-                } as AccountingEntryView;
-            })
-            .sort((a, b) => {
-                const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                return tb - ta;
-            })
-            .slice(0, limit);
+        const entries: AccountingEntryView[] = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt:
+                    data.createdAt instanceof Timestamp
+                        ? data.createdAt.toDate().toISOString()
+                        : data.createdAt ?? null,
+            } as AccountingEntryView;
+        });
 
         return NextResponse.json({ entries, total: entries.length });
     } catch (error) {

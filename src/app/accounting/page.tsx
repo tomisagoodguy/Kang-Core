@@ -372,6 +372,37 @@ export default function AccountingPage() {
                 </div>
             )}
 
+            {/* 收支摘要卡（與週報 Email 同款排版） */}
+            {!loading && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "16px" }}>
+                    <div className="glass-card" style={{ padding: "14px 16px", background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.18)" }}>
+                        <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>支出</p>
+                        <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--danger)", fontVariantNumeric: "tabular-nums" }}>
+                            ${totalExpenses.toLocaleString()}
+                        </p>
+                    </div>
+                    <div className="glass-card" style={{ padding: "14px 16px", background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.18)" }}>
+                        <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>收入</p>
+                        <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--success)", fontVariantNumeric: "tabular-nums" }}>
+                            ${totalIncome.toLocaleString()}
+                        </p>
+                    </div>
+                    <div className="glass-card" style={{ padding: "14px 16px" }}>
+                        <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>
+                            {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`}
+                        </p>
+                        <p style={{ fontSize: "1.25rem", fontWeight: 700, color: netBalance >= 0 ? "var(--success)" : "var(--danger)", fontVariantNumeric: "tabular-nums" }}>
+                            {netBalance < 0 ? "-" : ""}${Math.abs(netBalance).toLocaleString()}
+                        </p>
+                        {forecast && (
+                            <p style={{ fontSize: "0.68rem", color: forecast.projectedBalance >= 0 ? "var(--text-muted)" : "#f59e0b", marginTop: "2px" }}>
+                                📈 預測月底支出 ${forecast.projectedExpense.toLocaleString()}（剩 {forecast.daysLeft} 天）
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <div className="filter-bar" style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
                 <div style={{ position: "relative", flex: "1", minWidth: "160px" }}>
                     <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }}>
@@ -431,26 +462,10 @@ export default function AccountingPage() {
                     </select>
                 </div>
 
-                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "16px" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
-                        <div style={{ display: "flex", gap: "12px", fontSize: "0.8125rem" }}>
-                            <span style={{ color: "var(--success)" }}>收入: ${totalIncome.toLocaleString()}</span>
-                            <span style={{ color: "var(--danger)" }}>支出: ${totalExpenses.toLocaleString()}</span>
-                        </div>
-                        <span style={{ color: netBalance >= 0 ? "var(--success)" : "var(--danger)", fontWeight: 700, fontSize: "1.125rem" }}>
-                            {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`} {netBalance < 0 ? '-' : ''}${Math.abs(netBalance).toLocaleString()}
-                        </span>
-                        {forecast && (
-                            <span style={{ fontSize: "0.72rem", color: forecast.projectedBalance >= 0 ? "var(--text-muted)" : "#f59e0b", marginTop: "1px" }}>
-                                📈 預測月底支出 ${forecast.projectedExpense.toLocaleString()}（剩 {forecast.daysLeft} 天）
-                            </span>
-                        )}
-                    </div>
-                    <button className="card-action-btn" onClick={handleExportCSV} style={{ display: "flex", alignItems: "center", gap: "6px", opacity: 1, padding: "8px 14px", fontWeight: 500 }}>
-                        <Download size={16} />
-                        匯出 CSV
-                    </button>
-                </div>
+                <button className="card-action-btn" onClick={handleExportCSV} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px", opacity: 1, padding: "8px 14px", fontWeight: 500 }}>
+                    <Download size={16} />
+                    匯出 CSV
+                </button>
             </div>
 
             {loading ? (
