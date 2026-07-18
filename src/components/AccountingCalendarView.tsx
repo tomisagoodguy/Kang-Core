@@ -3,6 +3,7 @@
 
 import React, { useMemo, useState } from "react";
 import type { AccountingEntryView } from "@/models/schema";
+import { myExpenseTWD } from "@/utils/currency";
 import { AccountingCard } from "./AccountingCard";
 import { CalendarDays, MapPin } from "lucide-react";
 
@@ -42,9 +43,9 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
                     if (mapping[dayNum]) {
                         mapping[dayNum].push(entry);
                         if (entry.tag === "Income") {
-                            totalMonth += (entry.amount || 0);
+                            totalMonth += myExpenseTWD(entry);
                         } else {
-                            totalMonth -= (entry.amount || 0);
+                            totalMonth -= myExpenseTWD(entry);
                         }
                     }
                 }
@@ -106,7 +107,7 @@ export function AccountingCalendarView({ entries, currentMonth }: AccountingCale
                         const dayStr = `${validMonth}-${day.toString().padStart(2, '0')}`;
                         const dayEntries = mappedEntries[day];
                         const dayTotal = dayEntries.reduce((sum, e) => {
-                            return e.tag === "Income" ? sum + (e.amount || 0) : sum - (e.amount || 0);
+                            return e.tag === "Income" ? sum + myExpenseTWD(e) : sum - myExpenseTWD(e);
                         }, 0);
                         const isSelected = selectedDate === dayStr;
                         const isToday = dayStr === new Date().toISOString().slice(0, 10);

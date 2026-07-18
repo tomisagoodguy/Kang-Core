@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { lineService } from "@/services/line.service";
 import { exportToSheet, SheetRow } from "@/lib/sheets/client";
+import { myExpenseTWD } from "@/utils/currency";
 
 /**
  * 月底帳目 Export 到 Google Sheets
@@ -62,8 +63,8 @@ export async function GET(req: Request) {
             };
         });
 
-        // 計算月合計
-        const total = rows.reduce((s, r) => s + r.amount, 0);
+        // 計算月合計（換算台幣，代墊只計自己份額）
+        const total = snap.docs.reduce((s, d) => s + myExpenseTWD(d.data()), 0);
 
         // 匯出到 Google Sheets
         const sheetsUrl = await exportToSheet(ym, rows);

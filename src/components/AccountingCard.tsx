@@ -7,6 +7,7 @@ import { DeleteConfirm } from "./DeleteConfirm";
 import { Pencil, Trash2, Image as ImageIcon } from "lucide-react";
 
 import type { AccountingEntryView } from "@/models/schema";
+import { formatMoney } from "@/utils/currency";
 
 interface AccountingCardProps {
     entry: AccountingEntryView;
@@ -25,15 +26,18 @@ export function AccountingCard({ entry }: AccountingCardProps) {
     const [deleteOpen, setDeleteOpen] = useState(false);
 
     const isIncome = entry.tag === "Income";
+    const currency = entry.currency || "TWD";
+    const twdValue = entry.amountTWD ?? entry.amount;
     const amountClass = isIncome
         ? "accounting-card-amount low"
-        : entry.amount >= 1000
+        : twdValue >= 1000
             ? "accounting-card-amount high"
-            : entry.amount >= 500
+            : twdValue >= 500
                 ? "accounting-card-amount medium"
                 : "accounting-card-amount low";
 
-    const formattedAmount = `${isIncome ? "+" : "-"}$${entry.amount.toLocaleString()}`;
+    const formattedAmount = `${isIncome ? "+" : "-"}${formatMoney(entry.amount, currency)}`;
+    const twdSub = currency !== "TWD" && entry.amountTWD != null ? `≈ NT$${entry.amountTWD.toLocaleString()}` : null;
 
     return (
         <>
@@ -112,7 +116,10 @@ export function AccountingCard({ entry }: AccountingCardProps) {
                 </div>
 
                 <div className="accounting-card-right" style={{ gap: "12px", alignItems: "flex-end" }}>
-                    <span className={amountClass} style={{ fontSize: "1.125rem", fontWeight: 700 }}>{formattedAmount}</span>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                        <span className={amountClass} style={{ fontSize: "1.125rem", fontWeight: 700 }}>{formattedAmount}</span>
+                        {twdSub && <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{twdSub}</span>}
+                    </div>
                     <div className="card-actions">
                         <button className="card-action-btn" aria-label="Edit Entry" onClick={() => setEditOpen(true)} style={{ padding: "6px" }}>
                             <Pencil size={14} />

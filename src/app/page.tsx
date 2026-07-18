@@ -6,6 +6,7 @@ import { ThreadsCard } from "@/components/ThreadsCard";
 import Link from "next/link";
 import { LayoutDashboard, Coins, CreditCard, Scale, Receipt, BookMarked, CalendarDays, Library, MessageCircle, Inbox } from "lucide-react";
 import { db } from "@/lib/firebase/admin";
+import { myExpenseTWD } from "@/utils/currency";
 import { Timestamp } from "firebase-admin/firestore";
 import type { AccountingEntryView, ArchiveEntryView, CalendarEntryView, ThreadsEntryView } from "@/models/schema";
 
@@ -201,8 +202,8 @@ export default async function HomePage() {
             .get();
 
         const monthDocs = monthAccSnapshot.docs.map(doc => doc.data());
-        monthlyIncome = monthDocs.reduce((sum, data) => data.tag === "Income" ? sum + (data.amount || 0) : sum, 0);
-        monthlyExpense = monthDocs.reduce((sum, data) => data.tag !== "Income" ? sum + (data.amount || 0) : sum, 0);
+        monthlyIncome = monthDocs.reduce((sum, data) => data.tag === "Income" ? sum + myExpenseTWD(data) : sum, 0);
+        monthlyExpense = monthDocs.reduce((sum, data) => data.tag !== "Income" ? sum + myExpenseTWD(data) : sum, 0);
         monthlyCount = monthAccSnapshot.size;
     } catch (e) {
         console.error("[HomePage] Failed to calculate monthly stats:", e);

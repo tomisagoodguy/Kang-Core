@@ -3,6 +3,7 @@ import { db } from "@/lib/firebase/admin";
 import { lineService } from "@/services/line.service";
 import { getTagEmoji } from "@/utils/tagEmoji";
 import { getAllLineUserIds } from "@/lib/userRegistry";
+import { myExpenseTWD } from "@/utils/currency";
 
 /**
  * 每日消費摘要推播
@@ -37,8 +38,8 @@ export async function GET(req: Request) {
 
             // 今日數據
             const todayEntries = todaySnap.docs.map((d) => d.data());
-            const todayIncome = todayEntries.filter(e => e.tag === "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
-            const todayExpense = todayEntries.filter(e => e.tag !== "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const todayIncome = todayEntries.filter(e => e.tag === "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
+            const todayExpense = todayEntries.filter(e => e.tag !== "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
             const todayBalance = todayIncome - todayExpense;
 
             // 本月數據
@@ -50,15 +51,15 @@ export async function GET(req: Request) {
                 .get();
 
             const monthEntries = monthSnap.docs.map(d => d.data());
-            const monthIncome = monthEntries.filter(e => e.tag === "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
-            const monthExpense = monthEntries.filter(e => e.tag !== "Income").reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const monthIncome = monthEntries.filter(e => e.tag === "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
+            const monthExpense = monthEntries.filter(e => e.tag !== "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
             const monthBalance = monthIncome - monthExpense;
 
             // 標籤統計
             const tagMap = new Map<string, number>();
             todayEntries.forEach((e) => {
                 const tag = (e.tag as string) || "Other";
-                tagMap.set(tag, (tagMap.get(tag) || 0) + ((e.amount as number) || 0));
+                tagMap.set(tag, (tagMap.get(tag) || 0) + myExpenseTWD(e));
             });
 
             const tagLines = Array.from(tagMap.entries())

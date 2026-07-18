@@ -8,6 +8,7 @@ import { TagPieChart } from "@/components/charts/TagPieChart";
 import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
 import { SpendingHeatmap } from "@/components/charts/SpendingHeatmap";
 import { ALL_TAGS } from "@/utils/constants";
+import { myExpenseTWD } from "@/utils/currency";
 import type { AccountingEntryView, CustomTag, Budget } from "@/models/schema";
 import { AccountingCalendarView } from "@/components/AccountingCalendarView";
 import {
@@ -68,7 +69,7 @@ export default function AccountingPage() {
 
     const { totalIncome, totalExpenses } = useMemo(() => {
         return filtered.reduce((acc, e) => {
-            const amount = e.amount || 0;
+            const amount = myExpenseTWD(e);
             if (e.tag === "Income") {
                 acc.totalIncome += amount;
             } else {
@@ -93,7 +94,7 @@ export default function AccountingPage() {
         entries.forEach((e) => {
             const m = e.date?.slice(0, 7);
             if (!m) return;
-            const amount = e.amount || 0;
+            const amount = myExpenseTWD(e);
             if (e.tag === "Income") {
                 incomeMap.set(m, (incomeMap.get(m) || 0) + amount);
             } else {
@@ -125,9 +126,9 @@ export default function AccountingPage() {
                 const day = e.date?.slice(8, 10) ?? "";
                 if (!day) return;
                 if (e.tag === "Income") {
-                    incomeMap.set(day, (incomeMap.get(day) || 0) + (e.amount || 0));
+                    incomeMap.set(day, (incomeMap.get(day) || 0) + myExpenseTWD(e));
                 } else {
-                    expenseMap.set(day, (expenseMap.get(day) || 0) + (e.amount || 0));
+                    expenseMap.set(day, (expenseMap.get(day) || 0) + myExpenseTWD(e));
                 }
             });
 
@@ -149,7 +150,7 @@ export default function AccountingPage() {
             .filter((e) => e.date?.startsWith(currentMonth))
             .forEach((e) => {
                 const tag = e.tag || "Other";
-                map.set(tag, (map.get(tag) || 0) + (e.amount || 0));
+                map.set(tag, (map.get(tag) || 0) + myExpenseTWD(e));
             });
         return Array.from(map.entries())
             .map(([tag, total]) => ({ tag, total }))
@@ -162,7 +163,7 @@ export default function AccountingPage() {
         entries
             .filter(e => e.tag !== "Income" && e.date)
             .forEach(e => {
-                map[e.date!] = (map[e.date!] || 0) + (e.amount || 0);
+                map[e.date!] = (map[e.date!] || 0) + myExpenseTWD(e);
             });
         return map;
     }, [entries]);
@@ -177,10 +178,10 @@ export default function AccountingPage() {
         const daysInMonth = new Date(y, m, 0).getDate();
         const monthExpenses = entries
             .filter(e => e.date?.startsWith(currentMonth) && e.tag !== "Income")
-            .reduce((sum, e) => sum + (e.amount || 0), 0);
+            .reduce((sum, e) => sum + myExpenseTWD(e), 0);
         const monthIncome = entries
             .filter(e => e.date?.startsWith(currentMonth) && e.tag === "Income")
-            .reduce((sum, e) => sum + (e.amount || 0), 0);
+            .reduce((sum, e) => sum + myExpenseTWD(e), 0);
         if (daysElapsed === 0) return null;
         const dailyExpenseAvg = monthExpenses / daysElapsed;
         const projectedExpense = Math.round(dailyExpenseAvg * daysInMonth);
@@ -194,10 +195,10 @@ export default function AccountingPage() {
         const currentMonth = new Date().toISOString().slice(0, 7);
         const monthExpenses = entries.filter(e => e.date?.startsWith(currentMonth) && e.tag !== "Income");
         const spentMap = monthExpenses.reduce((map, e) => {
-            map.set(e.tag, (map.get(e.tag) || 0) + (e.amount || 0));
+            map.set(e.tag, (map.get(e.tag) || 0) + myExpenseTWD(e));
             return map;
         }, new Map<string, number>());
-        const totalSpent = monthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+        const totalSpent = monthExpenses.reduce((sum, e) => sum + myExpenseTWD(e), 0);
         return budgets
             .map(b => {
                 const spent = b.tag ? (spentMap.get(b.tag) || 0) : totalSpent;
@@ -216,20 +217,20 @@ export default function AccountingPage() {
 
     // 異常大額支出偵測（IQR 方法，Q3 + 1.5×IQR）
     const outliers = useMemo(() => {
-        const expenses = entries.filter(e => e.tag !== "Income" && (e.amount ?? 0) > 0);
+        const expenses = entries.filter(e => e.tag !== "Income" && myExpenseTWD(e) > 0);
         if (expenses.length < 8) return [];
 
-        const sorted = [...expenses].sort((a, b) => (a.amount ?? 0) - (b.amount ?? 0));
-        const q1 = sorted[Math.floor(sorted.length * 0.25)]?.amount ?? 0;
-        const q3 = sorted[Math.floor(sorted.length * 0.75)]?.amount ?? 0;
+        const sorted = [...expenses].sort((a, b) => myExpenseTWD(a) - myExpenseTWD(b));
+        const q1 = myExpenseTWD(sorted[Math.floor(sorted.length * 0.25)] ?? {});
+        const q3 = myExpenseTWD(sorted[Math.floor(sorted.length * 0.75)] ?? {});
         const iqr = q3 - q1;
         const threshold = q3 + 1.5 * iqr;
 
-        // 計算各分類平均值（方便顯示「比平常高幾倍」）
+        // 計算各分類平均值（方便顯示「比平常高幾倍」，均以台幣計）
         const tagAvgMap = new Map<string, number>();
         const tagGrouped = expenses.reduce((acc, e) => {
             const t = e.tag ?? "Other";
-            acc.set(t, (acc.get(t) ?? []).concat(e.amount ?? 0));
+            acc.set(t, (acc.get(t) ?? []).concat(myExpenseTWD(e)));
             return acc;
         }, new Map<string, number[]>());
         tagGrouped.forEach((amts, tag) => {
@@ -237,14 +238,14 @@ export default function AccountingPage() {
         });
 
         return expenses
-            .filter(e => (e.amount ?? 0) > threshold)
-            .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))
+            .filter(e => myExpenseTWD(e) > threshold)
+            .sort((a, b) => myExpenseTWD(b) - myExpenseTWD(a))
             .slice(0, 6)
             .map(e => ({
                 ...e,
                 tagAvg: tagAvgMap.get(e.tag ?? "") ?? 0,
                 times: tagAvgMap.get(e.tag ?? "")
-                    ? Math.round(((e.amount ?? 0) / tagAvgMap.get(e.tag ?? "")!) * 10) / 10
+                    ? Math.round((myExpenseTWD(e) / tagAvgMap.get(e.tag ?? "")!) * 10) / 10
                     : null,
             }));
     }, [entries]);
@@ -309,7 +310,7 @@ export default function AccountingPage() {
                                     )}
                                 </div>
                                 <p style={{ fontSize: "1rem", fontWeight: 700, color: "#f87171", whiteSpace: "nowrap" }}>
-                                    ${(o.amount ?? 0).toLocaleString()}
+                                    ${myExpenseTWD(o).toLocaleString()}
                                 </p>
                             </div>
                         ))}
@@ -367,6 +368,37 @@ export default function AccountingPage() {
                                 )}
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 收支摘要卡（與週報 Email 同款排版） */}
+            {!loading && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "16px" }}>
+                    <div className="glass-card" style={{ padding: "14px 16px", background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.18)" }}>
+                        <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>支出</p>
+                        <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--danger)", fontVariantNumeric: "tabular-nums" }}>
+                            ${totalExpenses.toLocaleString()}
+                        </p>
+                    </div>
+                    <div className="glass-card" style={{ padding: "14px 16px", background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.18)" }}>
+                        <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>收入</p>
+                        <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--success)", fontVariantNumeric: "tabular-nums" }}>
+                            ${totalIncome.toLocaleString()}
+                        </p>
+                    </div>
+                    <div className="glass-card" style={{ padding: "14px 16px" }}>
+                        <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>
+                            {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`}
+                        </p>
+                        <p style={{ fontSize: "1.25rem", fontWeight: 700, color: netBalance >= 0 ? "var(--success)" : "var(--danger)", fontVariantNumeric: "tabular-nums" }}>
+                            {netBalance < 0 ? "-" : ""}${Math.abs(netBalance).toLocaleString()}
+                        </p>
+                        {forecast && (
+                            <p style={{ fontSize: "0.68rem", color: forecast.projectedBalance >= 0 ? "var(--text-muted)" : "#f59e0b", marginTop: "2px" }}>
+                                📈 預測月底支出 ${forecast.projectedExpense.toLocaleString()}（剩 {forecast.daysLeft} 天）
+                            </p>
+                        )}
                     </div>
                 </div>
             )}
@@ -430,26 +462,10 @@ export default function AccountingPage() {
                     </select>
                 </div>
 
-                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "16px" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
-                        <div style={{ display: "flex", gap: "12px", fontSize: "0.8125rem" }}>
-                            <span style={{ color: "var(--success)" }}>收入: ${totalIncome.toLocaleString()}</span>
-                            <span style={{ color: "var(--danger)" }}>支出: ${totalExpenses.toLocaleString()}</span>
-                        </div>
-                        <span style={{ color: netBalance >= 0 ? "var(--success)" : "var(--danger)", fontWeight: 700, fontSize: "1.125rem" }}>
-                            {selectedMonth === new Date().toISOString().slice(0, 7) ? "本月結餘" : selectedMonth === "all" ? "累計結餘" : `${selectedMonth.slice(5)}月結餘`} {netBalance < 0 ? '-' : ''}${Math.abs(netBalance).toLocaleString()}
-                        </span>
-                        {forecast && (
-                            <span style={{ fontSize: "0.72rem", color: forecast.projectedBalance >= 0 ? "var(--text-muted)" : "#f59e0b", marginTop: "1px" }}>
-                                📈 預測月底支出 ${forecast.projectedExpense.toLocaleString()}（剩 {forecast.daysLeft} 天）
-                            </span>
-                        )}
-                    </div>
-                    <button className="card-action-btn" onClick={handleExportCSV} style={{ display: "flex", alignItems: "center", gap: "6px", opacity: 1, padding: "8px 14px", fontWeight: 500 }}>
-                        <Download size={16} />
-                        匯出 CSV
-                    </button>
-                </div>
+                <button className="card-action-btn" onClick={handleExportCSV} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px", opacity: 1, padding: "8px 14px", fontWeight: 500 }}>
+                    <Download size={16} />
+                    匯出 CSV
+                </button>
             </div>
 
             {loading ? (
@@ -511,7 +527,7 @@ export default function AccountingPage() {
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
                             {groupedEntries.map(([date, dailyEntries]) => {
                                 const dailyTotal = dailyEntries.reduce((sum, item) => {
-                                    return item.tag === "Income" ? sum + (item.amount || 0) : sum - (item.amount || 0);
+                                    return item.tag === "Income" ? sum + myExpenseTWD(item) : sum - myExpenseTWD(item);
                                 }, 0);
                                 const dateObj = new Date(date + "T00:00:00");
                                 const weekday = ["日", "一", "二", "三", "四", "五", "六"][dateObj.getDay()];

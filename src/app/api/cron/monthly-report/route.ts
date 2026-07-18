@@ -3,6 +3,7 @@ import { db } from "@/lib/firebase/admin";
 import { lineService } from "@/services/line.service";
 import { generateFinancialInsights } from "@/services/insights";
 import { getAllLineUserIds } from "@/lib/userRegistry";
+import { myExpenseTWD } from "@/utils/currency";
 
 /**
  * 每月月報推播
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
 
             const allEntries = snap.docs.map((d) => d.data());
             const entries = allEntries.filter((e) => e.tag !== "Income");
-            const total = entries.reduce((s, e) => s + ((e.amount as number) || 0), 0);
+            const total = entries.reduce((s, e) => s + myExpenseTWD(e), 0);
 
             // 上上月消費（對比用，同樣排除 Income）
             const prevSnap = await db
@@ -66,7 +67,7 @@ export async function GET(req: Request) {
 
             const prevTotal = prevSnap.docs
                 .filter((d) => d.data().tag !== "Income")
-                .reduce((s, d) => s + ((d.data().amount as number) || 0), 0);
+                .reduce((s, d) => s + myExpenseTWD(d.data()), 0);
 
             // 月增減
             let comparison = "";
@@ -80,7 +81,7 @@ export async function GET(req: Request) {
             const tagMap = new Map<string, number>();
             entries.forEach((e) => {
                 const tag = (e.tag as string) || "Other";
-                tagMap.set(tag, (tagMap.get(tag) || 0) + ((e.amount as number) || 0));
+                tagMap.set(tag, (tagMap.get(tag) || 0) + myExpenseTWD(e));
             });
 
             const tagLines = Array.from(tagMap.entries())
@@ -92,9 +93,9 @@ export async function GET(req: Request) {
 
             // Top 3 最高單筆
             const top3 = entries
-                .sort((a, b) => ((b.amount as number) || 0) - ((a.amount as number) || 0))
+                .sort((a, b) => myExpenseTWD(b) - myExpenseTWD(a))
                 .slice(0, 3)
-                .map((e, i) => `${i + 1}. $${((e.amount as number) || 0).toLocaleString()} - ${(e.description as string) || "—"}`);
+                .map((e, i) => `${i + 1}. $${myExpenseTWD(e).toLocaleString()} - ${(e.description as string) || "—"}`);
 
             // AI 洞察
             const insight = await generateFinancialInsights(userId);
