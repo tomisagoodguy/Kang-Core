@@ -149,7 +149,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
 | 集合 | 主要欄位 |
 |------|---------|
-| `accounting` | date, amount, tag, subTag, description, source |
+| `accounting` | date, amount（原幣）, currency, exchangeRate, amountTWD, paymentMethod, settlement, tag, subTag, description, source |
 | `archive` | title, content, embedding[], keywords, imageUrl |
 | `calendar` | startTime, title, type(event/todo), completed, syncedToGCal |
 | `recurring_expenses` | frequency, dayOfMonth, amount, tag, enabled |
@@ -160,13 +160,21 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `sessions` | userId, messages[], TTL: 15 分鐘 |
 | `insights` | monthYear, insight, TTL: 1 小時 |
 | `processed_messages` | messageId, TTL: 7 天（去重用）|
-| `user_settings` | userId, travelMode.{active, destination, startedAt}（旅遊模式狀態）|
+| `user_settings` | userId, travelMode.{active, destination, startedAt, currency, exchangeRate}（旅遊模式狀態＋當地幣別與啟動時匯率） |
+
+### 多幣別 / 代墊 / 付款方式（記帳延伸欄位）
+
+- **金額三概念**：`amount` 永遠存**原幣**（當地實際付的數字）；`amountTWD` = `amount × exchangeRate`（整筆換算台幣）；統計支出一律透過 `myExpenseTWD()`（`src/utils/currency.ts`）取得「我的那一份換算台幣」。**禁止直接 `reduce` 加總 `amount`**——跨幣別相加無意義，所有統計／圖表/預算/月報都要用 `myExpenseTWD()`。
+- **幣別來源**：明確文字（「20鎂」「5歐」）> 旅遊模式幣別 > TWD。旅遊模式**啟動時抓一次匯率**（`lib/exchangeRate.ts`，免金鑰 open.er-api.com，失敗退回靜態表）存進 `travelMode.exchangeRate`，整趟沿用；非當地幣別的零星外幣記帳才即時抓。
+- **代墊／借貸**：`settlement.{paidBy, counterparty, myShare, settled}`。`paidBy="me"` → 對方欠我 `amount-myShare`；`paidBy="other"` → 我欠對方 `myShare`。統計只計 `myShare`。LINE 查詢用 `/欠款`、結清用 `/結清 {對方}`。
+- **付款方式**：`paymentMethod` = `cash|credit_card|e_payment`，由 Gemini 或 `detectPaymentMethod()` 關鍵字判定，純分類用途。
+- **編輯陷阱**：Dashboard 改 `amount` 時，`PUT /api/accounting/[id]` 會用原 `exchangeRate` 重算 `amountTWD`，勿讓兩者失同步。
 
 ---
 
 ## Cron Jobs
 
-`vercel.json` 定義 7 個定時任務（UTC 時間，台灣 = UTC+8）：
+`vercel.json` 定義 8 個定時任務（UTC 時間，台灣 = UTC+8）：
 
 | Cron | 台灣時間 | 用途 |
 |------|---------|------|
@@ -177,8 +185,13 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `0 2 * * 0` | 10:00 週日 | 舊訊息清理 |
 | `0 15 28-31 * *` | 23:00 月底 | Google Sheets 匯出 |
 | `0 12 * * *` | 20:00 | Threads 摘要 |
+| `0 0 * * 1` | 08:00 週一 | 週報 Email（上週一～日收支明細） |
 
 每個 Cron 端點需要 `Authorization: Bearer ${CRON_SECRET}` 標頭驗證。
+
+### 週報 Email
+
+`/api/cron/weekly-email-report` 以 Gmail API（`src/lib/gmail/client.ts`）從授權帳號寄出 HTML 週報，收件者由 `EMAIL_LINE_MAP` 反查（`getEmailFromLineUserId()`，無對應 email 的用戶跳過）。**前提**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `gmail.send` scope——若寄信回 403/insufficient scopes，重跑 `npx tsx scripts/refresh-google-token.ts` 重新授權並更新 Vercel 環境變數。
 
 ---
 

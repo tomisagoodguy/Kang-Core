@@ -44,7 +44,13 @@ export async function PUT(
         const { amount, tag, subTag, date, description } = body;
 
         const updateData: Record<string, unknown> = {};
-        if (amount !== undefined) updateData.amount = Number(amount);
+        if (amount !== undefined) {
+            const newAmount = Number(amount);
+            updateData.amount = newAmount;
+            // 同步重算台幣金額（沿用原匯率），避免統計用到舊的 amountTWD
+            const rate = (snap.data()?.exchangeRate as number) ?? 1;
+            updateData.amountTWD = Math.round(newAmount * rate);
+        }
         if (tag !== undefined) updateData.tag = tag;
         if (subTag !== undefined) updateData.subTag = subTag;
         if (date !== undefined) updateData.date = date;

@@ -1,5 +1,6 @@
 import { db } from "@/lib/firebase/admin";
 import { getTagEmoji } from "@/utils/tagEmoji";
+import { myExpenseTWD } from "@/utils/currency";
 import { RAGService } from "./rag.service";
 import { getEventsFromGoogleCalendar } from "@/lib/calendar/client";
 import type { AccountingEntry, ArchiveEntry, CalendarEntry } from "@/models/schema";
@@ -53,8 +54,9 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
         entries = entries.filter((e) => e.tag === filters.tag);
     }
 
-    const totalIncome = entries.filter(e => e.tag === "Income").reduce((s, e) => s + (e.amount || 0), 0);
-    const totalExpense = entries.filter(e => e.tag !== "Income").reduce((s, e) => s + (e.amount || 0), 0);
+    // 金額一律換算台幣、代墊只計自己份額
+    const totalIncome = entries.filter(e => e.tag === "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
+    const totalExpense = entries.filter(e => e.tag !== "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
     const netBalance = totalIncome - totalExpense;
 
     if (entries.length === 0) {
@@ -66,7 +68,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
     const tagMap = new Map<string, number>();
     entries.forEach((e) => {
         const tag = e.tag || "Other";
-        tagMap.set(tag, (tagMap.get(tag) || 0) + (e.amount || 0));
+        tagMap.set(tag, (tagMap.get(tag) || 0) + myExpenseTWD(e));
     });
 
     const tagLines = Array.from(tagMap.entries())
@@ -80,7 +82,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
     // 最高一筆（僅計支出）
     const expenseEntries = entries.filter(e => e.tag !== "Income");
     const maxEntry = expenseEntries.length > 0
-        ? expenseEntries.reduce((max, e) => (e.amount || 0) > (max.amount || 0) ? e : max)
+        ? expenseEntries.reduce((max, e) => myExpenseTWD(e) > myExpenseTWD(max) ? e : max)
         : null;
 
     const totalEntriesCount = entries.length;
@@ -96,7 +98,7 @@ async function queryExpense(filters: QueryFilter): Promise<QueryResult> {
             `💸 總支出: $${totalExpense.toLocaleString()}`,
             `⚖️ 淨結餘: $${netBalance.toLocaleString()}`,
             `📈 平均支出/筆: $${avgAmount.toLocaleString()}`,
-            `🏆 最高支出: ${maxEntry ? `$${(maxEntry.amount || 0).toLocaleString()} (${maxEntry.description || "—"})` : "無支出記錄"}`,
+            `🏆 最高支出: ${maxEntry ? `$${myExpenseTWD(maxEntry).toLocaleString()} (${maxEntry.description || "—"})` : "無支出記錄"}`,
             "",
             ...tagLines,
         ].join("\n"),
