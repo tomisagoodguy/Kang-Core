@@ -8,12 +8,15 @@ export async function GET() {
         const userId = await getSessionUserId();
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+        // 排序在 JS 端做：where + orderBy 需要複合索引，此集合每用戶僅少量文件
         const snapshot = await db
             .collection("custom_tags")
             .where("userId", "==", userId)
-            .orderBy("createdAt", "asc")
             .get();
-        const tags = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const ts = (v: unknown) => (v as { toMillis?: () => number })?.toMillis?.() ?? (v ? new Date(v as string).getTime() : 0);
+        const tags = snapshot.docs
+            .sort((a, b) => ts(a.data().createdAt) - ts(b.data().createdAt))
+            .map(doc => ({ id: doc.id, ...doc.data() }));
         return NextResponse.json(tags);
     } catch (error) {
         console.error("GET /api/tags error:", error);

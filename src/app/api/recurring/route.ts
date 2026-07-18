@@ -9,18 +9,21 @@ export async function GET() {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     try {
+        // 排序在 JS 端做：where + orderBy 需要複合索引，此集合每用戶僅少量文件
         const snapshot = await db.collection("recurring_expenses")
             .where("userId", "==", userId)
-            .orderBy("createdAt", "desc")
             .get();
-        const docs = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-            };
-        });
+        const ts = (v: unknown) => (v as { toMillis?: () => number })?.toMillis?.() ?? (v ? new Date(v as string).getTime() : 0);
+        const docs = snapshot.docs
+            .sort((a, b) => ts(b.data().createdAt) - ts(a.data().createdAt))
+            .map((doc) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+                };
+            });
         return NextResponse.json(docs);
     } catch (error) {
         console.error("GET /api/recurring error:", error);
