@@ -16,7 +16,7 @@ function LoginForm() {
             await signInWithGoogle();
             const redirect = searchParams.get("redirect") || "/";
             // 硬導向：確保瀏覽器帶著剛設定的 session cookie 重新向伺服器請求，
-            // 避免 router.push 軟導向時 middleware 讀不到新 cookie 而被踢回登入頁
+            // 避免 router.push 軟導向時 proxy 讀不到新 cookie 而被踢回登入頁
             window.location.assign(redirect);
         } catch (err: unknown) {
             const e = err as { message?: string; code?: string };

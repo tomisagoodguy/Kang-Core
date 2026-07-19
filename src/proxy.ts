@@ -9,7 +9,7 @@ const PROTECTED_PATHS = ["/", "/accounting", "/archive", "/calendar", "/recurrin
 // 不需要驗證的路徑
 const PUBLIC_PATHS = ["/login", "/api/webhook", "/api/auth"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // 靜態資源與公開路徑不攔截

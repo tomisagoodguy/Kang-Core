@@ -234,9 +234,9 @@ NEXT_PUBLIC_FIREBASE_*    # 前端 Firebase 設定（7 個變數）
 Dashboard 採 Firebase Google OAuth + Session Cookie 機制：
 
 1. 前端登入 → `POST /api/auth/session`（建立 5 天 httpOnly Cookie `firebase-session`）
-2. `src/middleware.ts` 保護所有 Dashboard 路徑（`PROTECTED_PATHS`：`/`, `/accounting`, `/archive`, `/calendar`, `/recurring`, `/threads`, `/settings`），Cookie 不存在 → 導向 `/login`
+2. `src/proxy.ts`（Next.js 16 的 proxy 檔案慣例，即原 middleware）保護所有 Dashboard 路徑（`PROTECTED_PATHS`：`/`, `/accounting`, `/archive`, `/calendar`, `/recurring`, `/loans`, `/assets`, `/threads`, `/settings`），Cookie 不存在 → 導向 `/login`
 3. API Route 中呼叫 `getSessionUserId()`（`src/lib/auth/getSessionUserId.ts`）驗證 Cookie 並透過 `EMAIL_LINE_MAP` 取得 LINE userId；或使用 `withAuth` wrapper（`src/lib/auth/withAuth.ts`）自動注入 userId：`export const GET = withAuth(async (req, userId) => { ... })`
-4. 所有 Firestore 查詢**必須**帶 `userId`，資料隔離在 API 層而非 Middleware 層
+4. 所有 Firestore 查詢**必須**帶 `userId`，資料隔離在 API 層而非 Proxy 層
 
 公開路徑（不驗證）：`/login`, `/api/webhook`, `/api/auth`
 
