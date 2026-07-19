@@ -53,7 +53,8 @@ export class NetWorthService {
         return doc.data()?.balance ?? 0;
     }
 
-    private static async computeInvestmentValueTWD(userId: string): Promise<number> {
+    /** 持股市值換算台幣（美股以即時匯率換算）。也供投資績效（XIRR）當期末值使用 */
+    static async computeInvestmentValueTWD(userId: string): Promise<number> {
         const holdingsSnap = await db.collection("holdings").where("userId", "==", userId).get();
         if (holdingsSnap.empty) return 0;
 
