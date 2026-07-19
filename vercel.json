@@ -31,6 +31,14 @@
         {
             "path": "/api/cron/weekly-email-report",
             "schedule": "0 0 * * 1"
+        },
+        {
+            "path": "/api/cron/net-worth-snapshot",
+            "schedule": "30 1 1 * *"
+        },
+        {
+            "path": "/api/cron/invoice-sync",
+            "schedule": "30 12 * * *"
         }
     ]
 }

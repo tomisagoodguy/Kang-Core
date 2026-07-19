@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
-import { fetchRateToTWD } from "@/lib/exchangeRate";
+import { NetWorthService } from "@/services/netWorth.service";
 import type { NetWorthSnapshotView } from "@/models/schema";
 import { z } from "zod";
 
@@ -37,34 +37,6 @@ const CreateSnapshotSchema = z.object({
     // cashBalance 不再由前端傳入，一律由伺服器從 cash_accounts 即時餘額取得
 });
 
-async function computeCashBalance(userId: string): Promise<number> {
-    const doc = await db.collection("cash_accounts").doc(userId).get();
-    return doc.data()?.balance ?? 0;
-}
-
-async function computeInvestmentValueTWD(userId: string): Promise<number> {
-    const holdingsSnap = await db.collection("holdings").where("userId", "==", userId).get();
-    if (holdingsSnap.empty) return 0;
-
-    const usdRate = await fetchRateToTWD("USD");
-    let total = 0;
-    for (const doc of holdingsSnap.docs) {
-        const h = doc.data();
-        const price = h.currentPrice ?? h.avgCost ?? 0;
-        const marketValue = (h.shares ?? 0) * price;
-        total += h.market === "US" ? marketValue * usdRate : marketValue;
-    }
-    return Math.round(total);
-}
-
-async function computeLoanBalance(userId: string): Promise<number> {
-    const loansSnap = await db.collection("loans")
-        .where("userId", "==", userId)
-        .where("status", "==", "active")
-        .get();
-    return loansSnap.docs.reduce((sum, doc) => sum + (doc.data().remainingPrincipal ?? 0), 0);
-}
-
 export async function POST(request: Request) {
     const userId = await getSessionUserId();
     if (!userId) {
@@ -81,26 +53,9 @@ export async function POST(request: Request) {
         }
 
         const { date } = result.data;
-        const [cashBalance, investmentValueTWD, loanBalance] = await Promise.all([
-            computeCashBalance(userId),
-            computeInvestmentValueTWD(userId),
-            computeLoanBalance(userId),
-        ]);
-        const netWorth = cashBalance + investmentValueTWD - loanBalance;
+        const created = await NetWorthService.createSnapshot(userId, date);
 
-        const insertData = {
-            userId,
-            date,
-            cashBalance,
-            investmentValueTWD,
-            loanBalance,
-            netWorth,
-            createdAt: new Date(),
-        };
-
-        const docRef = await db.collection("net_worth_snapshots").add(insertData);
-
-        return NextResponse.json({ id: docRef.id, ...insertData }, { status: 201 });
+        return NextResponse.json(created, { status: 201 });
     } catch (error) {
         console.error("POST /api/net-worth error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
