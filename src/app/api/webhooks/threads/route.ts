@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { ThreadsEntrySchema } from "@/models/schema";
+import { threadsRetentionCutoff } from "@/utils/constants";
 
 export async function POST(req: Request) {
     try {
@@ -49,6 +50,11 @@ export async function POST(req: Request) {
 
             const entry = parsedData.data;
             entry.createdAt = new Date();
+
+            // 拒收超過保留天數的舊貼文（cleanup cron 會刪逾期資料，這裡擋住爬蟲重抓回來）
+            if (entry.publishedAt < threadsRetentionCutoff()) {
+                return NextResponse.json({ status: "skipped_old", threadId: entry.threadId });
+            }
 
             // 去重：爬蟲端資料庫在 GitHub Actions 為暫時性，每次執行會重發相同貼文
             const dup = await db
