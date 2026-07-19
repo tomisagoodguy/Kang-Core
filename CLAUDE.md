@@ -161,6 +161,14 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `processed_messages` | messageId, TTL: 7 天（去重用）|
 | `user_settings` | userId, travelMode.{active, destination, startedAt, currency, exchangeRate}（旅遊模式狀態＋當地幣別與啟動時匯率）, annualTravelBudget（年度旅遊預算，台幣） |
 | `trips` | userId, destination, startDate, endDate, days, totalTWD（期間 Travel 支出加總，關閉旅遊模式時凍結）, currency |
+| `net_worth_snapshots` | userId, date, cashBalance, investmentValueTWD, loanBalance, netWorth（月初 cron 自動落地或 Dashboard 手動建立） |
+| `investment_transactions` | userId, market(TW/US), ticker, side(buy/sell), shares, pricePerShare, fee, date（XIRR 計算的現金流來源） |
+
+### 資產總覽與投資績效（/assets）
+
+- **淨值計算單一事實來源**：`src/services/netWorth.service.ts`（`NetWorthService`）＝現金 + 持股市值（美股即時匯率換算）− 貸款餘額。`/api/net-worth`（手動快照）與 `/api/cron/net-worth-snapshot`（月初自動快照）都走這裡，勿另寫計算邏輯。
+- **XIRR 年化報酬**：`GET /api/holdings/performance` 以 `investment_transactions` 買賣現金流 + 今日市值求解（二分法）。美股歷史交易以**目前**匯率換算（近似值）；交易未滿 30 天不提供（年化會爆炸）。
+- **儲蓄率與 FIRE**：`/assets` 前端由 `/api/dashboard/cashflow` 近 12 月資料計算儲蓄率（只計有資料的月份），`FireCalculator`（`src/components/FireCalculator.tsx`）自動帶入平均月支出／月儲蓄／目前淨值，純前端試算不落地。
 
 ### 多幣別 / 代墊 / 付款方式（記帳延伸欄位）
 
@@ -175,7 +183,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
 ## Cron Jobs
 
-`vercel.json` 定義 8 個定時任務（UTC 時間，台灣 = UTC+8）：
+`vercel.json` 定義下列定時任務（UTC 時間，台灣 = UTC+8）：
 
 | Cron | 台灣時間 | 用途 |
 |------|---------|------|
@@ -187,6 +195,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `0 15 28-31 * *` | 23:00 月底 | Google Sheets 匯出 |
 | `0 12 * * *` | 20:00 | Threads 摘要 |
 | `0 0 * * 1` | 08:00 週一 | 週報 Email（上週一～日收支明細） |
+| `30 1 1 * *` | 09:30 每月1日 | 淨值快照自動落地（該月已有快照則跳過） |
 
 每個 Cron 端點需要 `Authorization: Bearer ${CRON_SECRET}` 標頭驗證。
 
