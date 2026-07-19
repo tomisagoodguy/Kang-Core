@@ -34,9 +34,13 @@ export async function GET() {
 
 const CreateSnapshotSchema = z.object({
     date: z.string(),
-    cashBalance: z.number(),
-    // 前端若傳這兩個欄位一律忽略，永遠由伺服器重新計算
+    // cashBalance 不再由前端傳入，一律由伺服器從 cash_accounts 即時餘額取得
 });
+
+async function computeCashBalance(userId: string): Promise<number> {
+    const doc = await db.collection("cash_accounts").doc(userId).get();
+    return doc.data()?.balance ?? 0;
+}
 
 async function computeInvestmentValueTWD(userId: string): Promise<number> {
     const holdingsSnap = await db.collection("holdings").where("userId", "==", userId).get();
@@ -76,8 +80,9 @@ export async function POST(request: Request) {
             );
         }
 
-        const { date, cashBalance } = result.data;
-        const [investmentValueTWD, loanBalance] = await Promise.all([
+        const { date } = result.data;
+        const [cashBalance, investmentValueTWD, loanBalance] = await Promise.all([
+            computeCashBalance(userId),
             computeInvestmentValueTWD(userId),
             computeLoanBalance(userId),
         ]);

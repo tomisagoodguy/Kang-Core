@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
-import { InvestmentTransactionSchema, type AccountingEntry } from "@/models/schema";
+import { InvestmentTransactionSchema } from "@/models/schema";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 import { z } from "zod";
 
@@ -39,8 +39,9 @@ const CreateTransactionSchema = InvestmentTransactionSchema.omit({
     userId: true,
     linkedAccountingEntryId: true,
 }).extend({
-    // 只有 buy 交易可選擇是否同時記一筆現金流支出；sell 不提供此選項（見 design.md Decision 5）
-    recordCashFlow: z.boolean().default(true),
+    // 這筆交易是否為「今天實際發生」，需要即時反映到現金餘額；
+    // 補登已持有多年的舊部位、或現金早已在其他地方入帳過，請設為 false（預設）
+    affectsCash: z.boolean().default(false),
 });
 
 export async function POST(request: Request) {
@@ -58,13 +59,12 @@ export async function POST(request: Request) {
             );
         }
 
-        const { market, ticker, name, side, shares, pricePerShare, fee, date, recordCashFlow } = result.data;
+        const { market, ticker, name, side, shares, pricePerShare, fee, date, affectsCash } = result.data;
         const holdingId = `${userId}_${market}_${ticker}`;
         const holdingRef = db.collection("holdings").doc(holdingId);
         const txRef = db.collection("investment_transactions").doc();
-
-        let linkedAccountingEntryId: string | undefined;
-        let accountingEntry: AccountingEntry | null = null;
+        const cashAccountRef = db.collection("cash_accounts").doc(userId);
+        const cashTxRef = db.collection("cash_transactions").doc();
 
         await db.runTransaction(async (t) => {
             const holdingSnap = await t.get(holdingRef);
@@ -96,20 +96,21 @@ export async function POST(request: Request) {
                 updatedAt: new Date(),
             }, { merge: true });
 
-            if (side === "buy" && recordCashFlow) {
-                const accountingRef = db.collection("accounting").doc();
-                accountingEntry = {
+            // 買賣股票是現金 ↔ 投資的資產轉移，不算收支，只影響現金餘額（不寫入 accounting）
+            if (affectsCash) {
+                const cashAccountSnap = await t.get(cashAccountRef);
+                const currentBalance = cashAccountSnap.exists ? cashAccountSnap.data()!.balance ?? 0 : 0;
+                const delta = side === "buy" ? -(shares * pricePerShare + fee) : shares * pricePerShare - fee;
+                t.set(cashAccountRef, { userId, balance: currentBalance + delta, updatedAt: new Date() }, { merge: true });
+                t.set(cashTxRef, {
                     userId,
-                    amount: shares * pricePerShare + fee,
-                    tag: "Investment",
-                    description: `${name || ticker} 買入 ${shares}股`,
+                    type: side === "buy" ? "investment_buy" : "investment_sell",
+                    amount: delta,
+                    description: `${name || ticker} ${side === "buy" ? "買入" : "賣出"} ${shares}股`,
                     date,
-                    source: "manual",
-                    originalText: `Dashboard: buy ${market} ${ticker}`,
+                    linkedInvestmentTransactionId: txRef.id,
                     createdAt: new Date(),
-                };
-                t.set(accountingRef, accountingEntry);
-                linkedAccountingEntryId = accountingRef.id;
+                });
             }
 
             t.set(txRef, {
@@ -125,7 +126,6 @@ export async function POST(request: Request) {
                 source: "manual",
                 originalText: `Dashboard: ${side} ${market} ${ticker}`,
                 createdAt: new Date(),
-                ...(linkedAccountingEntryId ? { linkedAccountingEntryId } : {}),
             });
         });
 

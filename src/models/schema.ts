@@ -179,7 +179,7 @@ export const NetWorthSnapshotSchema = z.object({
     id: z.string().optional(),
     userId: z.string(),
     date: z.string(), // YYYY-MM-DD
-    cashBalance: z.number(), // 使用者手動輸入
+    cashBalance: z.number(), // 伺服器由 cash_accounts 即時餘額算出，寫入時凍結
     investmentValueTWD: z.number(), // 伺服器算出，寫入時凍結
     loanBalance: z.number(), // 伺服器算出，寫入時凍結
     netWorth: z.number(),
@@ -187,6 +187,38 @@ export const NetWorthSnapshotSchema = z.object({
 });
 
 export type NetWorthSnapshot = z.infer<typeof NetWorthSnapshotSchema>;
+
+// ─── 現金帳戶（即時餘額 + 異動流水）────────────────────────────
+// doc id: userId，單一使用者只有一筆running balance
+export const CashAccountSchema = z.object({
+    userId: z.string(),
+    balance: z.number(), // 即時現金/存款餘額
+    updatedAt: z.any().optional(),
+});
+
+export type CashAccount = z.infer<typeof CashAccountSchema>;
+
+export const CashTransactionTypeEnum = z.enum([
+    "deposit", // 手動存入，如薪水入帳
+    "withdrawal", // 手動提出
+    "adjustment", // 手動校正為指定餘額（如第一次設定期初餘額）
+    "investment_buy", // 買股票自動扣減（系統寫入，不可手動新增）
+    "investment_sell", // 賣股票自動增加（系統寫入，不可手動新增）
+]);
+
+export const CashTransactionSchema = z.object({
+    id: z.string().optional(),
+    userId: z.string(),
+    type: CashTransactionTypeEnum,
+    amount: z.number(), // 對餘額的淨影響（正數增加、負數減少）
+    description: z.string().optional(),
+    date: z.string(), // YYYY-MM-DD
+    linkedInvestmentTransactionId: z.string().optional(),
+    createdAt: z.any().optional(),
+});
+
+export type CashTransaction = z.infer<typeof CashTransactionSchema>;
+export type CashTransactionType = z.infer<typeof CashTransactionTypeEnum>;
 
 export const GeminiParseResultSchema = z.object({
     type: z.enum(["accounting", "archive", "calendar", "recurring", "query", "clear_memory", "unknown"]),
@@ -354,6 +386,17 @@ export type HoldingView = Omit<Holding, "id" | "updatedAt"> & {
 
 /** 前端接收的淨資產快照資料 */
 export type NetWorthSnapshotView = Omit<NetWorthSnapshot, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的現金帳戶資料 */
+export type CashAccountView = Omit<CashAccount, "updatedAt"> & {
+    updatedAt?: string;
+};
+
+/** 前端接收的現金異動流水資料 */
+export type CashTransactionView = Omit<CashTransaction, "id" | "createdAt"> & {
     id: string;
     createdAt?: string;
 };

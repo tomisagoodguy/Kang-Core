@@ -25,7 +25,11 @@
       "Read(//c/tmp/reconstruct/**)",
       "Bash(npx add-skill *)",
       "Bash(npm --version)",
-      "Bash(npx skills *)"
+      "Bash(npx skills *)",
+      "Bash(node scripts/_diag_check_holdings.mjs)",
+      "Bash(node scripts/_diag_check_email_map.mjs)",
+      "Bash(node scripts/_diag_check_holdings2.mjs)",
+      "Bash(rm scripts/_diag_check_holdings2.mjs)"
     ]
   }
 }

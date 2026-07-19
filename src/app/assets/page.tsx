@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import type { HoldingView, LoanView, NetWorthSnapshotView } from "@/models/schema";
+import type { HoldingView, LoanView, NetWorthSnapshotView, CashAccountView } from "@/models/schema";
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { NetWorthTrendChart } from "@/components/charts/NetWorthTrendChart";
 
@@ -18,15 +18,47 @@ function daysSince(dateStr?: string): number | null {
     return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
 
+// 台股標準預設值：手續費 0.1425%（不打折）；證交稅 ETF 0.1%、一般股票 0.3%
+const TW_FEE_RATE = 0.001425;
+const TW_TAX_RATE_ETF = 0.001;
+const TW_TAX_RATE_STOCK = 0.003;
+
+function isTwEtfTicker(ticker: string): boolean {
+    return ticker.startsWith("00");
+}
+
+function computeHoldingMetrics(h: HoldingView) {
+    const price = h.currentPrice ?? h.avgCost;
+    const hasPrice = h.currentPrice != null;
+    const investmentCost = h.shares * h.avgCost;
+    const marketValue = h.shares * price;
+
+    if (h.market === "TW") {
+        const taxRate = isTwEtfTicker(h.ticker) ? TW_TAX_RATE_ETF : TW_TAX_RATE_STOCK;
+        const sellCostRate = TW_FEE_RATE + taxRate;
+        const estimatedProceeds = hasPrice ? marketValue * (1 - sellCostRate) : marketValue;
+        const pnl = hasPrice ? estimatedProceeds - investmentCost : 0;
+        const pnlRate = investmentCost > 0 ? (pnl / investmentCost) * 100 : 0;
+        const breakevenPrice = h.avgCost / (1 - sellCostRate);
+        return { price, investmentCost, marketValue, estimatedProceeds, pnl, pnlRate, breakevenPrice, hasPrice };
+    }
+
+    const pnl = hasPrice ? (price - h.avgCost) * h.shares : 0;
+    const pnlRate = investmentCost > 0 ? (pnl / investmentCost) * 100 : 0;
+    return { price, investmentCost, marketValue, estimatedProceeds: marketValue, pnl, pnlRate, breakevenPrice: null as number | null, hasPrice };
+}
+
 export default function AssetsPage() {
     const [cashflow, setCashflow] = useState<CashflowMonth[]>([]);
     const [snapshots, setSnapshots] = useState<NetWorthSnapshotView[]>([]);
     const [holdings, setHoldings] = useState<HoldingView[]>([]);
     const [loans, setLoans] = useState<LoanView[]>([]);
+    const [cashAccount, setCashAccount] = useState<CashAccountView | null>(null);
     const [loading, setLoading] = useState(true);
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
+    const [isCashModalOpen, setIsCashModalOpen] = useState(false);
 
     const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
     const [editingPriceValue, setEditingPriceValue] = useState("");
@@ -40,25 +72,32 @@ export default function AssetsPage() {
     const [txPrice, setTxPrice] = useState("");
     const [txFee, setTxFee] = useState("0");
     const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 10));
-    const [txRecordCashFlow, setTxRecordCashFlow] = useState(true);
+    const [txAffectsCash, setTxAffectsCash] = useState(false);
+
+    // 現金存提表單 state
+    const [cashType, setCashType] = useState<"deposit" | "withdrawal" | "adjustment">("deposit");
+    const [cashAmount, setCashAmount] = useState("");
+    const [cashDescription, setCashDescription] = useState("");
+    const [cashDate, setCashDate] = useState(new Date().toISOString().slice(0, 10));
 
     // 快照表單 state
     const [snapshotDate, setSnapshotDate] = useState(new Date().toISOString().slice(0, 10));
-    const [snapshotCash, setSnapshotCash] = useState("");
 
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [cashflowRes, snapshotsRes, holdingsRes, loansRes] = await Promise.all([
+            const [cashflowRes, snapshotsRes, holdingsRes, loansRes, cashAccountRes] = await Promise.all([
                 fetch("/api/dashboard/cashflow?months=12"),
                 fetch("/api/net-worth"),
                 fetch("/api/holdings"),
                 fetch("/api/loans"),
+                fetch("/api/cash-account"),
             ]);
             if (cashflowRes.ok) setCashflow(await cashflowRes.json());
             if (snapshotsRes.ok) setSnapshots(await snapshotsRes.json());
             if (holdingsRes.ok) setHoldings(await holdingsRes.json());
             if (loansRes.ok) setLoans(await loansRes.json());
+            if (cashAccountRes.ok) setCashAccount(await cashAccountRes.json());
         } catch (error) {
             console.error(error);
         } finally {
@@ -79,7 +118,7 @@ export default function AssetsPage() {
         setTxPrice("");
         setTxFee("0");
         setTxDate(new Date().toISOString().slice(0, 10));
-        setTxRecordCashFlow(true);
+        setTxAffectsCash(false);
         setIsTxModalOpen(true);
     };
 
@@ -99,7 +138,7 @@ export default function AssetsPage() {
                     pricePerShare: Number(txPrice),
                     fee: Number(txFee) || 0,
                     date: txDate,
-                    recordCashFlow: txSide === "buy" ? txRecordCashFlow : false,
+                    affectsCash: txAffectsCash,
                 }),
             });
             if (res.ok) {
@@ -114,19 +153,50 @@ export default function AssetsPage() {
         }
     };
 
+    const handleOpenCashModal = () => {
+        setCashType("deposit");
+        setCashAmount("");
+        setCashDescription("");
+        setCashDate(new Date().toISOString().slice(0, 10));
+        setIsCashModalOpen(true);
+    };
+
+    const handleSaveCash = async () => {
+        if (!cashAmount) return alert("請填寫金額");
+        try {
+            const res = await fetch("/api/cash-account", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: cashType,
+                    amount: Number(cashAmount),
+                    description: cashDescription || undefined,
+                    date: cashDate,
+                }),
+            });
+            if (res.ok) {
+                setIsCashModalOpen(false);
+                fetchAll();
+            } else {
+                const data = await res.json().catch(() => null);
+                alert(data?.error || "儲存失敗");
+            }
+        } catch {
+            alert("Error");
+        }
+    };
+
     const handleOpenSnapshotModal = () => {
         setSnapshotDate(new Date().toISOString().slice(0, 10));
-        setSnapshotCash("");
         setIsSnapshotModalOpen(true);
     };
 
     const handleSaveSnapshot = async () => {
-        if (!snapshotCash) return alert("請填寫目前現金/存款餘額");
         try {
             const res = await fetch("/api/net-worth", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ date: snapshotDate, cashBalance: Number(snapshotCash) }),
+                body: JSON.stringify({ date: snapshotDate }),
             });
             if (res.ok) {
                 setIsSnapshotModalOpen(false);
@@ -156,10 +226,11 @@ export default function AssetsPage() {
                 setEditingPriceId(null);
                 fetchAll();
             } else {
-                alert("更新失敗");
+                const data = await res.json().catch(() => null);
+                alert(`更新失敗（${res.status}）：${data?.error || "未知錯誤"}`);
             }
-        } catch {
-            alert("Error");
+        } catch (error) {
+            alert(`更新失敗：${error instanceof Error ? error.message : "網路錯誤"}`);
         }
     };
 
@@ -190,6 +261,9 @@ export default function AssetsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
                 <h1 className="page-title">📊 資產總覽</h1>
                 <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={handleOpenCashModal} style={btnStyle("secondary")}>
+                        ＋ 現金存提
+                    </button>
                     <button onClick={handleOpenSnapshotModal} style={btnStyle("secondary")}>
                         ＋ 記錄本月快照
                     </button>
@@ -206,11 +280,15 @@ export default function AssetsPage() {
                 </div>
             ) : (
                 <div style={{ display: "grid", gap: "16px", marginTop: "24px" }}>
-                    {latestSnapshot && (
+                    {(latestSnapshot || cashAccount) && (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
-                            <StatTile label="淨資產" value={latestSnapshot.netWorth} color="#818cf8" />
-                            <StatTile label="現金" value={latestSnapshot.cashBalance} color="#22c55e" />
-                            <StatTile label="投資現值" value={latestSnapshot.investmentValueTWD} color="#38bdf8" />
+                            <StatTile
+                                label="淨資產"
+                                value={(cashAccount?.balance ?? latestSnapshot?.cashBalance ?? 0) + (latestSnapshot?.investmentValueTWD ?? 0) - totalLoanBalance}
+                                color="#818cf8"
+                            />
+                            <StatTile label="現金（即時）" value={cashAccount?.balance ?? latestSnapshot?.cashBalance ?? 0} color="#22c55e" />
+                            <StatTile label="投資現值" value={latestSnapshot?.investmentValueTWD ?? 0} color="#38bdf8" />
                             <StatTile label="貸款餘額" value={-totalLoanBalance} color="#f43f5e" />
                         </div>
                     )}
@@ -227,9 +305,7 @@ export default function AssetsPage() {
                         ) : (
                             <div style={{ display: "grid", gap: "12px" }}>
                                 {holdings.map((h) => {
-                                    const price = h.currentPrice ?? h.avgCost;
-                                    const marketValue = h.shares * price;
-                                    const pnl = h.currentPrice != null ? (h.currentPrice - h.avgCost) * h.shares : 0;
+                                    const { price, investmentCost, marketValue, pnl, pnlRate, breakevenPrice, hasPrice } = computeHoldingMetrics(h);
                                     const stale = daysSince(h.priceAsOf);
                                     return (
                                         <div key={h.id} className="card" style={{ padding: "12px 16px" }}>
@@ -237,9 +313,13 @@ export default function AssetsPage() {
                                                 <strong>{h.market} {h.ticker} {h.name ? `（${h.name}）` : ""}</strong>
                                                 <span style={{ color: pnl >= 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>
                                                     {pnl >= 0 ? "+" : ""}${Math.round(pnl).toLocaleString()}
+                                                    {hasPrice && <span style={{ fontSize: "0.8rem", marginLeft: "4px" }}>（{pnlRate >= 0 ? "+" : ""}{pnlRate.toFixed(2)}%）</span>}
                                                 </span>
                                             </div>
-                                            <p className="card-text">股數 {h.shares} ／ 均價 ${h.avgCost.toFixed(2)} ／ 市值 ${Math.round(marketValue).toLocaleString()}</p>
+                                            <p className="card-text">股數 {h.shares} ／ 均價 ${h.avgCost.toFixed(2)} ／ 投資成本 ${Math.round(investmentCost).toLocaleString()} ／ 市值 ${Math.round(marketValue).toLocaleString()}</p>
+                                            {h.market === "TW" && breakevenPrice != null && (
+                                                <p className="card-text">損益平衡價（含手續費+證交稅）約 ${breakevenPrice.toFixed(2)}</p>
+                                            )}
                                             {editingPriceId === h.id ? (
                                                 <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "6px" }}>
                                                     <input
@@ -301,20 +381,37 @@ export default function AssetsPage() {
                     <input type="number" placeholder="單價" value={txPrice} onChange={(e) => setTxPrice(e.target.value)} style={inputStyle} />
                     <input type="number" placeholder="手續費" value={txFee} onChange={(e) => setTxFee(e.target.value)} style={inputStyle} />
                     <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} style={inputStyle} />
-                    {txSide === "buy" && (
-                        <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)", fontSize: "0.875rem" }}>
-                            <input type="checkbox" checked={txRecordCashFlow} onChange={(e) => setTxRecordCashFlow(e.target.checked)} />
-                            同時記一筆 Investment 支出（如果已用 LINE 記過這筆錢，請取消勾選避免重複計算）
-                        </label>
-                    )}
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)", fontSize: "0.875rem" }}>
+                        <input type="checkbox" checked={txAffectsCash} onChange={(e) => setTxAffectsCash(e.target.checked)} />
+                        這是「今天」實際發生的新交易，同時從現金餘額{txSide === "buy" ? "扣款" : "入帳"}（若是補登已持有的舊部位、或現金早已在其他地方入帳過，請勿勾選）
+                    </label>
+                </Modal>
+            )}
+
+            {isCashModalOpen && (
+                <Modal title="現金存提" onCancel={() => setIsCashModalOpen(false)} onSave={handleSaveCash}>
+                    <select value={cashType} onChange={(e) => setCashType(e.target.value as "deposit" | "withdrawal" | "adjustment")} style={inputStyle}>
+                        <option value="deposit">存入（如薪水入帳）</option>
+                        <option value="withdrawal">提出</option>
+                        <option value="adjustment">校正為指定餘額（如第一次設定目前餘額）</option>
+                    </select>
+                    <input
+                        type="number"
+                        placeholder={cashType === "adjustment" ? "校正後的餘額" : "金額"}
+                        value={cashAmount}
+                        onChange={(e) => setCashAmount(e.target.value)}
+                        style={inputStyle}
+                    />
+                    <input type="text" placeholder="備註（選填）" value={cashDescription} onChange={(e) => setCashDescription(e.target.value)} style={inputStyle} />
+                    <input type="date" value={cashDate} onChange={(e) => setCashDate(e.target.value)} style={inputStyle} />
+                    <p className="card-date">目前現金餘額：${(cashAccount?.balance ?? 0).toLocaleString()}</p>
                 </Modal>
             )}
 
             {isSnapshotModalOpen && (
                 <Modal title="記錄本月淨資產快照" onCancel={() => setIsSnapshotModalOpen(false)} onSave={handleSaveSnapshot}>
                     <input type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} style={inputStyle} />
-                    <input type="number" placeholder="目前現金/存款餘額" value={snapshotCash} onChange={(e) => setSnapshotCash(e.target.value)} style={inputStyle} />
-                    <p className="card-date">投資現值與貸款餘額系統會自動代入，不需手動輸入</p>
+                    <p className="card-date">現金（${(cashAccount?.balance ?? 0).toLocaleString()}）、投資現值與貸款餘額系統會自動代入，不需手動輸入</p>
                 </Modal>
             )}
         </div>
