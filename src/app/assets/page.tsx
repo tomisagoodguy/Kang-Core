@@ -28,6 +28,9 @@ export default function AssetsPage() {
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
 
+    const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+    const [editingPriceValue, setEditingPriceValue] = useState("");
+
     // 交易表單 state
     const [txMarket, setTxMarket] = useState<"TW" | "US">("TW");
     const [txTicker, setTxTicker] = useState("");
@@ -136,6 +139,40 @@ export default function AssetsPage() {
         }
     };
 
+    const handleStartEditPrice = (h: HoldingView) => {
+        setEditingPriceId(h.id);
+        setEditingPriceValue((h.currentPrice ?? h.avgCost).toString());
+    };
+
+    const handleSavePrice = async (id: string) => {
+        if (!editingPriceValue) return;
+        try {
+            const res = await fetch(`/api/holdings/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPrice: Number(editingPriceValue) }),
+            });
+            if (res.ok) {
+                setEditingPriceId(null);
+                fetchAll();
+            } else {
+                alert("更新失敗");
+            }
+        } catch {
+            alert("Error");
+        }
+    };
+
+    const handleDeleteHolding = async (id: string) => {
+        if (!confirm("確定要刪除此持股嗎？（不會刪除已產生的現金流紀錄）")) return;
+        try {
+            await fetch(`/api/holdings/${id}`, { method: "DELETE" });
+            fetchAll();
+        } catch {
+            console.error("Fetch error");
+        }
+    };
+
     const cashflowChartData = cashflow.map((c) => ({ month: c.month, total: c.expense, income: c.income, net: c.net }));
     const netWorthChartData = snapshots.map((s) => ({
         date: s.date,
@@ -202,9 +239,28 @@ export default function AssetsPage() {
                                                     {pnl >= 0 ? "+" : ""}${Math.round(pnl).toLocaleString()}
                                                 </span>
                                             </div>
-                                            <p className="card-text">股數 {h.shares} ／ 均價 ${h.avgCost.toFixed(2)} ／ 現價 ${price.toFixed(2)} ／ 市值 ${Math.round(marketValue).toLocaleString()}</p>
+                                            <p className="card-text">股數 {h.shares} ／ 均價 ${h.avgCost.toFixed(2)} ／ 市值 ${Math.round(marketValue).toLocaleString()}</p>
+                                            {editingPriceId === h.id ? (
+                                                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "6px" }}>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={editingPriceValue}
+                                                        onChange={(e) => setEditingPriceValue(e.target.value)}
+                                                        style={{ ...inputStyle, width: "100px", padding: "4px 8px" }}
+                                                    />
+                                                    <button onClick={() => handleSavePrice(h.id)} style={{ ...btnStyle("primary"), padding: "4px 10px", fontSize: "0.8rem" }}>儲存</button>
+                                                    <button onClick={() => setEditingPriceId(null)} style={{ ...btnStyle("secondary"), padding: "4px 10px", fontSize: "0.8rem" }}>取消</button>
+                                                </div>
+                                            ) : (
+                                                <p className="card-text">
+                                                    現價 ${price.toFixed(2)}
+                                                    <button onClick={() => handleStartEditPrice(h)} className="card-action-btn" style={{ marginLeft: "8px", fontSize: "0.7rem" }}>✏️ 手動更新現價</button>
+                                                </p>
+                                            )}
                                             {h.currentPrice == null && <p className="card-date">無最新股價，以成本計算</p>}
                                             {stale != null && stale > 2 && <p className="card-date">⚠️ 價格已 {stale} 天未更新</p>}
+                                            <button onClick={() => handleDeleteHolding(h.id)} className="card-action-btn danger" style={{ marginTop: "6px", fontSize: "0.7rem" }}>🗑️ 刪除持股</button>
                                         </div>
                                     );
                                 })}
