@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { HoldingView, LoanView, NetWorthSnapshotView, CashAccountView, TripView } from "@/models/schema";
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { NetWorthTrendChart } from "@/components/charts/NetWorthTrendChart";
+import { FireCalculator } from "@/components/FireCalculator";
 
 interface CashflowMonth {
     month: string;
@@ -17,6 +18,15 @@ interface TravelStats {
     totalTWD: number;
     trips: TripView[];
     budget: number | null;
+}
+
+interface PerformanceData {
+    xirr: number | null;
+    reason?: string;
+    totalInvestedTWD?: number;
+    totalRecoveredTWD?: number;
+    marketValueTWD?: number;
+    since?: string | null;
 }
 
 function daysSince(dateStr?: string): number | null {
@@ -62,6 +72,7 @@ export default function AssetsPage() {
     const [loans, setLoans] = useState<LoanView[]>([]);
     const [cashAccount, setCashAccount] = useState<CashAccountView | null>(null);
     const [travelStats, setTravelStats] = useState<TravelStats | null>(null);
+    const [performance, setPerformance] = useState<PerformanceData | null>(null);
     const [travelBudgetInput, setTravelBudgetInput] = useState("");
     const [isEditingTravelBudget, setIsEditingTravelBudget] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -96,13 +107,14 @@ export default function AssetsPage() {
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [cashflowRes, snapshotsRes, holdingsRes, loansRes, cashAccountRes, tripsRes] = await Promise.all([
+            const [cashflowRes, snapshotsRes, holdingsRes, loansRes, cashAccountRes, tripsRes, performanceRes] = await Promise.all([
                 fetch("/api/dashboard/cashflow?months=12"),
                 fetch("/api/net-worth"),
                 fetch("/api/holdings"),
                 fetch("/api/loans"),
                 fetch("/api/cash-account"),
                 fetch("/api/trips"),
+                fetch("/api/holdings/performance"),
             ]);
             if (cashflowRes.ok) setCashflow(await cashflowRes.json());
             if (snapshotsRes.ok) setSnapshots(await snapshotsRes.json());
@@ -110,6 +122,7 @@ export default function AssetsPage() {
             if (loansRes.ok) setLoans(await loansRes.json());
             if (cashAccountRes.ok) setCashAccount(await cashAccountRes.json());
             if (tripsRes.ok) setTravelStats(await tripsRes.json());
+            if (performanceRes.ok) setPerformance(await performanceRes.json());
         } catch (error) {
             console.error(error);
         } finally {
@@ -288,6 +301,15 @@ export default function AssetsPage() {
     const activeLoans = loans.filter((l) => l.status === "active");
     const totalLoanBalance = activeLoans.reduce((sum, l) => sum + l.remainingPrincipal, 0);
     const latestSnapshot = snapshots[snapshots.length - 1];
+    const currentNetWorth = (cashAccount?.balance ?? latestSnapshot?.cashBalance ?? 0) + (latestSnapshot?.investmentValueTWD ?? 0) - totalLoanBalance;
+
+    // 近 12 月儲蓄率（僅計有資料的月份，避免剛開始記帳的空月份稀釋平均）
+    const activeMonths = cashflow.filter((c) => c.income > 0 || c.expense > 0);
+    const totalIncome12m = activeMonths.reduce((sum, c) => sum + c.income, 0);
+    const totalExpense12m = activeMonths.reduce((sum, c) => sum + c.expense, 0);
+    const savingsRate = totalIncome12m > 0 ? ((totalIncome12m - totalExpense12m) / totalIncome12m) * 100 : null;
+    const avgMonthlyExpense = activeMonths.length > 0 ? totalExpense12m / activeMonths.length : 0;
+    const avgMonthlySavings = activeMonths.length > 0 ? (totalIncome12m - totalExpense12m) / activeMonths.length : 0;
 
     return (
         <div className="page-container">
@@ -317,17 +339,35 @@ export default function AssetsPage() {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
                             <StatTile
                                 label="淨資產"
-                                value={(cashAccount?.balance ?? latestSnapshot?.cashBalance ?? 0) + (latestSnapshot?.investmentValueTWD ?? 0) - totalLoanBalance}
+                                value={currentNetWorth}
                                 color="#818cf8"
                             />
                             <StatTile label="現金（即時）" value={cashAccount?.balance ?? latestSnapshot?.cashBalance ?? 0} color="#22c55e" />
                             <StatTile label="投資現值" value={latestSnapshot?.investmentValueTWD ?? 0} color="#38bdf8" />
                             <StatTile label="貸款餘額" value={-totalLoanBalance} color="#f43f5e" />
+                            <RateTile
+                                label="近12月儲蓄率"
+                                pct={savingsRate}
+                                emptyHint="尚無收入資料"
+                                color={savingsRate != null && savingsRate < 0 ? "#f43f5e" : "#f59e0b"}
+                            />
+                            <RateTile
+                                label="投資年化報酬 XIRR"
+                                pct={performance?.xirr != null ? performance.xirr * 100 : null}
+                                emptyHint={performance?.reason === "insufficient_history" ? "交易未滿 30 天" : "尚無交易紀錄"}
+                                color={performance?.xirr != null && performance.xirr < 0 ? "#22c55e" : "#ef4444"}
+                            />
                         </div>
                     )}
 
                     <NetWorthTrendChart data={netWorthChartData} />
                     <MonthlyTrendChart data={cashflowChartData} />
+
+                    <FireCalculator
+                        avgMonthlyExpense={avgMonthlyExpense}
+                        avgMonthlySavings={avgMonthlySavings}
+                        currentAssets={currentNetWorth}
+                    />
 
                     <div className="glass-card" style={{ padding: "24px" }}>
                         <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "16px" }}>
@@ -521,6 +561,19 @@ function StatTile({ label, value, color }: { label: string; value: number; color
         <div className="glass-card" style={{ padding: "16px" }}>
             <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>{label}</p>
             <p style={{ fontSize: "1.25rem", fontWeight: 700, color }}>{value < 0 ? "-" : ""}${Math.abs(Math.round(value)).toLocaleString()}</p>
+        </div>
+    );
+}
+
+function RateTile({ label, pct, emptyHint, color }: { label: string; pct: number | null; emptyHint: string; color: string }) {
+    return (
+        <div className="glass-card" style={{ padding: "16px" }}>
+            <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "4px" }}>{label}</p>
+            {pct == null ? (
+                <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>{emptyHint}</p>
+            ) : (
+                <p style={{ fontSize: "1.25rem", fontWeight: 700, color }}>{pct >= 0 ? "+" : ""}{pct.toFixed(1)}%</p>
+            )}
         </div>
     );
 }
