@@ -141,6 +141,7 @@ export class MessageService {
             let totalReplyText = "";
             let totalExpense = 0;
             let firstExpenseTag = "";
+            const learnQueue: Array<{ text: string; tag: string; subTag?: string }> = [];
 
             for (const item of list) {
                 const docRef = db.collection("accounting").doc();
@@ -173,15 +174,19 @@ export class MessageService {
                     if (!firstExpenseTag) firstExpenseTag = entry.tag;
                 }
 
-                // 學習新規則 (C9) - 使用 catch 不等待
+                // 學習新規則 (C9) - 先排隊，等寫入成功才學，避免 commit 失敗仍污染規則
                 if (entry.tag && entry.tag !== "Other") {
-                    ClassificationEngine.learn(entry.description || userText, entry.tag, userId, entry.subTag).catch(() => { });
+                    learnQueue.push({ text: entry.description || userText, tag: entry.tag, subTag: entry.subTag });
                 }
 
                 totalReplyText += replyText + "\n\n";
             }
 
             await batch.commit();
+
+            for (const item of learnQueue) {
+                ClassificationEngine.learn(item.text, item.tag, userId, item.subTag).catch(() => { });
+            }
 
             // 預算超支警報（針對同一批次的總花費只觸發一次）
             if (totalExpense > 0 && firstExpenseTag) {
