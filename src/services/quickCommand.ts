@@ -343,8 +343,8 @@ async function handleQuickInsight(userId: string): Promise<QuickCommandResult> {
 
 // ─── 工具函數 ────────────────────────────────────
 
-/** 從描述推斷標籤（簡易版） */
-function guessTag(desc: string): string {
+/** 從描述推斷標籤（簡易版）。電子發票匯入（invoiceImport.service）也複用此兜底規則 */
+export function guessTag(desc: string): string {
     const lower = desc.toLowerCase();
     const rules: [string[], string][] = [
         [["早餐", "午餐", "晚餐", "吃", "餐", "飯", "麵", "便當", "火鍋", "壽司", "拉麵", "咖啡", "飲料", "手搖", "茶", "奶茶", "雞排", "滷味", "pizza", "food"], "Food"],

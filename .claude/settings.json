@@ -29,7 +29,14 @@
       "Bash(node scripts/_diag_check_holdings.mjs)",
       "Bash(node scripts/_diag_check_email_map.mjs)",
       "Bash(node scripts/_diag_check_holdings2.mjs)",
-      "Bash(rm scripts/_diag_check_holdings2.mjs)"
+      "Bash(rm scripts/_diag_check_holdings2.mjs)",
+      "Bash(taskkill //PID 13048 //F)",
+      "PowerShell(Get-Process -Id 9808)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Id 9808 -Force -Confirm:$false)",
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 3000,3001 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; if \\($conn\\) { $conn | ForEach-Object { Stop-Process -Id $_ -Force -Confirm:$false }; \"已結束 dev server: $conn\" } else { \"沒有執行中的 dev server\" }; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Test-Path .next)",
+      "PowerShell(yarn dev)",
+      "PowerShell(Start-Sleep -Seconds 8; try { \\(Invoke-WebRequest -Uri http://localhost:3000/login -UseBasicParsing -TimeoutSec 30\\).StatusCode } catch { $_.Exception.Message })"
     ]
   }
 }

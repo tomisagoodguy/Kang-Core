@@ -47,3 +47,6 @@ next-env.d.ts
 .env*.local
 .spectra/
 openspec/.vector-search.db*
+
+# 參考用外部記帳專案（僅本地研究，不入版控）
+/reference-repos/

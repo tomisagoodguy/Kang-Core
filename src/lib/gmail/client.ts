@@ -46,3 +46,77 @@ export async function sendHtmlEmail(to: string, subject: string, html: string): 
         },
     });
 }
+
+// ─── 讀取（電子發票同步用，需 refresh token 含 gmail.readonly scope）───────
+
+export interface GmailAttachmentRef {
+    filename: string;
+    attachmentId?: string;
+    /** 小附件會直接內嵌在 message payload（base64url） */
+    inlineData?: string;
+}
+
+/** 取得授權帳號的 email（用於 EMAIL_LINE_MAP 反查 LINE userId） */
+export async function getAuthorizedEmail(): Promise<string> {
+    const gmail = getGmailClient();
+    const profile = await gmail.users.getProfile({ userId: "me" });
+    return profile.data.emailAddress ?? "";
+}
+
+/** 依 Gmail 搜尋語法列出符合的 message id */
+export async function listMessageIds(query: string, maxResults = 50): Promise<string[]> {
+    const gmail = getGmailClient();
+    const res = await gmail.users.messages.list({ userId: "me", q: query, maxResults });
+    return (res.data.messages ?? []).map((m) => m.id).filter((id): id is string => Boolean(id));
+}
+
+/** 取出一封信中所有 csv/txt/zip 附件的參照（遞迴掃 multipart） */
+export async function getInvoiceAttachmentRefs(messageId: string): Promise<GmailAttachmentRef[]> {
+    const gmail = getGmailClient();
+    const res = await gmail.users.messages.get({ userId: "me", id: messageId, format: "full" });
+
+    type Part = {
+        filename?: string | null;
+        body?: { attachmentId?: string | null; data?: string | null } | null;
+        parts?: Part[] | null;
+    };
+
+    const collect = (part: Part | undefined | null): GmailAttachmentRef[] => {
+        if (!part) return [];
+        const nested = (part.parts ?? []).flatMap(collect);
+        const filename = part.filename?.trim() ?? "";
+        if (/\.(csv|txt|zip)$/i.test(filename)) {
+            return [
+                {
+                    filename,
+                    attachmentId: part.body?.attachmentId ?? undefined,
+                    inlineData: part.body?.data ?? undefined,
+                },
+                ...nested,
+            ];
+        }
+        return nested;
+    };
+
+    return collect(res.data.payload as Part | undefined);
+}
+
+/** 下載附件內容為 bytes */
+export async function getAttachmentBytes(messageId: string, ref: GmailAttachmentRef): Promise<Uint8Array> {
+    if (ref.inlineData) {
+        return new Uint8Array(Buffer.from(ref.inlineData, "base64url"));
+    }
+    if (!ref.attachmentId) {
+        throw new Error(`附件 ${ref.filename} 缺少 attachmentId`);
+    }
+    const gmail = getGmailClient();
+    const res = await gmail.users.messages.attachments.get({
+        userId: "me",
+        messageId,
+        id: ref.attachmentId,
+    });
+    if (!res.data.data) {
+        throw new Error(`附件 ${ref.filename} 下載失敗`);
+    }
+    return new Uint8Array(Buffer.from(res.data.data, "base64url"));
+}

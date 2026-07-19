@@ -17,7 +17,7 @@ export const TagEnum = z.enum([
     "Other",
 ]);
 
-export const SourceEnum = z.enum(["line", "manual", "system", "line-rule", "line-image", "line-file", "threads"]);
+export const SourceEnum = z.enum(["line", "manual", "system", "line-rule", "line-image", "line-file", "threads", "einvoice"]);
 
 /** 付款方式：現金 / 信用卡 / 電子支付 */
 export const PaymentMethodEnum = z.enum(["cash", "credit_card", "e_payment"]);
@@ -60,6 +60,8 @@ export const AccountingEntrySchema = BaseEntrySchema.extend({
     paymentMethod: PaymentMethodEnum.optional(),
     // ── 代墊 / 借貸 ──────────────────────────────────
     settlement: SettlementSchema.optional(),
+    // ── 電子發票（source="einvoice" 時寫入，供追溯與去重）──
+    invoiceNumber: z.string().optional(),
 });
 
 export type AccountingEntry = z.infer<typeof AccountingEntrySchema>;

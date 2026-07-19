@@ -38,7 +38,7 @@ src/
 ├── app/
 │   ├── api/                    # 所有 API Routes
 │   │   ├── webhook/line-bot/   # LINE Bot 接收入口（實際路徑含子目錄）
-│   │   ├── cron/               # Vercel Cron Jobs（7 個定時任務）
+│   │   ├── cron/               # Vercel Cron Jobs（10 個定時任務）
 │   │   ├── accounting/         # 記帳 CRUD
 │   │   ├── archive/            # 知識庫 CRUD
 │   │   ├── calendar/           # 行事曆與待辦 CRUD
@@ -159,6 +159,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `sessions` | userId, messages[], TTL: 15 分鐘 |
 | `insights` | monthYear, insight, TTL: 1 小時 |
 | `processed_messages` | messageId, TTL: 7 天（去重用）|
+| `processed_invoices` | 電子發票三層去重鎖：`msg_{messageId}` / `att_{sha256}` / `inv_{發票號碼}_{日期}`（永久保留，防彙整信重寄重複入帳） |
 | `user_settings` | userId, travelMode.{active, destination, startedAt, currency, exchangeRate}（旅遊模式狀態＋當地幣別與啟動時匯率）, annualTravelBudget（年度旅遊預算，台幣） |
 | `trips` | userId, destination, startDate, endDate, days, totalTWD（期間 Travel 支出加總，關閉旅遊模式時凍結）, currency |
 | `net_worth_snapshots` | userId, date, cashBalance, investmentValueTWD, loanBalance, netWorth（月初 cron 自動落地或 Dashboard 手動建立） |
@@ -196,12 +197,25 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `0 12 * * *` | 20:00 | Threads 摘要 |
 | `0 0 * * 1` | 08:00 週一 | 週報 Email（上週一～日收支明細） |
 | `30 1 1 * *` | 09:30 每月1日 | 淨值快照自動落地（該月已有快照則跳過） |
+| `30 12 * * *` | 20:30 | 電子發票自動記帳（趕在 21:00 每日摘要前入帳） |
 
 每個 Cron 端點需要 `Authorization: Bearer ${CRON_SECRET}` 標頭驗證。
 
 ### 週報 Email
 
 `/api/cron/weekly-email-report` 以 Gmail API（`src/lib/gmail/client.ts`）從授權帳號寄出 HTML 週報，收件者由 `EMAIL_LINE_MAP` 反查（`getEmailFromLineUserId()`，無對應 email 的用戶跳過）。**前提**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `gmail.send` scope——若寄信回 403/insufficient scopes，重跑 `npx tsx scripts/refresh-google-token.ts` 重新授權並更新 Vercel 環境變數。
+
+### 電子發票自動記帳
+
+`/api/cron/invoice-sync` 從授權 Gmail 讀取財政部「消費發票彙整通知」附件（CSV/TXT/ZIP，`src/lib/einvoice/parser.ts` 解析，支援民國曆與 Big5），自動分類入帳（`source: "einvoice"`）並 LINE 推播摘要。核心邏輯在 `src/services/invoiceImport.service.ts`。
+
+- **三層去重**（`processed_invoices` 集合，`doc.create()` 搶鎖）：信件層 `msg_{messageId}` / 附件層 `att_{sha256}` / 發票層 `inv_{發票號碼}_{日期}`——同張發票出現在多封彙整信也不會重複入帳
+- **分類鏈**：`ClassificationEngine.match()` → `guessTag()`（quickCommand 匯出的靜態關鍵字兜底）→ `Other`
+- **疑似重複警示**：同日已有同額手動記帳仍會入帳，但 LINE 通知標示 ⚠️ 請人工到 Dashboard 確認
+- **入帳 userId**：Gmail 授權帳號 email 經 `EMAIL_LINE_MAP` 反查，查不到 fallback `LINE_USER_IDS` 第一位
+- **前提 1**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `gmail.readonly` scope（同上，重跑 refresh-google-token.ts）
+- **前提 2**：使用者需在財政部電子發票整合服務平台啟用「寄送消費資訊」到該 Gmail
+- 選配環境變數 `GMAIL_INVOICE_QUERY` 可覆寫 Gmail 搜尋條件（預設抓 60 天內含附件的彙整通知）
 
 ---
 
@@ -233,6 +247,7 @@ AUTHORIZED_EMAILS         # 允許登入 Dashboard 的 Google Email 白名單
 
 # 系統
 CRON_SECRET               # Cron Job 驗證金鑰
+GMAIL_INVOICE_QUERY       # 選配：覆寫電子發票 Gmail 搜尋條件（預設抓 60 天內彙整通知）
 NEXT_PUBLIC_FIREBASE_*    # 前端 Firebase 設定（7 個變數）
 ```
 
