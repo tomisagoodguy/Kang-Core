@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db as adminDb } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
+import { TagEnum, PaymentMethodEnum, SettlementSchema } from "@/models/schema";
 import type { AccountingEntryView } from "@/models/schema";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
+import { computeCurrencyFields } from "@/utils/currency";
+import { TravelModeService } from "@/services/travelMode.service";
+import { ClassificationEngine } from "@/services/classificationEngine";
 
 export async function GET(request: NextRequest) {
     const userId = await getSessionUserId();
@@ -51,5 +56,70 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error("[API/accounting] Error:", error);
         return NextResponse.json({ error: "Failed to fetch accounting data" }, { status: 500 });
+    }
+}
+
+const CreateEntrySchema = z.object({
+    amount: z.number().positive(),
+    tag: TagEnum,
+    subTag: z.string().optional(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    description: z.string().optional(),
+    currency: z.string().optional(), // ISO 4217，未填視為 TWD
+    paymentMethod: PaymentMethodEnum.optional(),
+    settlement: SettlementSchema.optional(),
+});
+
+export async function POST(request: NextRequest) {
+    const userId = await getSessionUserId();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    try {
+        const parsed = CreateEntrySchema.safeParse(await request.json());
+        if (!parsed.success) {
+            return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
+        }
+        const input = parsed.data;
+
+        // 旅遊模式進行中且幣別相同 → 沿用啟動時匯率；否則即時抓（含 fallback）
+        const travelState = await TravelModeService.getState(userId).catch(() => null);
+        const { currency, exchangeRate, amountTWD } = await computeCurrencyFields(
+            input.amount,
+            input.currency ?? "TWD",
+            travelState,
+        );
+
+        const createdAt = new Date();
+        const entry = {
+            userId,
+            amount: input.amount,
+            tag: input.tag,
+            date: input.date,
+            description: input.description ?? "",
+            originalText: `[Web] ${input.description || input.tag} ${input.amount} ${currency}`,
+            source: "manual",
+            createdAt,
+            currency,
+            exchangeRate,
+            amountTWD,
+            ...(input.subTag ? { subTag: input.subTag } : {}),
+            ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
+            ...(input.settlement ? { settlement: input.settlement } : {}),
+        };
+
+        const ref = await adminDb.collection("accounting").add(entry);
+
+        // 寫入成功後才學習分類規則（非同步不等待）
+        if (input.description && input.tag !== "Other") {
+            ClassificationEngine.learn(input.description, input.tag, userId, input.subTag, true).catch(() => {});
+        }
+
+        return NextResponse.json({
+            entry: { ...entry, id: ref.id, createdAt: createdAt.toISOString() },
+        }, { status: 201 });
+    } catch (error) {
+        console.error("[API/accounting/POST] Error:", error);
+        return NextResponse.json({ error: "Failed to create accounting entry" }, { status: 500 });
     }
 }

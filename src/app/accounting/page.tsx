@@ -11,6 +11,7 @@ import { myExpenseTWD } from "@/utils/currency";
 import { calculateMonthlyForecast } from "@/utils/forecast";
 import type { AccountingEntryView, CustomTag, Budget, RecurringExpenseView } from "@/models/schema";
 import { AccountingCalendarView } from "@/components/AccountingCalendarView";
+import { AddEntryModal } from "@/components/AddEntryModal";
 import {
     Wallet,
     Tags,
@@ -20,7 +21,8 @@ import {
     Loader2,
     Inbox,
     List,
-    CalendarDays
+    CalendarDays,
+    Plus
 } from "lucide-react";
 
 
@@ -35,6 +37,7 @@ export default function AccountingPage() {
     const [selectedSubTag, setSelectedSubTag] = useState("all");
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
     const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+    const [isAddOpen, setIsAddOpen] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -278,7 +281,21 @@ export default function AccountingPage() {
             <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <Wallet className="text-accent" size={28} />
                 記帳記錄
+                <button
+                    onClick={() => setIsAddOpen(true)}
+                    className="card-action-btn"
+                    style={{ marginLeft: "auto", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "4px" }}
+                >
+                    <Plus size={16} /> 新增記帳
+                </button>
             </h1>
+
+            <AddEntryModal
+                isOpen={isAddOpen}
+                onClose={() => setIsAddOpen(false)}
+                onCreated={(entry) => setEntries((prev) => [entry, ...prev])}
+                customTags={customTags}
+            />
 
             {/* 月份選擇器 */}
             <div style={{ position: "relative", maxWidth: "220px", marginBottom: "16px" }}>
