@@ -3,9 +3,10 @@ import { db } from "@/lib/firebase/admin";
 import { AccountingEntry } from "@/models/schema";
 import { lineService } from "@/services/line.service";
 import { getAllLineUserIds } from "@/lib/userRegistry";
+import { computeInstallment } from "@/utils/loan";
 
 /**
- * 處理定期支出
+ * 處理定期支出與貸款每月扣款
  * Vercel Cron: 5 16 * * * (UTC) -> 台灣時間 00:05
  */
 export async function GET(req: Request) {
@@ -93,6 +94,61 @@ export async function GET(req: Request) {
 
                     triggeredList.push(`- $${amount} [${tag}] ${description}`);
                 }
+            }
+
+            // 貸款每月扣款：等額本息，只有利息寫入 accounting 當支出，本金攤還只減少貸款餘額
+            const loansSnap = await db.collection("loans")
+                .where("userId", "==", userId)
+                .where("status", "==", "active")
+                .get();
+
+            for (const doc of loansSnap.docs) {
+                const data = doc.data();
+                const { name, annualRate, dayOfMonth, monthlyPayment, remainingPrincipal, paidInstallments, termMonths, lastTriggeredAt } = data;
+
+                if (lastTriggeredAt === todayStr) {
+                    continue;
+                }
+
+                let shouldTrigger = dayOfMonth === currentDayOfMonth;
+                if (!shouldTrigger && isLastDayOfMonth && typeof dayOfMonth === "number" && dayOfMonth > currentDayOfMonth) {
+                    shouldTrigger = true;
+                }
+
+                if (!shouldTrigger) {
+                    continue;
+                }
+
+                const isLastInstallment = paidInstallments + 1 >= termMonths;
+                const { interestPortion, principalPortion } = computeInstallment(
+                    remainingPrincipal,
+                    annualRate,
+                    monthlyPayment,
+                    isLastInstallment
+                );
+
+                if (interestPortion > 0) {
+                    const entry: AccountingEntry = {
+                        userId,
+                        amount: interestPortion,
+                        tag: "Loan",
+                        description: `${name} 利息 [貸款]`,
+                        date: todayStr,
+                        source: "system",
+                        originalText: `System: loan ${doc.id}`,
+                        createdAt: new Date(),
+                    };
+                    await db.collection("accounting").add(entry);
+                }
+
+                await doc.ref.update({
+                    remainingPrincipal: Math.max(0, remainingPrincipal - principalPortion),
+                    paidInstallments: paidInstallments + 1,
+                    lastTriggeredAt: todayStr,
+                    ...(isLastInstallment ? { status: "settled" } : {}),
+                });
+
+                triggeredList.push(`- $${interestPortion} [Loan] ${name} 利息（本金 -$${principalPortion}）`);
             }
 
             // 有觸發才推播給當前用戶

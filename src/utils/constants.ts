@@ -15,6 +15,7 @@ export const ALL_TAGS = [
     "Subscription",
     "Investment",
     "Travel",
+    "Loan",
     "Income",
     "Other",
 ] as const;

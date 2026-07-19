@@ -28,7 +28,7 @@ const outputSchema: Schema = {
                 amount: { type: SchemaType.NUMBER, nullable: false, description: "Amount in ORIGINAL currency the user actually paid" },
                 tag: {
                     type: SchemaType.STRING,
-                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Investment, Travel, Income, Other",
+                    description: "One of: Food, Transport, Entertainment, Utilities, Shopping, Health, Education, Insurance, Subscription, Investment, Travel, Loan, Income, Other",
                 },
                 subTag: {
                     type: SchemaType.STRING,
@@ -159,8 +159,9 @@ JSON schema:
 Financial Concepts:
 - Balance (結餘) = Income (收入) - Expenses (支出).
 - IncomeTags: 'Income'
-- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Subscription', 'Investment', 'Travel', 'Other'
+- ExpenseTags: 'Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Education', 'Insurance', 'Subscription', 'Investment', 'Travel', 'Loan', 'Other'
 - Investment 用於：買股票、定期定額、ETF、基金、存股、證券下單等投資行為
+- Loan 用於：信貸、房貸、車貸等貸款還款、繳利息（系統自動扣款已另外處理，這裡是使用者手動提到還款時使用）
 - Subscription 用於：定期訂閱服務（YouTube Premium、ChatGPT、Claude、iCloud、Notion、Adobe 等月費/年費）
 - Education 用於：才藝課、語言課、線上學習課（Hahow、Coursera 等）、補習費、學費
 - Travel 用於：出國旅遊期間的所有消費，包含機票、eSIM、住宿（Airbnb/Agoda/hotel）、伴手禮、旅遊當地餐飲食物、景點門票、當地購物、行李箱、簽證費等。判斷依據：描述中有出國地名（日本、德國、東京、大阪、柏林等）或明確標示為旅遊消費。
@@ -202,7 +203,7 @@ const GEMMA_MODELS = [
 
 async function tryGeminiModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null; currency?: string | null }): Promise<GeminiParseResult> {
     const travelInstruction = travelContext?.active
-        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses (food, shopping, transport, entertainment, activities) MUST use tag='Travel'. Only keep original tags for: Utilities (house bills), Insurance, Subscription, Investment, Income.${travelContext.currency ? ` Local currency is ${travelContext.currency}; bare numbers are assumed ${travelContext.currency} (the server applies this), so leave 'currency' null unless the user names a DIFFERENT currency.` : ""}`
+        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses (food, shopping, transport, entertainment, activities) MUST use tag='Travel'. Only keep original tags for: Utilities (house bills), Insurance, Subscription, Investment, Loan, Income.${travelContext.currency ? ` Local currency is ${travelContext.currency}; bare numbers are assumed ${travelContext.currency} (the server applies this), so leave 'currency' null unless the user names a DIFFERENT currency.` : ""}`
         : "";
     const model = genAI.getGenerativeModel({
         model: modelName,
@@ -219,7 +220,7 @@ async function tryGeminiModel(modelName: string, text: string, archiveTags: stri
 
 async function tryGemmaModel(modelName: string, text: string, archiveTags: string[], historyContext?: string, travelContext?: { active: boolean; destination: string | null; currency?: string | null }): Promise<GeminiParseResult> {
     const travelInstruction = travelContext?.active
-        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses MUST use tag='Travel' except Utilities/Insurance/Subscription/Investment/Income.${travelContext.currency ? ` Local currency is ${travelContext.currency}; leave 'currency' null unless a different currency is named.` : ""}`
+        ? `\n\n⚠️ TRAVEL MODE ACTIVE: User is currently traveling${travelContext.destination ? ` in ${travelContext.destination}` : ""}. ALL expenses MUST use tag='Travel' except Utilities/Insurance/Subscription/Investment/Loan/Income.${travelContext.currency ? ` Local currency is ${travelContext.currency}; leave 'currency' null unless a different currency is named.` : ""}`
         : "";
     const model = genAI.getGenerativeModel({ model: modelName });
     const prompt = `${SYSTEM_PROMPT(archiveTags)}${travelInstruction}\n\nRecent conversational history (for context only, if applicable):\n${historyContext || "None"}\n\nUser input: "${text}"`;

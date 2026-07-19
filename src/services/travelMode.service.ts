@@ -13,7 +13,7 @@ export interface TravelModeState {
 }
 
 // 不受旅遊模式影響的固定支出標籤
-export const NON_TRAVEL_TAGS = new Set(["Income", "Utilities", "Insurance", "Subscription", "Investment"]);
+export const NON_TRAVEL_TAGS = new Set(["Income", "Utilities", "Insurance", "Subscription", "Investment", "Loan"]);
 
 // 常見目的地關鍵字，用於從啟動訊息中提取地名
 export const DESTINATION_KEYWORDS = [

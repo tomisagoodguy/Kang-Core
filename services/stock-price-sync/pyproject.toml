@@ -1,0 +1,12 @@
+[project]
+name = "stock-price-sync"
+version = "1.0.0"
+description = "每日透過 finlab 同步 Kang-Core 使用者持股的最新收盤價，推送到 Kang-Core webhook"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "finlab>=1.5.9",
+    "requests>=2.32.5",
+]

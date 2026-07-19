@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { signOut } from "@/lib/firebase/auth";
 import { ThemeToggle } from "./ThemeToggle";
-import { Brain, Receipt, Library, CalendarDays, MessageCircle, Settings, Repeat, Tags, ListTree, LogOut } from "lucide-react";
+import { Brain, Receipt, Library, CalendarDays, MessageCircle, Settings, Repeat, Tags, ListTree, LogOut, Wallet, Landmark } from "lucide-react";
 
 const navLinks = [
     { href: "/", label: "首頁" },
     { href: "/accounting", label: "記帳", icon: <Receipt size={16} /> },
+    { href: "/assets", label: "資產", icon: <Wallet size={16} /> },
     { href: "/archive", label: "存檔", icon: <Library size={16} /> },
     { href: "/calendar", label: "日曆", icon: <CalendarDays size={16} /> },
     { href: "/threads", label: "洞察", icon: <MessageCircle size={16} /> },
@@ -17,6 +18,7 @@ const navLinks = [
 
 const settingsLinks = [
     { href: "/recurring", label: "定期", icon: <Repeat size={14} /> },
+    { href: "/loans", label: "貸款", icon: <Landmark size={14} /> },
     { href: "/settings/tags", label: "標籤", icon: <Tags size={14} /> },
     { href: "/settings/rules", label: "規則", icon: <ListTree size={14} /> },
 ];

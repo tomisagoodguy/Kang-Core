@@ -12,6 +12,7 @@ export const TagEnum = z.enum([
     "Subscription",
     "Investment",
     "Travel",
+    "Loan",
     "Income",
     "Other",
 ]);
@@ -112,6 +113,79 @@ export const RecurringExpenseSchema = BaseEntrySchema.extend({
 });
 
 export type RecurringExpense = z.infer<typeof RecurringExpenseSchema>;
+
+// ─── Loan（信貸／貸款）──────────────────────────────────
+export const LoanSchema = BaseEntrySchema.extend({
+    name: z.string(), // 貸款名稱，如「信貸-王小明」
+    principal: z.number().positive(), // 原始本金
+    annualRate: z.number().nonnegative(), // 年利率 %，如 3.5
+    termMonths: z.number().int().positive(), // 總期數
+    startDate: z.string(), // YYYY-MM-DD 首期扣款日
+    dayOfMonth: z.number().min(1).max(31), // 每月扣款日
+    monthlyPayment: z.number().positive(), // 每月應繳（等額本息公式算出）
+    remainingPrincipal: z.number().nonnegative(),
+    paidInstallments: z.number().int().nonnegative().default(0),
+    status: z.enum(["active", "settled"]).default("active"),
+    lastTriggeredAt: z.string().optional(), // 避免同日重複扣款
+});
+
+export type Loan = z.infer<typeof LoanSchema>;
+
+// ─── Investment（投資交易 / 持股彙總 / 股價 / 淨資產快照）───────────────
+export const MarketEnum = z.enum(["TW", "US"]);
+
+export const InvestmentTransactionSchema = BaseEntrySchema.extend({
+    market: MarketEnum,
+    ticker: z.string(), // 股票/ETF 代號，如 "2330" 或 "AAPL"
+    name: z.string().optional(), // 顯示用名稱
+    side: z.enum(["buy", "sell"]),
+    shares: z.number().positive(),
+    pricePerShare: z.number().positive(),
+    fee: z.number().nonnegative().default(0),
+    date: z.string(), // YYYY-MM-DD
+    linkedAccountingEntryId: z.string().optional(), // 對應的現金流紀錄（若有）
+});
+
+export type InvestmentTransaction = z.infer<typeof InvestmentTransactionSchema>;
+
+export const HoldingSchema = z.object({
+    id: z.string().optional(), // `${userId}_${market}_${ticker}`
+    userId: z.string(),
+    market: MarketEnum,
+    ticker: z.string(),
+    name: z.string().optional(),
+    shares: z.number().nonnegative(),
+    avgCost: z.number().nonnegative(), // 加權平均成本（每股）
+    currentPrice: z.number().nonnegative().optional(),
+    priceAsOf: z.string().optional(), // YYYY-MM-DD
+    updatedAt: z.any().optional(),
+});
+
+export type Holding = z.infer<typeof HoldingSchema>;
+
+// market_prices 集合文件形狀（doc id: `${market}_${ticker}`）
+export const MarketPriceSchema = z.object({
+    market: MarketEnum,
+    ticker: z.string(),
+    price: z.number().positive(),
+    asOfDate: z.string(), // YYYY-MM-DD
+    updatedAt: z.any().optional(),
+});
+
+export type MarketPrice = z.infer<typeof MarketPriceSchema>;
+
+export const NetWorthSnapshotSchema = z.object({
+    id: z.string().optional(),
+    userId: z.string(),
+    date: z.string(), // YYYY-MM-DD
+    cashBalance: z.number(), // 使用者手動輸入
+    investmentValueTWD: z.number(), // 伺服器算出，寫入時凍結
+    loanBalance: z.number(), // 伺服器算出，寫入時凍結
+    netWorth: z.number(),
+    createdAt: z.any().optional(),
+});
+
+export type NetWorthSnapshot = z.infer<typeof NetWorthSnapshotSchema>;
 
 export const GeminiParseResultSchema = z.object({
     type: z.enum(["accounting", "archive", "calendar", "recurring", "query", "clear_memory", "unknown"]),
@@ -227,6 +301,30 @@ export type CalendarEntryView = Omit<CalendarEntry, "id" | "createdAt"> & {
 export type RecurringExpenseView = Omit<RecurringExpense, "id" | "createdAt" | "tag"> & {
     id: string;
     tag: string;
+    createdAt?: string;
+};
+
+/** 前端接收的貸款資料 */
+export type LoanView = Omit<Loan, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的投資交易資料 */
+export type InvestmentTransactionView = Omit<InvestmentTransaction, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的持股彙總資料 */
+export type HoldingView = Omit<Holding, "id" | "updatedAt"> & {
+    id: string;
+    updatedAt?: string;
+};
+
+/** 前端接收的淨資產快照資料 */
+export type NetWorthSnapshotView = Omit<NetWorthSnapshot, "id" | "createdAt"> & {
+    id: string;
     createdAt?: string;
 };
 

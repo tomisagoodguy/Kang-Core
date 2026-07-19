@@ -15,6 +15,7 @@ const TAG_EMOJI_MAP: Record<string, string> = {
     Subscription: "🔖",
     Investment: "📈",
     Travel: "✈️",
+    Loan: "🏦",
     Other: "📦",
 };
 
