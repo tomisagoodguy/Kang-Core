@@ -22,7 +22,10 @@
       "Bash(git show *)",
       "Bash(ls -la /tmp/reconstruct/ 2>&1)",
       "Read(//tmp/reconstruct/**)",
-      "Read(//c/tmp/reconstruct/**)"
+      "Read(//c/tmp/reconstruct/**)",
+      "Bash(npx add-skill *)",
+      "Bash(npm --version)",
+      "Bash(npx skills *)"
     ]
   }
 }
