@@ -50,6 +50,15 @@
       ]
     },
     {
+      "collectionGroup": "forecast_snapshots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "monthYear", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "insights",
       "queryScope": "COLLECTION",
       "fields": [

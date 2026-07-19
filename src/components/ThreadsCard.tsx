@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ThreadsEntryView } from "@/models/schema";
 import { deleteThreadAction, toggleThreadSaveAction } from "@/app/actions/threads";
-import { Trash2, Heart, MessageCircle, ExternalLink, Sparkles, Pin, LoaderCircle } from "lucide-react";
+import { Trash2, Heart, MessageCircle, ExternalLink, Sparkles, Pin, LoaderCircle, Tag } from "lucide-react";
 
 interface ThreadsCardProps {
     entry: ThreadsEntryView;
@@ -98,6 +98,21 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
                                     <Sparkles size={10} /> 自動發現
                                 </span>
                             )}
+                            {entry.matchedKeyword && (
+                                <span style={{
+                                    background: "rgba(161,100,255,0.1)",
+                                    border: "1px solid rgba(161,100,255,0.2)",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    fontSize: "0.65rem",
+                                    color: "var(--accent-light)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px"
+                                }}>
+                                    <Tag size={10} /> {entry.matchedKeyword}
+                                </span>
+                            )}
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
                             {publishedDate}
@@ -148,21 +163,8 @@ export function ThreadsCard({ entry }: ThreadsCardProps) {
                 </div>
             </div>
 
-            {/* 貼文內容 */}
-            <div
-                className="custom-scrollbar"
-                style={{
-                    fontSize: "0.9375rem",
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    zIndex: 1,
-                    maxHeight: "180px",
-                    overflowY: "auto",
-                    paddingRight: "8px"
-                }}
-            >
+            {/* 貼文全文 */}
+            <div className="threads-card-preview">
                 {entry.content}
             </div>
 

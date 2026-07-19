@@ -769,6 +769,15 @@ a {
   background: #dc2626;
 }
 
+.threads-card-preview {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* Card Action Buttons */
 .card-actions {
   display: flex;
@@ -977,9 +986,9 @@ a {
 }
 
 .threads-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
 }
 
 .threads-card {
@@ -991,6 +1000,7 @@ a {
   flex-direction: column;
   gap: 16px;
 }
+
 
 .calendar-card {
   padding: 20px;
@@ -1024,10 +1034,13 @@ a {
     gap: 16px;
   }
 
-  .calendar-grid,
-  .threads-grid {
+  .calendar-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .threads-grid {
+    gap: 16px;
   }
 
   .page-container {

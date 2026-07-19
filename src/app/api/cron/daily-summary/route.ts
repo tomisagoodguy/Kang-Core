@@ -4,6 +4,7 @@ import { lineService } from "@/services/line.service";
 import { getTagEmoji } from "@/utils/tagEmoji";
 import { getAllLineUserIds } from "@/lib/userRegistry";
 import { myExpenseTWD } from "@/utils/currency";
+import { calculateMonthlyForecast } from "@/utils/forecast";
 
 /**
  * 每日消費摘要推播
@@ -54,6 +55,35 @@ export async function GET(req: Request) {
             const monthIncome = monthEntries.filter(e => e.tag === "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
             const monthExpense = monthEntries.filter(e => e.tag !== "Income").reduce((s, e) => s + myExpenseTWD(e), 0);
             const monthBalance = monthIncome - monthExpense;
+
+            // 記錄當日預測快照（供月底跟實際結果比對、校準未來預測）
+            try {
+                const monthYear = today.slice(0, 7);
+                const [recurringSnap, calibrationDoc] = await Promise.all([
+                    db.collection("recurring_expenses").where("userId", "==", userId).where("isActive", "==", true).get(),
+                    db.collection("forecast_calibration").doc(userId).get(),
+                ]);
+                const recurring = recurringSnap.docs.map(d => d.data() as { amount: number; tag?: string; frequency: "daily" | "weekly" | "monthly" | "yearly"; dayOfMonth?: number; dayOfWeek?: number; monthOfYear?: number; isActive?: boolean });
+                const biasMultiplier = (calibrationDoc.data()?.biasMultiplier as number | undefined) ?? 1;
+                const forecast = calculateMonthlyForecast(monthEntries, recurring, monthYear, today, biasMultiplier);
+                if (forecast) {
+                    await db.collection("forecast_snapshots").doc(`${userId}_${today}`).set({
+                        userId,
+                        monthYear,
+                        date: today,
+                        daysElapsed: forecast.daysElapsed,
+                        daysInMonth: forecast.daysInMonth,
+                        variableSoFar: forecast.variableSoFar,
+                        variableProjectionRemaining: forecast.variableProjectionRemaining,
+                        upcomingRecurring: forecast.upcomingRecurring,
+                        projectedExpense: forecast.projectedExpense,
+                        biasMultiplierUsed: forecast.biasMultiplierUsed,
+                        createdAt: new Date().toISOString(),
+                    });
+                }
+            } catch (snapshotErr) {
+                console.error(`[daily-summary] forecast snapshot failed for user ${userId}:`, snapshotErr);
+            }
 
             // 標籤統計
             const tagMap = new Map<string, number>();

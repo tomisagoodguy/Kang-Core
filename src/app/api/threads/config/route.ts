@@ -14,12 +14,12 @@ export async function GET(req: Request) {
     }
 
     try {
-        const snapshot = await db
-            .collection("threads_users")
-            .orderBy("addedAt", "asc")
-            .get();
+        const [usersSnapshot, topicsSnapshot] = await Promise.all([
+            db.collection("threads_users").orderBy("addedAt", "asc").get(),
+            db.collection("threads_topics").orderBy("addedAt", "asc").get(),
+        ]);
 
-        const users = snapshot.docs.map((doc) => {
+        const users = usersSnapshot.docs.map((doc) => {
             const data = doc.data();
             return {
                 username: data.username as string,
@@ -29,8 +29,18 @@ export async function GET(req: Request) {
             };
         });
 
+        const topics = topicsSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+                keyword: data.keyword as string,
+                addedAt: data.addedAt?.toDate?.()?.toISOString() ?? null,
+                source: (data.source as string) ?? "line-bot",
+            };
+        });
+
         return NextResponse.json({
             users,
+            topics,
             count: users.length,
             updatedAt: new Date().toISOString(),
         });

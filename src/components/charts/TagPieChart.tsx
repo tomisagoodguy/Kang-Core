@@ -164,7 +164,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                             <span style={{ color: parentColor }}>⬤</span> {drillTag} 子標籤分佈
                         </>
                     ) : (
-                        `🥧 當月${viewType === "expense" ? "支出" : "收入"}分佈`
+                        `🥧 ${currentMonth ?? "全部"}${viewType === "expense" ? "支出" : "收入"}分佈`
                     )}
                 </h3>
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -272,7 +272,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                 <div>
                     <div style={{ textAlign: "center", marginBottom: "8px" }}>
                         <span style={{ fontSize: 11, color: "var(--text-muted)", marginRight: 8 }}>
-                            {drillTag ?? (viewType === "expense" ? "當月支出" : "當月收入")}
+                            {drillTag ?? `${currentMonth ?? "全部"}${viewType === "expense" ? "支出" : "收入"}`}
                         </span>
                         <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
                             ${total.toLocaleString()}
@@ -351,7 +351,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                             zIndex: 1,
                         }}>
                             <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
-                                {drillTag ?? (viewType === "expense" ? "當月支出" : "當月收入")}
+                                {drillTag ?? `${currentMonth ?? "全部"}${viewType === "expense" ? "支出" : "收入"}`}
                             </div>
                             <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
                                 ${total.toLocaleString()}

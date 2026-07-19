@@ -95,6 +95,18 @@ class ThreadsScheduler:
                                 "source": "line-bot-api"
                             })
                             existing_usernames.add(uname)
+
+                    # 合併主題關鍵字 (避免重複)
+                    api_topics = api_data.get("topics", [])
+                    existing_keywords = {kw.lower() for kw in self.keywords}
+                    for topic in api_topics:
+                        kw_val = topic.get("keyword")
+                        if not kw_val or kw_val.lower() in existing_keywords:
+                            continue
+                        self.keywords.append(kw_val)
+                        existing_keywords.add(kw_val.lower())
+                    if api_topics:
+                        print(f"   ✅ 已同步 {len(api_topics)} 個主題關鍵字 (來自 LINE Bot)")
                 else:
                     print(f"   ⚠️ 同步失敗 (HTTP {resp.status_code})，將僅使用本地設定")
             except Exception as e:

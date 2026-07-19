@@ -8,6 +8,7 @@ import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
 import { SpendingHeatmap } from "@/components/charts/SpendingHeatmap";
 import { ALL_TAGS } from "@/utils/constants";
 import { myExpenseTWD } from "@/utils/currency";
+import { calculateMonthlyForecast } from "@/utils/forecast";
 import type { AccountingEntryView, CustomTag, Budget, RecurringExpenseView } from "@/models/schema";
 import { AccountingCalendarView } from "@/components/AccountingCalendarView";
 import {
@@ -28,6 +29,7 @@ export default function AccountingPage() {
     const [customTags, setCustomTags] = useState<CustomTag[]>([]);
     const [budgets, setBudgets] = useState<Budget[]>([]);
     const [recurring, setRecurring] = useState<RecurringExpenseView[]>([]);
+    const [calibration, setCalibration] = useState<{ biasMultiplier: number; sampleCount: number }>({ biasMultiplier: 1, sampleCount: 0 });
     const [loading, setLoading] = useState(true);
     const [selectedTag, setSelectedTag] = useState("all");
     const [selectedSubTag, setSelectedSubTag] = useState("all");
@@ -37,11 +39,12 @@ export default function AccountingPage() {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            const [accRes, tagRes, budgetRes, recurringRes] = await Promise.all([
+            const [accRes, tagRes, budgetRes, recurringRes, calibrationRes] = await Promise.all([
                 fetch("/api/accounting?limit=200"),
                 fetch("/api/tags"),
                 fetch("/api/budget"),
                 fetch("/api/recurring"),
+                fetch("/api/forecast-calibration"),
             ]);
 
             if (accRes.ok) {
@@ -59,6 +62,10 @@ export default function AccountingPage() {
             if (recurringRes.ok) {
                 const data = await recurringRes.json();
                 setRecurring(Array.isArray(data) ? data : []);
+            }
+            if (calibrationRes.ok) {
+                const data = await calibrationRes.json();
+                setCalibration({ biasMultiplier: data.biasMultiplier ?? 1, sampleCount: data.sampleCount ?? 0 });
             }
             setLoading(false);
         };
@@ -147,12 +154,12 @@ export default function AccountingPage() {
 
     const dailyTrendMonth = selectedMonth === "all" ? new Date().toISOString().slice(0, 7) : selectedMonth;
 
-    // 聚合：當月標籤分佈
+    // 聚合：選定月份的標籤分佈
     const tagDistribution = useMemo(() => {
-        const currentMonth = new Date().toISOString().slice(0, 7);
+        const targetMonth = selectedMonth === "all" ? new Date().toISOString().slice(0, 7) : selectedMonth;
         const map = new Map<string, number>();
         entries
-            .filter((e) => e.date?.startsWith(currentMonth))
+            .filter((e) => e.date?.startsWith(targetMonth))
             .forEach((e) => {
                 const tag = e.tag || "Other";
                 map.set(tag, (map.get(tag) || 0) + myExpenseTWD(e));
@@ -160,7 +167,7 @@ export default function AccountingPage() {
         return Array.from(map.entries())
             .map(([tag, total]) => ({ tag, total }))
             .sort((a, b) => b.total - a.total);
-    }, [entries]);
+    }, [entries, selectedMonth]);
 
     // 聚合：每日支出 Map（供熱力圖使用）
     const spendingMap = useMemo(() => {
@@ -173,60 +180,18 @@ export default function AccountingPage() {
         return map;
     }, [entries]);
 
-    // 計算：本月結餘預測（只在選取當月時顯示）
-    // 預測 = 已花費 ＋ 變動日均 × 剩餘天數 ＋ 本月尚未入帳的定期支出
-    // 變動日均排除定期入帳（source === "system"），避免固定支出灌高日均又在月底重複計算
+    // 計算：本月結餘預測（只在選取當月時顯示），套用歷史誤差校準係數讓推估逐月變準
     const forecast = useMemo(() => {
         const currentMonth = new Date().toISOString().slice(0, 7);
         if (selectedMonth !== currentMonth) return null;
-        const today = new Date();
-        const daysElapsed = today.getDate();
-        const [y, m] = currentMonth.split("-").map(Number);
-        const daysInMonth = new Date(y, m, 0).getDate();
-        const monthExpenseEntries = entries.filter(e => e.date?.startsWith(currentMonth) && e.tag !== "Income");
-        const monthExpenses = monthExpenseEntries.reduce((sum, e) => sum + myExpenseTWD(e), 0);
-        const recurringSpent = monthExpenseEntries
-            .filter(e => e.source === "system")
-            .reduce((sum, e) => sum + myExpenseTWD(e), 0);
-        const monthIncome = entries
-            .filter(e => e.date?.startsWith(currentMonth) && e.tag === "Income")
-            .reduce((sum, e) => sum + myExpenseTWD(e), 0);
-        if (daysElapsed === 0) return null;
-        const daysLeft = daysInMonth - daysElapsed;
-        const variableDailyAvg = Math.max(0, monthExpenses - recurringSpent) / daysElapsed;
+        const today = new Date().toISOString().slice(0, 10);
+        return calculateMonthlyForecast(entries, recurring, currentMonth, today, calibration.biasMultiplier);
+    }, [entries, recurring, selectedMonth, calibration.biasMultiplier]);
 
-        // 本月剩餘天數內會觸發的定期支出（規則同 cron/recurring：超出當月天數的 dayOfMonth 在月底觸發）
-        const upcomingRecurring = recurring
-            .filter(r => r.isActive !== false && r.tag !== "Income")
-            .reduce((sum, r) => {
-                if (r.frequency === "daily") return sum + r.amount * daysLeft;
-                if (r.frequency === "weekly" && r.dayOfWeek != null) {
-                    let count = 0;
-                    for (let d = daysElapsed + 1; d <= daysInMonth; d++) {
-                        if (new Date(y, m - 1, d).getDay() === r.dayOfWeek) count++;
-                    }
-                    return sum + r.amount * count;
-                }
-                if (r.frequency === "monthly" && r.dayOfMonth != null) {
-                    const triggerDay = Math.min(r.dayOfMonth, daysInMonth);
-                    return triggerDay > daysElapsed ? sum + r.amount : sum;
-                }
-                if (r.frequency === "yearly" && r.monthOfYear === m && r.dayOfMonth != null) {
-                    const triggerDay = Math.min(r.dayOfMonth, daysInMonth);
-                    return triggerDay > daysElapsed ? sum + r.amount : sum;
-                }
-                return sum;
-            }, 0);
-
-        const projectedExpense = Math.round(monthExpenses + variableDailyAvg * daysLeft + upcomingRecurring);
-        const projectedBalance = monthIncome - projectedExpense;
-        return { projectedExpense, projectedBalance, daysLeft, daysInMonth, daysElapsed, upcomingRecurring };
-    }, [entries, recurring, selectedMonth]);
-
-    // 聚合：本月預算進度
+    // 聚合：選定月份的預算進度
     const budgetProgress = useMemo(() => {
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        const monthExpenses = entries.filter(e => e.date?.startsWith(currentMonth) && e.tag !== "Income");
+        const targetMonth = selectedMonth === "all" ? new Date().toISOString().slice(0, 7) : selectedMonth;
+        const monthExpenses = entries.filter(e => e.date?.startsWith(targetMonth) && e.tag !== "Income");
         const spentMap = monthExpenses.reduce((map, e) => {
             map.set(e.tag, (map.get(e.tag) || 0) + myExpenseTWD(e));
             return map;
@@ -239,7 +204,7 @@ export default function AccountingPage() {
                 return { id: b.id, tag: b.tag, monthlyLimit: b.monthlyLimit, spent, pct };
             })
             .sort((a, b) => b.pct - a.pct);
-    }, [entries, budgets]);
+    }, [entries, budgets, selectedMonth]);
 
     const handleExportCSV = () => {
         const currentMonth = selectedMonth === "all"
@@ -315,6 +280,24 @@ export default function AccountingPage() {
                 記帳記錄
             </h1>
 
+            {/* 月份選擇器 */}
+            <div style={{ position: "relative", maxWidth: "220px", marginBottom: "16px" }}>
+                <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }}>
+                    <Calendar size={16} />
+                </div>
+                <select
+                    className="filter-select"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    style={{ paddingLeft: "36px", width: "100%" }}
+                >
+                    <option value="all">全部月份</option>
+                    {availableMonths.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                    ))}
+                </select>
+            </div>
+
             {/* 異常大額支出警示 */}
             {!loading && outliers.length > 0 && (
                 <div className="glass-card" style={{ padding: "20px 24px", marginBottom: "16px", borderLeft: "3px solid #f87171" }}>
@@ -363,7 +346,7 @@ export default function AccountingPage() {
                 <>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "16px" }}>
                     <MonthlyTrendChart data={monthlyTrend} />
-                    <TagPieChart data={tagDistribution} entries={entries} currentMonth={new Date().toISOString().slice(0, 7)} />
+                    <TagPieChart data={tagDistribution} entries={entries} currentMonth={selectedMonth === "all" ? undefined : selectedMonth} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "24px" }}>
                     <DailyTrendChart data={dailyTrend} month={dailyTrendMonth} />
@@ -376,7 +359,7 @@ export default function AccountingPage() {
             {!loading && budgetProgress.length > 0 && (
                 <div className="glass-card" style={{ padding: "24px", marginBottom: "16px" }}>
                     <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "16px" }}>
-                        💰 本月預算進度
+                        💰 {selectedMonth === "all" ? "全部月份" : selectedMonth}預算進度
                     </h3>
                     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                         {budgetProgress.map(b => (
@@ -437,6 +420,11 @@ export default function AccountingPage() {
                         {forecast && (
                             <p style={{ fontSize: "0.68rem", color: forecast.projectedBalance >= 0 ? "var(--text-muted)" : "#f59e0b", marginTop: "2px" }}>
                                 📈 預測月底支出 ${forecast.projectedExpense.toLocaleString()}（剩 {forecast.daysLeft} 天）
+                                {calibration.sampleCount > 0 && (
+                                    <span title={`已依過去 ${calibration.sampleCount} 個月的預測誤差自動校準`}>
+                                        {" "}· 已校準×{calibration.sampleCount}
+                                    </span>
+                                )}
                             </p>
                         )}
                     </div>
@@ -482,23 +470,6 @@ export default function AccountingPage() {
                                 <option key={t.id} value={t.name}>{t.name}</option>
                             ))
                         }
-                    </select>
-                </div>
-
-                <div style={{ position: "relative", flex: "1", minWidth: "160px" }}>
-                    <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }}>
-                        <Calendar size={16} />
-                    </div>
-                    <select
-                        className="filter-select"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        style={{ paddingLeft: "36px", width: "100%" }}
-                    >
-                        <option value="all">全部月份</option>
-                        {availableMonths.map((m) => (
-                            <option key={m} value={m}>{m}</option>
-                        ))}
                     </select>
                 </div>
 

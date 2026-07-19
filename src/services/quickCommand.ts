@@ -56,8 +56,12 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
                 "　　例：/threads 追蹤 hogan.tech",
                 "🧵 /threads 取消 {帳號}",
                 "　　例：/threads 取消 hogan.tech",
-                "� /threads 清單",
+                "🧵 /threads 清單",
                 "　　查看目前追蹤的 Threads 創作者",
+                "🏷️ /threads 主題 {關鍵字}",
+                "　　例：/threads 主題 台股",
+                "🏷️ /threads 主題取消 {關鍵字}",
+                "🏷️ /threads 主題清單",
                 "",
                 "🤝 /欠款　　查看代墊／借貸",
                 "　　/結清 {對方}　結清款項",
@@ -147,6 +151,23 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
     // /threads 清單
     if (/^\/threads\s+清單$/i.test(trimmed)) {
         return await handleThreadsList();
+    }
+
+    // /threads 主題 {關鍵字}
+    const threadsTopicAddMatch = trimmed.match(/^\/threads\s+主題\s+(\S+)$/i);
+    if (threadsTopicAddMatch) {
+        return await handleThreadsTopicAdd(threadsTopicAddMatch[1]);
+    }
+
+    // /threads 主題取消 {關鍵字}
+    const threadsTopicRemoveMatch = trimmed.match(/^\/threads\s+主題取消\s+(\S+)$/i);
+    if (threadsTopicRemoveMatch) {
+        return await handleThreadsTopicRemove(threadsTopicRemoveMatch[1]);
+    }
+
+    // /threads 主題清單
+    if (/^\/threads\s+主題清單$/i.test(trimmed)) {
+        return await handleThreadsTopicList();
     }
 
     // 未知指令
@@ -704,6 +725,99 @@ async function handleThreadsList(): Promise<QuickCommandResult> {
                 "",
                 "新增：/threads 追蹤 {帳號}",
                 "取消：/threads 取消 {帳號}",
+            ].join("\n"),
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 讀取清單失敗，請稍後再試" };
+    }
+}
+
+/** /threads 主題 {關鍵字} */
+async function handleThreadsTopicAdd(keyword: string): Promise<QuickCommandResult> {
+    try {
+        const cleanKeyword = keyword.trim();
+        // Upsert：用關鍵字當 doc ID 避免重複
+        await db.collection("threads_topics").doc(cleanKeyword).set({
+            keyword: cleanKeyword,
+            addedAt: new Date(),
+            source: "line-bot",
+        }, { merge: true });
+
+        return {
+            handled: true,
+            replyText: [
+                "✅ 已加入 Threads 主題追蹤",
+                "━━━━━━━━━━━━",
+                `🏷️ ${cleanKeyword}`,
+                "",
+                "下次爬蟲執行時開始監控相關貼文。",
+            ].join("\n"),
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 新增主題追蹤失敗，請稍後再試" };
+    }
+}
+
+/** /threads 主題取消 {關鍵字} */
+async function handleThreadsTopicRemove(keyword: string): Promise<QuickCommandResult> {
+    try {
+        const cleanKeyword = keyword.trim();
+        const docRef = db.collection("threads_topics").doc(cleanKeyword);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            return {
+                handled: true,
+                replyText: `❌ 找不到追蹤的主題「${cleanKeyword}」\n\n用 /threads 主題清單 查看目前的追蹤名單`,
+            };
+        }
+
+        await docRef.delete();
+
+        return {
+            handled: true,
+            replyText: [
+                "🗑️ 已取消 Threads 主題追蹤",
+                "━━━━━━━━━━━━",
+                `🏷️ ${cleanKeyword}`,
+            ].join("\n"),
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 取消主題追蹤失敗，請稍後再試" };
+    }
+}
+
+/** /threads 主題清單 */
+async function handleThreadsTopicList(): Promise<QuickCommandResult> {
+    try {
+        const snapshot = await db.collection("threads_topics").orderBy("addedAt", "asc").get();
+
+        if (snapshot.empty) {
+            return {
+                handled: true,
+                replyText: [
+                    "🏷️ 目前沒有追蹤的主題",
+                    "",
+                    "用以下指令新增：",
+                    "/threads 主題 台股",
+                ].join("\n"),
+            };
+        }
+
+        const lines = snapshot.docs.map((d, i) => {
+            const data = d.data();
+            return `${i + 1}. ${data.keyword}`;
+        });
+
+        return {
+            handled: true,
+            replyText: [
+                `🏷️ Threads 主題追蹤清單（${snapshot.size} 個）`,
+                "━━━━━━━━━━━━",
+                ...lines,
+                "",
+                "新增：/threads 主題 {關鍵字}",
+                "取消：/threads 主題取消 {關鍵字}",
             ].join("\n"),
         };
     } catch {

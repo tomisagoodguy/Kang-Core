@@ -28,6 +28,7 @@ export async function POST(req: Request) {
             }
 
             // Map incoming data to our schema
+            const matchedKeywords: string[] | undefined = body.matched_keywords;
             const mappedData = {
                 threadId: post.id,
                 threadUrl: post.url,
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
                 likeCount: post.like_count || 0,
                 replyCount: post.reply_count || 0,
                 isDiscovery: false,
+                matchedKeyword: matchedKeywords?.[0],
                 source: "threads",
                 originalText: post.text || "",
             };

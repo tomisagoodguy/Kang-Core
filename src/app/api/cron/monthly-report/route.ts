@@ -4,6 +4,7 @@ import { lineService } from "@/services/line.service";
 import { generateFinancialInsights } from "@/services/insights";
 import { getAllLineUserIds } from "@/lib/userRegistry";
 import { myExpenseTWD } from "@/utils/currency";
+import { updateBiasMultiplier } from "@/utils/forecast";
 
 /**
  * 每月月報推播
@@ -96,6 +97,49 @@ export async function GET(req: Request) {
                 .sort((a, b) => myExpenseTWD(b) - myExpenseTWD(a))
                 .slice(0, 3)
                 .map((e, i) => `${i + 1}. $${myExpenseTWD(e).toLocaleString()} - ${(e.description as string) || "—"}`);
+
+            // 校準預測公式：拿上月最後一筆快照的「變動支出預測」跟實際結果比對，調整未來的校準係數
+            try {
+                const lastMonthYearMonth = `${lastMonthYear}-${String(lastMonth + 1).padStart(2, "0")}`;
+                const snapQuery = await db.collection("forecast_snapshots")
+                    .where("userId", "==", userId)
+                    .where("monthYear", "==", lastMonthYearMonth)
+                    .orderBy("date", "desc")
+                    .limit(1)
+                    .get();
+
+                if (!snapQuery.empty) {
+                    const lastSnapshot = snapQuery.docs[0].data();
+                    const recurringActual = entries
+                        .filter((e) => e.source === "system")
+                        .reduce((s, e) => s + myExpenseTWD(e), 0);
+                    const actualVariable = total - recurringActual;
+                    // 快照當天預測的「本月全部變動支出」= 已花費 + 剩餘天數推估
+                    const predictedVariableTotal = lastSnapshot.variableSoFar + lastSnapshot.variableProjectionRemaining;
+
+                    if (predictedVariableTotal > 0) {
+                        const errorRatio = actualVariable / predictedVariableTotal;
+                        const calibrationRef = db.collection("forecast_calibration").doc(userId);
+                        const calibrationDoc = await calibrationRef.get();
+                        const prevBias = (calibrationDoc.data()?.biasMultiplier as number | undefined) ?? 1;
+                        const prevSampleCount = (calibrationDoc.data()?.sampleCount as number | undefined) ?? 0;
+                        const lastCalibratedMonth = calibrationDoc.data()?.lastCalibratedMonth as string | undefined;
+
+                        // 避免同一個月被重複校準（例如 cron 被手動重跑）
+                        if (lastCalibratedMonth !== lastMonthYearMonth) {
+                            await calibrationRef.set({
+                                userId,
+                                biasMultiplier: updateBiasMultiplier(prevBias, errorRatio),
+                                sampleCount: prevSampleCount + 1,
+                                lastCalibratedMonth: lastMonthYearMonth,
+                                updatedAt: new Date().toISOString(),
+                            });
+                        }
+                    }
+                }
+            } catch (calibrationErr) {
+                console.error(`[monthly-report] forecast calibration failed for user ${userId}:`, calibrationErr);
+            }
 
             // AI 洞察
             const insight = await generateFinancialInsights(userId);

@@ -84,6 +84,7 @@ export const ThreadsEntrySchema = BaseEntrySchema.extend({
     replyCount: z.number().optional(),
     isDiscovery: z.boolean().default(false), // Found via discovery mode
     isSaved: z.boolean().default(false).optional(), // Manually saved by user
+    matchedKeyword: z.string().optional(), // 命中的主題追蹤關鍵字（來自 /threads 主題 追蹤）
 });
 export type ThreadsEntry = z.infer<typeof ThreadsEntrySchema>;
 
@@ -269,6 +270,35 @@ export const BudgetSchema = z.object({
 });
 
 export type Budget = z.infer<typeof BudgetSchema>;
+
+// ─── Forecast（月底結餘預測快照與校準）──────────────────────
+// doc id: `${userId}_${date}`，每日 cron 覆寫當日快照，同月累積成完整曲線
+export const ForecastSnapshotSchema = z.object({
+    userId: z.string(),
+    monthYear: z.string(), // YYYY-MM
+    date: z.string(), // YYYY-MM-DD，快照當天
+    daysElapsed: z.number().int().nonnegative(),
+    daysInMonth: z.number().int().positive(),
+    variableSoFar: z.number(), // 已花費的變動支出（不含定期支出）
+    variableProjectionRemaining: z.number(), // 剩餘天數 × 變動日均（校準後）
+    upcomingRecurring: z.number(), // 剩餘天數內預計觸發的定期支出
+    projectedExpense: z.number(), // 預測本月總支出
+    biasMultiplierUsed: z.number(), // 產生此快照時套用的校準係數
+    createdAt: z.any(),
+});
+
+export type ForecastSnapshot = z.infer<typeof ForecastSnapshotSchema>;
+
+// doc id: userId。滾動校準係數：actual/predicted 的指數移動平均，用來修正未來「變動支出」預測
+export const ForecastCalibrationSchema = z.object({
+    userId: z.string(),
+    biasMultiplier: z.number().default(1),
+    sampleCount: z.number().int().nonnegative().default(0),
+    lastCalibratedMonth: z.string().optional(), // YYYY-MM，避免同月重複校準
+    updatedAt: z.any().optional(),
+});
+
+export type ForecastCalibration = z.infer<typeof ForecastCalibrationSchema>;
 
 // ─── 前端用型別（API 回傳後 id 一定存在，createdAt 為 ISO string）─────────
 /** 前端接收的記帳資料（id 必填、createdAt 為 string） */
