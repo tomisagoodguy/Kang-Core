@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import type { HoldingView, LoanView, NetWorthSnapshotView, CashAccountView } from "@/models/schema";
+import type { HoldingView, LoanView, NetWorthSnapshotView, CashAccountView, TripView } from "@/models/schema";
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { NetWorthTrendChart } from "@/components/charts/NetWorthTrendChart";
 
@@ -10,6 +10,13 @@ interface CashflowMonth {
     income: number;
     expense: number;
     net: number;
+}
+
+interface TravelStats {
+    year: number;
+    totalTWD: number;
+    trips: TripView[];
+    budget: number | null;
 }
 
 function daysSince(dateStr?: string): number | null {
@@ -54,6 +61,9 @@ export default function AssetsPage() {
     const [holdings, setHoldings] = useState<HoldingView[]>([]);
     const [loans, setLoans] = useState<LoanView[]>([]);
     const [cashAccount, setCashAccount] = useState<CashAccountView | null>(null);
+    const [travelStats, setTravelStats] = useState<TravelStats | null>(null);
+    const [travelBudgetInput, setTravelBudgetInput] = useState("");
+    const [isEditingTravelBudget, setIsEditingTravelBudget] = useState(false);
     const [loading, setLoading] = useState(true);
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -86,18 +96,20 @@ export default function AssetsPage() {
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [cashflowRes, snapshotsRes, holdingsRes, loansRes, cashAccountRes] = await Promise.all([
+            const [cashflowRes, snapshotsRes, holdingsRes, loansRes, cashAccountRes, tripsRes] = await Promise.all([
                 fetch("/api/dashboard/cashflow?months=12"),
                 fetch("/api/net-worth"),
                 fetch("/api/holdings"),
                 fetch("/api/loans"),
                 fetch("/api/cash-account"),
+                fetch("/api/trips"),
             ]);
             if (cashflowRes.ok) setCashflow(await cashflowRes.json());
             if (snapshotsRes.ok) setSnapshots(await snapshotsRes.json());
             if (holdingsRes.ok) setHoldings(await holdingsRes.json());
             if (loansRes.ok) setLoans(await loansRes.json());
             if (cashAccountRes.ok) setCashAccount(await cashAccountRes.json());
+            if (tripsRes.ok) setTravelStats(await tripsRes.json());
         } catch (error) {
             console.error(error);
         } finally {
@@ -203,6 +215,27 @@ export default function AssetsPage() {
                 fetchAll();
             } else {
                 alert("儲存失敗");
+            }
+        } catch {
+            alert("Error");
+        }
+    };
+
+    const handleSaveTravelBudget = async () => {
+        const budget = Number(travelBudgetInput);
+        if (!budget || budget <= 0) return alert("請輸入正確的預算金額");
+        try {
+            const res = await fetch("/api/trips", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ budget }),
+            });
+            if (res.ok) {
+                setIsEditingTravelBudget(false);
+                fetchAll();
+            } else {
+                const data = await res.json().catch(() => null);
+                alert(data?.error || "儲存失敗");
             }
         } catch {
             alert("Error");
@@ -358,6 +391,71 @@ export default function AssetsPage() {
                             <div style={{ display: "grid", gap: "8px" }}>
                                 {activeLoans.map((l) => (
                                     <p key={l.id} className="card-text">{l.name}：剩餘 ${l.remainingPrincipal.toLocaleString()} / ${l.principal.toLocaleString()}</p>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="glass-card" style={{ padding: "24px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                            <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                ✈️ {travelStats?.year ?? new Date().getFullYear()} 年度旅遊
+                            </h3>
+                            {isEditingTravelBudget ? (
+                                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                    <input
+                                        type="number"
+                                        placeholder="年度預算"
+                                        value={travelBudgetInput}
+                                        onChange={(e) => setTravelBudgetInput(e.target.value)}
+                                        style={{ ...inputStyle, width: "120px", padding: "4px 8px" }}
+                                    />
+                                    <button onClick={handleSaveTravelBudget} style={{ ...btnStyle("primary"), padding: "4px 10px", fontSize: "0.8rem" }}>儲存</button>
+                                    <button onClick={() => setIsEditingTravelBudget(false)} style={{ ...btnStyle("secondary"), padding: "4px 10px", fontSize: "0.8rem" }}>取消</button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        setTravelBudgetInput(travelStats?.budget?.toString() ?? "");
+                                        setIsEditingTravelBudget(true);
+                                    }}
+                                    className="card-action-btn"
+                                    style={{ fontSize: "0.75rem" }}
+                                >
+                                    ✏️ {travelStats?.budget ? "調整年度預算" : "設定年度預算"}
+                                </button>
+                            )}
+                        </div>
+                        <p className="card-text">
+                            全年旅遊支出 <strong>${(travelStats?.totalTWD ?? 0).toLocaleString()}</strong>
+                            {travelStats?.budget != null && (
+                                <>
+                                    　／　預算 ${travelStats.budget.toLocaleString()}
+                                    {travelStats.budget - travelStats.totalTWD >= 0
+                                        ? `（剩 $${(travelStats.budget - travelStats.totalTWD).toLocaleString()}）`
+                                        : `（已超支 $${(travelStats.totalTWD - travelStats.budget).toLocaleString()}）`}
+                                </>
+                            )}
+                        </p>
+                        {travelStats?.budget != null && (
+                            <div style={{ height: "8px", borderRadius: "4px", background: "var(--border-color)", overflow: "hidden", margin: "8px 0 12px" }}>
+                                <div style={{
+                                    height: "100%",
+                                    width: `${Math.min(100, (travelStats.totalTWD / travelStats.budget) * 100)}%`,
+                                    background: travelStats.totalTWD > travelStats.budget ? "#f43f5e" : travelStats.totalTWD > travelStats.budget * 0.8 ? "#f59e0b" : "#38bdf8",
+                                    transition: "width 0.3s",
+                                }} />
+                            </div>
+                        )}
+                        {(travelStats?.trips.length ?? 0) === 0 ? (
+                            <p style={{ color: "var(--text-muted)" }}>今年還沒有已結束的旅程（LINE 說「出發去日本」開啟、「回國了」結束，會自動記錄）</p>
+                        ) : (
+                            <div style={{ display: "grid", gap: "8px" }}>
+                                {travelStats!.trips.map((t) => (
+                                    <p key={t.id} className="card-text">
+                                        🧳 {t.destination ?? "未命名旅程"}　{t.startDate.slice(5)} ～ {t.endDate.slice(5)}（{t.days} 天）　${t.totalTWD.toLocaleString()}
+                                        <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>　平均 ${Math.round(t.totalTWD / t.days).toLocaleString()}/天</span>
+                                    </p>
                                 ))}
                             </div>
                         )}

@@ -66,6 +66,9 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
                 "🤝 /欠款　　查看代墊／借貸",
                 "　　/結清 {對方}　結清款項",
                 "",
+                "✈️ /旅遊　　今年旅遊支出總覽",
+                "　　/旅遊預算 {金額}　設定年度旅遊預算",
+                "",
                 "🧠 /洞察　　AI 分析消費",
                 "📁 /recent_files　查看最近檔案",
                 "",
@@ -134,6 +137,16 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
     const budgetSetMatch = trimmed.match(/^\/預算\s+設定\s+(\d+)$/);
     if (budgetSetMatch) {
         return await handleBudgetSet(userId, Number(budgetSetMatch[1]));
+    }
+
+    // /旅遊 — 今年旅遊支出總覽（/旅遊預算 不帶金額時也顯示總覽）
+    if (/^\/旅遊$/.test(trimmed) || /^\/旅遊預算$/.test(trimmed)) {
+        return await handleTravelSummary(userId);
+    }
+    // /旅遊預算 {金額} — 設定年度旅遊預算
+    const travelBudgetSetMatch = trimmed.match(/^\/旅遊預算\s+(\d+)$/);
+    if (travelBudgetSetMatch) {
+        return await handleTravelBudgetSet(userId, Number(travelBudgetSetMatch[1]));
     }
 
     // /threads 追蹤 {username}
@@ -415,15 +428,18 @@ const TRAVEL_END_RE = /旅遊模式.*(關|閉|結束|停)|結束旅遊|旅遊.*(
 
 async function detectTravelModeToggle(text: string, userId: string): Promise<QuickCommandResult | null> {
     if (TRAVEL_END_RE.test(text)) {
-        await TravelModeService.deactivate(userId);
-        return {
-            handled: true,
-            replyText: [
-                "✅ 旅遊模式已關閉",
-                "━━━━━━━━━━━━",
-                "歡迎回來！往後記帳恢復正常分類。",
-            ].join("\n"),
-        };
+        const trip = await TravelModeService.deactivate(userId);
+        const lines = ["✅ 旅遊模式已關閉", "━━━━━━━━━━━━"];
+        if (trip) {
+            lines.push(
+                `✈️ ${trip.destination ?? "這趟旅程"} ${trip.days} 天共花 NT$${trip.totalTWD.toLocaleString()}`,
+                `　平均每天 NT$${Math.round(trip.totalTWD / trip.days).toLocaleString()}`,
+                ...(await buildYearlyTravelLines(userId)),
+            );
+        } else {
+            lines.push("歡迎回來！往後記帳恢復正常分類。");
+        }
+        return { handled: true, replyText: lines.join("\n") };
     }
 
     if (TRAVEL_START_RE.test(text)) {
@@ -432,6 +448,8 @@ async function detectTravelModeToggle(text: string, userId: string): Promise<Qui
         const currencyLine = state.currency
             ? `💱 幣別：${state.currency}（1 ${state.currency} ≈ NT$${state.exchangeRate?.toFixed(state.exchangeRate < 1 ? 3 : 2)}）\n　記帳直接輸入當地金額即可自動換算`
             : "💱 未偵測到當地幣別，金額預設為台幣\n　可在金額後標明幣別（如「拉麵 1200 日幣」）";
+        // 衝動控制關鍵時點：出發當下攤開年度旅遊花費與剩餘預算
+        const yearlyLines = await buildYearlyTravelLines(userId);
         return {
             handled: true,
             replyText: [
@@ -441,6 +459,7 @@ async function detectTravelModeToggle(text: string, userId: string): Promise<Qui
                 "",
                 "所有消費自動歸類為 Travel，",
                 "房租/帳單/訂閱/保險/投資不受影響。",
+                ...yearlyLines,
                 "",
                 "回國後說「回國了」即可關閉。",
             ].join("\n"),
@@ -551,6 +570,84 @@ async function handleBudgetSet(userId: string, amount: number): Promise<QuickCom
         };
     } catch {
         return { handled: true, replyText: "⚠️ 設定預算失敗" };
+    }
+}
+
+// ─── 旅遊統計 / 年度旅遊預算 ─────────────────────
+
+/** 產生年度旅遊統計行（開啟/關閉旅遊模式回覆共用），失敗回空陣列不阻斷主流程 */
+async function buildYearlyTravelLines(userId: string): Promise<string[]> {
+    try {
+        const stats = await TravelModeService.getYearlyTravelStats(userId);
+        const lines = [
+            "",
+            `📊 今年出國 ${stats.trips.length} 趟、旅遊支出 NT$${stats.totalTWD.toLocaleString()}`,
+        ];
+        if (stats.budget) {
+            const left = stats.budget - stats.totalTWD;
+            lines.push(left >= 0
+                ? `💰 年度預算 NT$${stats.budget.toLocaleString()}，剩 NT$${left.toLocaleString()}`
+                : `⚠️ 年度預算 NT$${stats.budget.toLocaleString()} 已超支 NT$${(-left).toLocaleString()}`);
+        } else {
+            lines.push("💡 輸入「/旅遊預算 120000」設定年度預算");
+        }
+        return lines;
+    } catch (e) {
+        console.error("[buildYearlyTravelLines]", e);
+        return [];
+    }
+}
+
+/** /旅遊 — 今年旅遊支出總覽（含各趟明細與進行中旅程） */
+async function handleTravelSummary(userId: string): Promise<QuickCommandResult> {
+    try {
+        const stats = await TravelModeService.getYearlyTravelStats(userId);
+        const lines = [
+            `✈️ ${stats.year} 旅遊總覽`,
+            "━━━━━━━━━━━━",
+            `💸 全年旅遊支出 NT$${stats.totalTWD.toLocaleString()}`,
+        ];
+        if (stats.budget) {
+            const ratio = Math.round((stats.totalTWD / stats.budget) * 100);
+            const left = stats.budget - stats.totalTWD;
+            lines.push(left >= 0
+                ? `💰 年度預算 NT$${stats.budget.toLocaleString()}（${ratio}%，剩 NT$${left.toLocaleString()}）`
+                : `⚠️ 年度預算 NT$${stats.budget.toLocaleString()} 已超支 NT$${(-left).toLocaleString()}`);
+        } else {
+            lines.push("💰 尚未設定年度預算，輸入「/旅遊預算 120000」設定");
+        }
+        if (stats.trips.length > 0) {
+            const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+            lines.push("", "🧳 今年旅程");
+            stats.trips.forEach((t, i) => {
+                lines.push(`　${i + 1}. ${t.destination ?? "未命名"} ${md(t.startDate)}–${md(t.endDate)}（${t.days}天）NT$${t.totalTWD.toLocaleString()}`);
+            });
+        }
+        const state = await TravelModeService.getState(userId);
+        if (state.active && state.startedAt) {
+            const from = state.startedAt.toISOString().slice(0, 10);
+            const to = new Date().toISOString().slice(0, 10);
+            const spent = await TravelModeService.sumTravelSpendTWD(userId, from, to);
+            lines.push("", `🧭 進行中：${state.destination ?? "旅遊模式"}，目前已花 NT$${spent.toLocaleString()}`);
+        }
+        return { handled: true, replyText: lines.join("\n") };
+    } catch (e) {
+        console.error("[handleTravelSummary]", e);
+        return { handled: true, replyText: "⚠️ 查詢旅遊統計失敗，請稍後再試" };
+    }
+}
+
+/** /旅遊預算 {金額} — 設定年度旅遊預算 */
+async function handleTravelBudgetSet(userId: string, amount: number): Promise<QuickCommandResult> {
+    try {
+        await TravelModeService.setAnnualTravelBudget(userId, amount);
+        return {
+            handled: true,
+            replyText: `✅ 年度旅遊預算已設定為 NT$${amount.toLocaleString()}\n出發與回國時我都會告訴你還剩多少！`,
+        };
+    } catch (e) {
+        console.error("[handleTravelBudgetSet]", e);
+        return { handled: true, replyText: "⚠️ 設定旅遊預算失敗，請稍後再試" };
     }
 }
 

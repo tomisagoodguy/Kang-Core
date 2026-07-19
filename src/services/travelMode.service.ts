@@ -1,6 +1,7 @@
 import { db } from "@/lib/firebase/admin";
-import { currencyForDestination } from "@/utils/currency";
+import { currencyForDestination, myExpenseTWD } from "@/utils/currency";
 import { fetchRateToTWD } from "@/lib/exchangeRate";
+import type { AccountingEntry, Trip } from "@/models/schema";
 
 export interface TravelModeState {
     active: boolean;
@@ -10,6 +11,16 @@ export interface TravelModeState {
     currency: string | null;
     /** 啟動時抓取的匯率（1 外幣 = ? 台幣），整趟沿用 */
     exchangeRate: number | null;
+}
+
+export interface YearlyTravelStats {
+    year: number;
+    /** 全年 Travel 標籤支出加總（台幣），含旅程期間外的機票、簽證等 */
+    totalTWD: number;
+    /** 該年度已結束的旅程（依出發日排序） */
+    trips: Trip[];
+    /** 年度旅遊預算，未設定為 null */
+    budget: number | null;
 }
 
 // 不受旅遊模式影響的固定支出標籤
@@ -69,12 +80,77 @@ export class TravelModeService {
         return state;
     }
 
-    static async deactivate(userId: string): Promise<void> {
+    /** 關閉旅遊模式；若原本為開啟狀態則落地一筆 trips 紀錄並回傳（供回覆總結用） */
+    static async deactivate(userId: string): Promise<Trip | null> {
+        const prev = await this.getState(userId);
+
+        let trip: Trip | null = null;
+        if (prev.active && prev.startedAt) {
+            const startDate = prev.startedAt.toISOString().slice(0, 10);
+            const endDate = new Date().toISOString().slice(0, 10);
+            const days = Math.max(1, Math.round((Date.parse(endDate) - Date.parse(startDate)) / 86400000) + 1);
+            const totalTWD = await this.sumTravelSpendTWD(userId, startDate, endDate);
+            trip = {
+                userId,
+                destination: prev.destination,
+                startDate,
+                endDate,
+                days,
+                totalTWD,
+                currency: prev.currency,
+                createdAt: new Date(),
+            };
+            const ref = await db.collection("trips").add(trip);
+            trip.id = ref.id;
+        }
+
         const state: TravelModeState = {
             active: false, destination: null, startedAt: null, currency: null, exchangeRate: null,
         };
         await db.collection("user_settings").doc(userId).set({ travelMode: state }, { merge: true });
         this.cache.set(userId, state);
+        return trip;
+    }
+
+    /** 期間內 Travel 標籤支出加總（換算台幣、代墊只計自己份額） */
+    static async sumTravelSpendTWD(userId: string, from: string, to: string): Promise<number> {
+        const snap = await db.collection("accounting")
+            .where("userId", "==", userId)
+            .where("date", ">=", from)
+            .where("date", "<=", to)
+            .get();
+        return snap.docs
+            .map((d) => d.data() as AccountingEntry)
+            .filter((e) => e.tag === "Travel")
+            .reduce((s, e) => s + myExpenseTWD(e), 0);
+    }
+
+    /** 年度旅遊預算（存於 user_settings.annualTravelBudget，未設定回 null） */
+    static async getAnnualTravelBudget(userId: string): Promise<number | null> {
+        const doc = await db.collection("user_settings").doc(userId).get();
+        return doc.data()?.annualTravelBudget ?? null;
+    }
+
+    static async setAnnualTravelBudget(userId: string, amount: number): Promise<void> {
+        await db.collection("user_settings").doc(userId).set({ annualTravelBudget: amount }, { merge: true });
+    }
+
+    /**
+     * 年度旅遊統計：全年 Travel 支出（含旅程外的機票、簽證等）、
+     * 已結束旅程列表、年度預算。
+     */
+    static async getYearlyTravelStats(userId: string, year?: number): Promise<YearlyTravelStats> {
+        const y = year ?? new Date().getFullYear();
+        const [totalTWD, tripsSnap, budget] = await Promise.all([
+            this.sumTravelSpendTWD(userId, `${y}-01-01`, `${y}-12-31`),
+            db.collection("trips").where("userId", "==", userId).get(),
+            this.getAnnualTravelBudget(userId),
+        ]);
+        const trips = tripsSnap.docs
+            .map((d) => ({ id: d.id, ...d.data() } as Trip))
+            .filter((t) => t.startDate.startsWith(String(y)))
+            .sort((a, b) => a.startDate.localeCompare(b.startDate));
+        return { year: y, totalTWD, trips, budget };
     }
 
     /** 從訊息中提取目的地名稱 */

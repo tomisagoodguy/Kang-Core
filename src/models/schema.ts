@@ -220,6 +220,21 @@ export const CashTransactionSchema = z.object({
 export type CashTransaction = z.infer<typeof CashTransactionSchema>;
 export type CashTransactionType = z.infer<typeof CashTransactionTypeEnum>;
 
+// ─── 旅程紀錄（旅遊模式關閉時自動落地）────────────────────────────
+export const TripSchema = z.object({
+    id: z.string().optional(),
+    userId: z.string(),
+    destination: z.string().nullable(), // 啟動時未偵測到目的地則為 null
+    startDate: z.string(), // YYYY-MM-DD（旅遊模式啟動日）
+    endDate: z.string(), // YYYY-MM-DD（旅遊模式關閉日）
+    days: z.number().positive(), // 含頭尾天數
+    totalTWD: z.number().nonnegative(), // 期間 Travel 標籤支出加總（myExpenseTWD），關閉時凍結
+    currency: z.string().nullable().optional(), // 當地幣別
+    createdAt: z.any().optional(),
+});
+
+export type Trip = z.infer<typeof TripSchema>;
+
 export const GeminiParseResultSchema = z.object({
     type: z.enum(["accounting", "archive", "calendar", "recurring", "query", "clear_memory", "unknown"]),
     accountingDataList: z.array(AccountingEntrySchema.omit({
@@ -397,6 +412,12 @@ export type CashAccountView = Omit<CashAccount, "updatedAt"> & {
 
 /** 前端接收的現金異動流水資料 */
 export type CashTransactionView = Omit<CashTransaction, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的旅程紀錄資料 */
+export type TripView = Omit<Trip, "id" | "createdAt"> & {
     id: string;
     createdAt?: string;
 };
