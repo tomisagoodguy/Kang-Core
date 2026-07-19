@@ -249,8 +249,17 @@ export default function AccountingPage() {
     };
 
     // 異常大額支出偵測（IQR 方法，Q3 + 1.5×IQR）
+    // 固定必要開銷（房租、家裡伙食費分攤等）金額雖大但非「手癢」消費，排除偵測
+    const isFixedNecessaryExpense = (e: AccountingEntryView) => {
+        if (e.source === "system") return true; // 定期支出（cron 自動插入）
+        const text = `${e.subTag ?? ""} ${e.description ?? ""}`;
+        return /房租|家裡伙食費|伙食費分攤|幫家裡|家裡分攤|管理費/.test(text);
+    };
+
     const outliers = useMemo(() => {
-        const expenses = entries.filter(e => e.tag !== "Income" && myExpenseTWD(e) > 0);
+        const expenses = entries.filter(
+            e => e.tag !== "Income" && myExpenseTWD(e) > 0 && !isFixedNecessaryExpense(e)
+        );
         if (expenses.length < 8) return [];
 
         const sorted = [...expenses].sort((a, b) => myExpenseTWD(a) - myExpenseTWD(b));

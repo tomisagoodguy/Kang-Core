@@ -59,13 +59,15 @@ const TAG_COLORS: Record<string, string> = {
     Other: "#6b7280",
 };
 
-// 子標籤用較淺的色調
-function lightenColor(hex: string, amount = 40): string {
-    const num = parseInt(hex.replace("#", ""), 16);
-    const r = Math.min(255, (num >> 16) + amount);
-    const g = Math.min(255, ((num >> 8) & 0x00ff) + amount);
-    const b = Math.min(255, (num & 0x0000ff) + amount);
-    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+// 子標籤用一組彼此可區分的色階（依序循環，不再是同一色相的深淺）
+const SUBTAG_PALETTE = [
+    "#f59e0b", "#3b82f6", "#ec4899", "#10b981", "#8b5cf6",
+    "#06b6d4", "#f97316", "#a78bfa", "#22c55e", "#ef4444",
+    "#0ea5e9", "#eab308",
+];
+
+function subTagColor(index: number): string {
+    return SUBTAG_PALETTE[index % SUBTAG_PALETTE.length];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -319,7 +321,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                             >
                                 {barData.map((entry, index) => {
                                     const baseColor = drillTag
-                                        ? lightenColor(parentColor!, index * 20)
+                                        ? subTagColor(index)
                                         : TAG_COLORS[(entry as TagData).tag] || TAG_COLORS.Other;
                                     return <Cell key={`bar-cell-${index}`} fill={baseColor} />;
                                 })}
@@ -383,7 +385,7 @@ export function TagPieChart({ data, entries, currentMonth }: TagPieChartProps) {
                         >
                             {displayData.map((entry, index) => {
                                 const baseColor = drillTag
-                                    ? lightenColor(parentColor!, index * 20)
+                                    ? subTagColor(index)
                                     : TAG_COLORS[(entry as TagData).tag] || TAG_COLORS.Other;
                                 return <Cell key={`cell-${index}`} fill={baseColor} />;
                             })}
