@@ -121,7 +121,9 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
         webhooks.append({
             "url": kang_webhook,
             "type": "generic",
-            "name": "Kang-Core Production"
+            "name": "Kang-Core Production",
+            # /api/webhooks/threads 需要 Bearer CRON_SECRET 驗證（2026-06-07 起）
+            "auth_token": os.getenv("CRON_SECRET"),
         })
 
     if webhooks:

@@ -3,7 +3,8 @@
 """
 
 import json
-from typing import Dict, List
+import os
+from typing import Dict, List, Optional
 import requests
 
 
@@ -18,6 +19,12 @@ class Notifier:
         """
         self.webhooks = webhooks
         self.notify_on = notify_on
+
+    @staticmethod
+    def _generic_headers(webhook: Optional[Dict] = None) -> Dict[str, str]:
+        """generic webhook 的認證標頭（Kang-Core /api/webhooks/threads 需要 Bearer CRON_SECRET）"""
+        token = (webhook or {}).get("auth_token") or os.getenv("CRON_SECRET")
+        return {"Authorization": f"Bearer {token}"} if token else {}
 
     def send_new_posts(self, posts: List[Dict], keywords: List[str] = None):
         """發送新貼文通知"""
@@ -69,7 +76,7 @@ class Notifier:
                 elif webhook_type == "line":
                     self._send_line_post(url, post, keywords)
                 else:
-                    self._send_generic_post(url, post, keywords)
+                    self._send_generic_post(url, post, keywords, webhook)
             except Exception as e:
                 print(f"⚠️  發送通知失敗 ({webhook.get('name', 'Unknown')}): {e}")
 
@@ -92,7 +99,7 @@ class Notifier:
                 elif webhook_type == "line":
                     self._send_line_reply(url, reply)
                 else:
-                    self._send_generic_reply(url, reply)
+                    self._send_generic_reply(url, reply, webhook)
             except Exception as e:
                 print(f"⚠️  發送通知失敗 ({webhook.get('name', 'Unknown')}): {e}")
 
@@ -290,7 +297,7 @@ class Notifier:
         response = requests.post(url, json=payload)
         response.raise_for_status()
 
-    def _send_generic_post(self, url: str, post: Dict, keywords: List[str] = None):
+    def _send_generic_post(self, url: str, post: Dict, keywords: List[str] = None, webhook: Optional[Dict] = None):
         """發送通用 JSON 格式的貼文通知"""
         payload = {
             "type": "new_post",
@@ -310,10 +317,10 @@ class Notifier:
         if keywords:
             payload["matched_keywords"] = keywords
 
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, headers=self._generic_headers(webhook))
         response.raise_for_status()
 
-    def _send_generic_reply(self, url: str, reply: Dict):
+    def _send_generic_reply(self, url: str, reply: Dict, webhook: Optional[Dict] = None):
         """發送通用 JSON 格式的回覆通知"""
         payload = {
             "type": "new_reply",
@@ -327,7 +334,7 @@ class Notifier:
             }
         }
 
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, headers=self._generic_headers(webhook))
         response.raise_for_status()
 
     def _send_telegram_post(self, bot_token: str, post: Dict, keywords: List[str], webhook: Dict):
@@ -538,7 +545,7 @@ class Notifier:
                         "type": "test",
                         "message": "Threads Scraper Webhook 連線成功！"
                     }
-                    response = requests.post(url, json=payload, timeout=10)
+                    response = requests.post(url, json=payload, headers=self._generic_headers(webhook), timeout=10)
                     response.raise_for_status()
 
                 print(f"  ✅ {name} ({webhook_type}): 連線成功")

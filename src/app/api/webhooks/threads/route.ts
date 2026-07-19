@@ -50,7 +50,16 @@ export async function POST(req: Request) {
             const entry = parsedData.data;
             entry.createdAt = new Date();
 
-            // Store in Firestore
+            // 去重：爬蟲端資料庫在 GitHub Actions 為暫時性，每次執行會重發相同貼文
+            const dup = await db
+                .collection("threads")
+                .where("threadId", "==", entry.threadId)
+                .limit(1)
+                .get();
+            if (!dup.empty) {
+                return NextResponse.json({ status: "duplicate", threadId: entry.threadId });
+            }
+
             await db.collection("threads").add(entry);
 
             // Notify via Line
