@@ -175,6 +175,8 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 - **XIRR 年化報酬**：`GET /api/holdings/performance` 以 `investment_transactions` 買賣現金流 + 今日市值求解（二分法）。美股歷史交易以**目前**匯率換算（近似值）；交易未滿 30 天不提供（年化會爆炸）。
 - **儲蓄率與 FIRE**：`/assets` 前端由 `/api/dashboard/cashflow` 近 12 月資料計算儲蓄率（只計有資料的月份），`FireCalculator`（`src/components/FireCalculator.tsx`）自動帶入平均月支出／月儲蓄／目前淨值，純前端試算不落地。
 - **CAGR 複利試算**：`GET /api/market/cagr`（需登入）查詢 Yahoo Finance chart API 算歷史年化報酬率，**務必用 `indicators.adjclose`，不能用 `indicators.quote[0].close`**——close 未還原減資/分割（例：0050 2025 年拆分），算出來的 CAGR 會嚴重失真。`CagrCalculator.tsx` 顯示於 `/assets` 頁，查詢結果自動帶入下方複利試算的年化報酬率輸入框。
+- **三情境 FIRE**：`FireCalculator.tsx` 以「中性情境年化報酬率 ± 情境增減幅」算出悲觀/中性/樂觀三種預估達成時間，純前端試算。
+- **TWR + 風險指標**：`GET /api/holdings/performance` 除了 XIRR，也用 `net_worth_snapshots` 的月度 `investmentValueTWD` 序列（搭配 `investment_transactions` 現金流做 Modified-Dietz-lite 校正）算 `riskMetrics`：年化 TWR、年化波動度、Sharpe（用固定粗估無風險利率 1.5%，非即時抓取）、最大回撤。**至少需要 3 期報酬率（4 個月快照）才提供**，快照不足回傳 `null`，`/assets` 頁對應區塊會整塊不顯示。未實作 Sortino Ratio（northstar 原始功能列表之一），如需要要另外處理下檔波動的分母計算。
 
 ### PWA 離線支援
 

@@ -21,6 +21,14 @@ interface TravelStats {
     budget: number | null;
 }
 
+interface RiskMetrics {
+    twrPct: number;
+    volatilityPct: number;
+    sharpe: number;
+    maxDrawdownPct: number;
+    periodsUsed: number;
+}
+
 interface PerformanceData {
     xirr: number | null;
     reason?: string;
@@ -28,6 +36,7 @@ interface PerformanceData {
     totalRecoveredTWD?: number;
     marketValueTWD?: number;
     since?: string | null;
+    riskMetrics?: RiskMetrics | null;
 }
 
 function daysSince(dateStr?: string): number | null {
@@ -363,6 +372,39 @@ export default function AssetsPage() {
 
                     <NetWorthTrendChart data={netWorthChartData} />
                     <MonthlyTrendChart data={cashflowChartData} />
+
+                    {performance?.riskMetrics && (
+                        <div className="glass-card" style={{ padding: "24px" }}>
+                            <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "4px" }}>
+                                📉 投資組合風險指標
+                            </h3>
+                            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "16px" }}>
+                                依 {performance.riskMetrics.periodsUsed} 期月度淨值快照計算，快照期數越多越準確
+                            </p>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px" }}>
+                                <div>
+                                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>TWR（時間加權年化報酬）</p>
+                                    <p style={{ fontSize: "1.15rem", fontWeight: 700, color: performance.riskMetrics.twrPct >= 0 ? "#22c55e" : "#ef4444" }}>
+                                        {performance.riskMetrics.twrPct.toFixed(1)}%
+                                    </p>
+                                </div>
+                                <div>
+                                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>年化波動度</p>
+                                    <p style={{ fontSize: "1.15rem", fontWeight: 700, color: "#f59e0b" }}>{performance.riskMetrics.volatilityPct.toFixed(1)}%</p>
+                                </div>
+                                <div>
+                                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Sharpe Ratio</p>
+                                    <p style={{ fontSize: "1.15rem", fontWeight: 700, color: performance.riskMetrics.sharpe >= 1 ? "#22c55e" : "#818cf8" }}>
+                                        {performance.riskMetrics.sharpe.toFixed(2)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>最大回撤</p>
+                                    <p style={{ fontSize: "1.15rem", fontWeight: 700, color: "#ef4444" }}>{performance.riskMetrics.maxDrawdownPct.toFixed(1)}%</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <FireCalculator
                         avgMonthlyExpense={avgMonthlyExpense}

@@ -35,13 +35,22 @@ export function FireCalculator({ avgMonthlyExpense, avgMonthlySavings, currentAs
     const [monthlyContribution, setMonthlyContribution] = useState(Math.max(0, Math.round(avgMonthlySavings)));
     const [annualReturnPct, setAnnualReturnPct] = useState(5);
     const [withdrawalRatePct, setWithdrawalRatePct] = useState(4);
+    const [scenarioDeltaPct, setScenarioDeltaPct] = useState(3); // 悲觀/樂觀情境的報酬率增減幅度
 
     const annualExpense = monthlyExpense * 12;
     const fireNumber = withdrawalRatePct > 0 ? annualExpense / (withdrawalRatePct / 100) : 0;
     const progressPct = fireNumber > 0 ? Math.min(100, (currentAssets / fireNumber) * 100) : 0;
-    const yearsToFire = fireNumber > 0
-        ? simulateYearsToFire(currentAssets, monthlyContribution, annualReturnPct, fireNumber)
-        : null;
+
+    const scenarios = [
+        { key: "pessimistic", label: "😟 悲觀", returnPct: annualReturnPct - scenarioDeltaPct, color: "#f87171" },
+        { key: "neutral", label: "😐 中性", returnPct: annualReturnPct, color: "#38bdf8" },
+        { key: "optimistic", label: "😄 樂觀", returnPct: annualReturnPct + scenarioDeltaPct, color: "#22c55e" },
+    ].map((s) => ({
+        ...s,
+        years: fireNumber > 0
+            ? simulateYearsToFire(currentAssets, monthlyContribution, s.returnPct, fireNumber)
+            : null,
+    }));
 
     return (
         <div className="glass-card" style={{ padding: "24px" }}>
@@ -55,11 +64,12 @@ export function FireCalculator({ avgMonthlyExpense, avgMonthlySavings, currentAs
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "16px" }}>
                 <FireInput label="月支出（退休後）" value={monthlyExpense} onChange={setMonthlyExpense} step={1000} />
                 <FireInput label="每月投入" value={monthlyContribution} onChange={setMonthlyContribution} step={1000} />
-                <FireInput label="預期年化報酬 %" value={annualReturnPct} onChange={setAnnualReturnPct} step={0.5} />
+                <FireInput label="預期年化報酬 %（中性情境）" value={annualReturnPct} onChange={setAnnualReturnPct} step={0.5} />
                 <FireInput label="提領率 %" value={withdrawalRatePct} onChange={setWithdrawalRatePct} step={0.5} />
+                <FireInput label="情境報酬增減幅 %" value={scenarioDeltaPct} onChange={setScenarioDeltaPct} step={0.5} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "16px" }}>
                 <div>
                     <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>FIRE 目標（年支出 ÷ 提領率）</p>
                     <p style={{ fontSize: "1.15rem", fontWeight: 700, color: "#f59e0b" }}>${Math.round(fireNumber).toLocaleString()}</p>
@@ -68,16 +78,22 @@ export function FireCalculator({ avgMonthlyExpense, avgMonthlySavings, currentAs
                     <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>目前淨資產</p>
                     <p style={{ fontSize: "1.15rem", fontWeight: 700, color: "#818cf8" }}>${Math.round(currentAssets).toLocaleString()}</p>
                 </div>
-                <div>
-                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>預估達成時間</p>
-                    <p style={{ fontSize: "1.15rem", fontWeight: 700, color: "#38bdf8" }}>
-                        {yearsToFire === null
-                            ? "—（百年內無法達成）"
-                            : yearsToFire === 0
-                                ? "🎉 已達成"
-                                : `約 ${yearsToFire.toFixed(1)} 年`}
-                    </p>
-                </div>
+            </div>
+
+            <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "8px" }}>三情境預估達成時間（報酬率以中性情境 ± {scenarioDeltaPct}% 增減）</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "12px" }}>
+                {scenarios.map((s) => (
+                    <div key={s.key} style={{ padding: "10px 12px", borderRadius: "8px", background: "rgba(128,128,128,0.08)" }}>
+                        <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{s.label}（{s.returnPct.toFixed(1)}%）</p>
+                        <p style={{ fontSize: "1.05rem", fontWeight: 700, color: s.color }}>
+                            {s.years === null
+                                ? "—（百年內無法達成）"
+                                : s.years === 0
+                                    ? "🎉 已達成"
+                                    : `約 ${s.years.toFixed(1)} 年`}
+                        </p>
+                    </div>
+                ))}
             </div>
 
             <div style={{ height: "8px", borderRadius: "4px", background: "var(--border-color)", overflow: "hidden" }}>
