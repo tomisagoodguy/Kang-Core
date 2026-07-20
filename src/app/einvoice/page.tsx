@@ -24,6 +24,90 @@ function shiftMonth(month: string, delta: number): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+interface AnalysisData {
+    count: number;
+    total: number;
+    tags: Array<[string, number]>;
+    merchants: Array<[string, number]>;
+    items: Array<[string, number]>;
+}
+
+/** 分類分布 / 常去商家 / 常買品項卡片，我與爸媽分析共用 */
+function AnalysisCard({ title, note, data, grandTotal }: {
+    title: string;
+    note: string;
+    data: AnalysisData;
+    grandTotal: number;
+}) {
+    return (
+        <div className="card" style={{ marginTop: "16px", padding: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px" }}>
+                <h3 style={{ fontWeight: 700 }}>{title}</h3>
+                <span style={{ fontSize: "13px", opacity: 0.6 }}>{note}</span>
+            </div>
+            <div style={{ fontSize: "24px", fontWeight: 700, margin: "8px 0 14px" }}>
+                ${data.total.toLocaleString("zh-TW")}
+                <span style={{ fontSize: "13px", fontWeight: 400, opacity: 0.6, marginLeft: "8px" }}>
+                    佔全家 {grandTotal > 0 ? Math.round((data.total / grandTotal) * 100) : 0}%
+                </span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "20px" }}>
+                {/* 分類分布 */}
+                <div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>消費種類</div>
+                    {data.tags.map(([tag, amt]) => (
+                        <div key={tag} style={{ marginBottom: "6px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                                <span>{getTagEmoji(tag)} {tag}</span>
+                                <span style={{ fontWeight: 600 }}>${amt.toLocaleString("zh-TW")}</span>
+                            </div>
+                            <div style={{ height: "5px", background: "var(--border, #eee)", borderRadius: "3px", marginTop: "3px" }}>
+                                <div style={{
+                                    height: "100%",
+                                    width: `${data.total > 0 ? Math.max(2, (amt / data.total) * 100) : 0}%`,
+                                    background: "var(--primary)",
+                                    borderRadius: "3px",
+                                }} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* 常去商家 */}
+                <div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>常去商家 Top {data.merchants.length}</div>
+                    {data.merchants.map(([merchant, amt], i) => (
+                        <div key={merchant} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", padding: "4px 0", borderBottom: "1px solid var(--border, #f0f0f0)" }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: "8px" }}>{i + 1}. {merchant}</span>
+                            <span style={{ fontWeight: 600, flexShrink: 0 }}>${amt.toLocaleString("zh-TW")}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* 品項熱點 */}
+            {data.items.length > 0 && (
+                <div style={{ marginTop: "14px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>常買品項</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {data.items.map(([item, count]) => (
+                            <span key={item} style={{
+                                fontSize: "12px",
+                                padding: "3px 10px",
+                                borderRadius: "999px",
+                                background: "var(--border, #f0f0f0)",
+                            }}>
+                                {item}{count > 1 ? ` ×${count}` : ""}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function EinvoicePage() {
     const [month, setMonth] = useState(currentMonth());
     const [records, setRecords] = useState<EinvoiceRecordView[]>([]);
@@ -89,11 +173,9 @@ export default function EinvoicePage() {
 
     const grandTotal = records.reduce((s, r) => s + r.amount, 0);
 
-    // 爸媽消費分析：生活共同體視角——member ≠ "me"（含未歸屬）即視為爸媽
-    const parentsAnalysis = (() => {
-        const rows = records.filter((r) => r.member !== "me");
+    // 分析函式（我 / 爸媽共用）：分類分布、常去商家、常買品項
+    const analyze = (rows: EinvoiceRecordView[]) => {
         const total = rows.reduce((s, r) => s + r.amount, 0);
-
         const byTag = new Map<string, number>();
         const byMerchant = new Map<string, number>();
         const itemCount = new Map<string, number>();
@@ -113,7 +195,13 @@ export default function EinvoicePage() {
             merchants: sortDesc(byMerchant).slice(0, 6),
             items: sortDesc(itemCount).slice(0, 10),
         };
-    })();
+    };
+
+    // 我的發票分析：僅供快速核對，非權威統計——現金/未開發票消費不會出現在此，
+    // 完整個人消費請看 /accounting 與 /assets
+    const myAnalysis = analyze(records.filter((r) => r.member === "me"));
+    // 爸媽消費分析：生活共同體視角——member ≠ "me"（含未歸屬）即視為爸媽
+    const parentsAnalysis = analyze(records.filter((r) => r.member !== "me"));
 
     const filtered = filter === "all"
         ? records
@@ -172,73 +260,24 @@ export default function EinvoicePage() {
                 {filter !== "all" && <button className="card-action-btn" style={{ marginLeft: "12px" }} onClick={() => setFilter("all")}>清除篩選</button>}
             </p>
 
+            {/* 我的發票分析：僅供核對，非權威統計——現金/未開發票消費看不到，完整個人分析請看 /accounting、/assets */}
+            {myAnalysis.count > 0 && (
+                <AnalysisCard
+                    title="🙋 我的發票分析"
+                    note={`已比對到我的發票共 ${myAnalysis.count} 筆 · 僅供核對，完整個人消費請看記帳/資產頁`}
+                    data={myAnalysis}
+                    grandTotal={grandTotal}
+                />
+            )}
+
             {/* 爸媽消費分析（生活共同體：非「我」即爸媽，含未歸屬） */}
             {parentsAnalysis.count > 0 && (
-                <div className="card" style={{ marginTop: "16px", padding: "16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px" }}>
-                        <h3 style={{ fontWeight: 700 }}>👨‍👩 爸媽消費分析</h3>
-                        <span style={{ fontSize: "13px", opacity: 0.6 }}>非「我」的發票（含未歸屬）共 {parentsAnalysis.count} 筆</span>
-                    </div>
-                    <div style={{ fontSize: "24px", fontWeight: 700, margin: "8px 0 14px" }}>
-                        ${parentsAnalysis.total.toLocaleString("zh-TW")}
-                        <span style={{ fontSize: "13px", fontWeight: 400, opacity: 0.6, marginLeft: "8px" }}>
-                            佔全家 {grandTotal > 0 ? Math.round((parentsAnalysis.total / grandTotal) * 100) : 0}%
-                        </span>
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "20px" }}>
-                        {/* 分類分布 */}
-                        <div>
-                            <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>消費種類</div>
-                            {parentsAnalysis.tags.map(([tag, amt]) => (
-                                <div key={tag} style={{ marginBottom: "6px" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                                        <span>{getTagEmoji(tag)} {tag}</span>
-                                        <span style={{ fontWeight: 600 }}>${amt.toLocaleString("zh-TW")}</span>
-                                    </div>
-                                    <div style={{ height: "5px", background: "var(--border, #eee)", borderRadius: "3px", marginTop: "3px" }}>
-                                        <div style={{
-                                            height: "100%",
-                                            width: `${parentsAnalysis.total > 0 ? Math.max(2, (amt / parentsAnalysis.total) * 100) : 0}%`,
-                                            background: "var(--primary)",
-                                            borderRadius: "3px",
-                                        }} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* 常去商家 */}
-                        <div>
-                            <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>常去商家 Top {parentsAnalysis.merchants.length}</div>
-                            {parentsAnalysis.merchants.map(([merchant, amt], i) => (
-                                <div key={merchant} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", padding: "4px 0", borderBottom: "1px solid var(--border, #f0f0f0)" }}>
-                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: "8px" }}>{i + 1}. {merchant}</span>
-                                    <span style={{ fontWeight: 600, flexShrink: 0 }}>${amt.toLocaleString("zh-TW")}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 品項熱點 */}
-                    {parentsAnalysis.items.length > 0 && (
-                        <div style={{ marginTop: "14px" }}>
-                            <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>常買品項</div>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                                {parentsAnalysis.items.map(([item, count]) => (
-                                    <span key={item} style={{
-                                        fontSize: "12px",
-                                        padding: "3px 10px",
-                                        borderRadius: "999px",
-                                        background: "var(--border, #f0f0f0)",
-                                    }}>
-                                        {item}{count > 1 ? ` ×${count}` : ""}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                <AnalysisCard
+                    title="👨‍👩 爸媽消費分析"
+                    note={`非「我」的發票（含未歸屬）共 ${parentsAnalysis.count} 筆`}
+                    data={parentsAnalysis}
+                    grandTotal={grandTotal}
+                />
             )}
 
             {loading ? (
