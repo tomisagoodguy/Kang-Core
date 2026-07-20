@@ -26,6 +26,14 @@
       ]
     },
     {
+      "collectionGroup": "einvoice_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "archive",
       "queryScope": "COLLECTION",
       "fields": [

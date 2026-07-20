@@ -5,12 +5,14 @@ import { getAllLineUserIds, getLineUserIdFromEmail } from "@/lib/userRegistry";
 import { lineService } from "@/services/line.service";
 import { getTagEmoji } from "@/utils/tagEmoji";
 
+const MEMBER_LABEL: Record<string, string> = { me: "我", dad: "爸", mom: "媽" };
+
 /**
- * 財政部電子發票 Gmail 自動記帳
- * Vercel Cron: 30 12 * * * (UTC) -> 台灣時間 20:30（趕在 21:00 每日摘要前入帳）
+ * 財政部電子發票 Gmail 自動匯入（家庭帳 einvoice_records，不進個人 accounting）
+ * Vercel Cron: 30 12 * * * (UTC) -> 台灣時間 20:30
  *
  * Gmail 帳號 = GOOGLE_OAUTH_REFRESH_TOKEN 的授權帳號（單一信箱），
- * 入帳的 userId 以該信箱透過 EMAIL_LINE_MAP 反查，查不到 fallback 第一位註冊用戶。
+ * 帳本 userId 以該信箱透過 EMAIL_LINE_MAP 反查，查不到 fallback 第一位註冊用戶。
  */
 export async function GET(req: Request) {
     const authHeader = req.headers.get("authorization");
@@ -29,19 +31,19 @@ export async function GET(req: Request) {
 
         if (result.imported.length > 0) {
             const lines = result.imported.slice(0, 15).map((inv) => {
-                const flag = inv.suspectedDuplicate ? " ⚠️疑似重複" : "";
-                return `${getTagEmoji(inv.tag)} ${inv.date.slice(5)} ${inv.merchantName} $${inv.amount.toLocaleString("zh-TW")}${flag}`;
+                const who = inv.member ? `[${MEMBER_LABEL[inv.member] ?? inv.member}] ` : "";
+                return `${getTagEmoji(inv.tag)} ${inv.date.slice(5)} ${who}${inv.merchantName} $${inv.amount.toLocaleString("zh-TW")}`;
             });
             const total = result.imported.reduce((sum, inv) => sum + inv.amount, 0);
             const overflow = result.imported.length > 15 ? [`…及其他 ${result.imported.length - 15} 筆`] : [];
-            const suspects = result.imported.filter((inv) => inv.suspectedDuplicate).length;
+            const unassigned = result.imported.filter((inv) => !inv.member).length;
             await lineService.pushText(userId, [
-                `🧾 電子發票自動入帳 ${result.imported.length} 筆`,
+                `🧾 家庭發票新入帳 ${result.imported.length} 筆`,
                 "━━━━━━━━━━━━",
                 ...lines,
                 ...overflow,
                 `合計 $${total.toLocaleString("zh-TW")}`,
-                ...(suspects > 0 ? [`⚠️ ${suspects} 筆與手動記帳同日同額，請到 Dashboard 確認是否重複`] : []),
+                ...(unassigned > 0 ? [`👥 ${unassigned} 筆未歸屬成員，可到 Dashboard「發票」頁指定（指定過的商家之後會自動歸屬）`] : []),
             ].join("\n"));
         }
 

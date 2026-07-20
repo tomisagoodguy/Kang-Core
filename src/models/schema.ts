@@ -237,6 +237,36 @@ export const TripSchema = z.object({
 
 export type Trip = z.infer<typeof TripSchema>;
 
+// ─── 電子發票（家庭帳，與個人 accounting 完全分離）────────────────
+// 全家共用同一載具，發票落地此集合後再歸屬成員；個人統計不受影響
+export const InvoiceMemberEnum = z.enum(["me", "dad", "mom"]);
+export type InvoiceMember = z.infer<typeof InvoiceMemberEnum>;
+
+export const EinvoiceRecordSchema = z.object({
+    id: z.string().optional(),
+    userId: z.string(), // Gmail 授權帳號對應的 LINE userId（帳本擁有者）
+    invoiceNumber: z.string(),
+    date: z.string(), // YYYY-MM-DD
+    merchantName: z.string(),
+    sellerTaxId: z.string().optional(),
+    amount: z.number(),
+    tag: TagEnum, // 自動分類（與個人帳同一套標籤）
+    description: z.string().optional(), // 品項摘要
+    member: InvoiceMemberEnum.nullable().default(null), // null = 未歸屬
+    memberSource: z.enum(["auto-match", "rule", "manual"]).optional(), // 歸屬依據
+    matchedAccountingEntryId: z.string().optional(), // 對到的手動記帳（同日同額 → member=me）
+    createdAt: z.any().optional(),
+});
+
+export type EinvoiceRecord = z.infer<typeof EinvoiceRecordSchema>;
+
+/** 前端接收的電子發票資料 */
+export type EinvoiceRecordView = Omit<EinvoiceRecord, "id" | "createdAt" | "tag"> & {
+    id: string;
+    tag: string;
+    createdAt?: string;
+};
+
 export const GeminiParseResultSchema = z.object({
     type: z.enum(["accounting", "archive", "calendar", "recurring", "query", "clear_memory", "unknown"]),
     accountingDataList: z.array(AccountingEntrySchema.omit({

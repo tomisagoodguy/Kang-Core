@@ -160,6 +160,8 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `insights` | monthYear, insight, TTL: 1 小時 |
 | `processed_messages` | messageId, TTL: 7 天（去重用）|
 | `processed_invoices` | 電子發票三層去重鎖：`msg_{messageId}` / `att_{sha256}` / `inv_{發票號碼}_{日期}`（永久保留，防彙整信重寄重複入帳） |
+| `einvoice_records` | 家庭電子發票（與個人 accounting 分離）：invoiceNumber, date, merchantName, amount, tag, member(me/dad/mom/null), memberSource, matchedAccountingEntryId |
+| `einvoice_member_rules` | 商家 → 成員歸屬規則：userId, merchantKey（`normalizeMerchant()` 正規化）, member |
 | `user_settings` | userId, travelMode.{active, destination, startedAt, currency, exchangeRate}（旅遊模式狀態＋當地幣別與啟動時匯率）, annualTravelBudget（年度旅遊預算，台幣） |
 | `trips` | userId, destination, startDate, endDate, days, totalTWD（期間 Travel 支出加總，關閉旅遊模式時凍結）, currency |
 | `net_worth_snapshots` | userId, date, cashBalance, investmentValueTWD, loanBalance, netWorth（月初 cron 自動落地或 Dashboard 手動建立） |
@@ -205,17 +207,19 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
 `/api/cron/weekly-email-report` 以 Gmail API（`src/lib/gmail/client.ts`）從授權帳號寄出 HTML 週報，收件者由 `EMAIL_LINE_MAP` 反查（`getEmailFromLineUserId()`，無對應 email 的用戶跳過）。**前提**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `gmail.send` scope——若寄信回 403/insufficient scopes，重跑 `npx tsx scripts/refresh-google-token.ts` 重新授權並更新 Vercel 環境變數。
 
-### 電子發票自動記帳
+### 電子發票自動匯入（家庭帳，與個人帳分離）
 
-`/api/cron/invoice-sync` 從授權 Gmail 讀取財政部「消費發票彙整通知」附件（CSV/TXT/ZIP，`src/lib/einvoice/parser.ts` 解析，支援民國曆與 Big5），自動分類入帳（`source: "einvoice"`）並 LINE 推播摘要。核心邏輯在 `src/services/invoiceImport.service.ts`。
+`/api/cron/invoice-sync` 從授權 Gmail 讀取財政部「消費發票彙整通知」附件（CSV/TXT/ZIP，`src/lib/einvoice/parser.ts` 解析，支援民國曆與 Big5）。**全家共用同一載具**，發票**不進個人 `accounting`**，落地獨立的 `einvoice_records` 集合——個人統計（儲蓄率／預算／月報）不受家人消費污染。核心邏輯在 `src/services/invoiceImport.service.ts`。
 
+- **成員歸屬（我/爸/媽）三層判定**：①同日同額對到手動記帳 → `member="me"` 並連結該筆（`auto-match`）②`einvoice_member_rules` 商家規則（`rule`）③未歸屬 → Dashboard `/einvoice` 頁手動指定（`manual`），指定時預設寫回規則，同商家（`normalizeMerchant()` 正規化後）之後自動歸屬
 - **三層去重**（`processed_invoices` 集合，`doc.create()` 搶鎖）：信件層 `msg_{messageId}` / 附件層 `att_{sha256}` / 發票層 `inv_{發票號碼}_{日期}`——同張發票出現在多封彙整信也不會重複入帳
-- **分類鏈**：`ClassificationEngine.match()` → `guessTag()`（quickCommand 匯出的靜態關鍵字兜底）→ `Other`
-- **疑似重複警示**：同日已有同額手動記帳仍會入帳，但 LINE 通知標示 ⚠️ 請人工到 Dashboard 確認
-- **入帳 userId**：Gmail 授權帳號 email 經 `EMAIL_LINE_MAP` 反查，查不到 fallback `LINE_USER_IDS` 第一位
+- **分類鏈**：`ClassificationEngine.match()` → `guessTag()`（quickCommand 匯出的靜態關鍵字兜底）→ `Other`；Dashboard 修正分類會回饋 `ClassificationEngine.learn()`
+- **帳本 userId**：Gmail 授權帳號 email 經 `EMAIL_LINE_MAP` 反查，查不到 fallback `LINE_USER_IDS` 第一位
+- **API**：`GET /api/einvoice?month=YYYY-MM`（列表）、`PUT /api/einvoice/[id]`（改 member/tag，member 附 `learnRule`）
 - **前提 1**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `gmail.readonly` scope（同上，重跑 refresh-google-token.ts）
 - **前提 2**：使用者需在財政部電子發票整合服務平台啟用「寄送消費資訊」到該 Gmail
 - 選配環境變數 `GMAIL_INVOICE_QUERY` 可覆寫 Gmail 搜尋條件（預設抓 60 天內含附件的彙整通知）
+- 歷史遷移：`scripts/migrate-einvoice-to-family.ts`（一次性，已於 2026-07 執行）
 
 ---
 
@@ -258,7 +262,7 @@ NEXT_PUBLIC_FIREBASE_*    # 前端 Firebase 設定（7 個變數）
 Dashboard 採 Firebase Google OAuth + Session Cookie 機制：
 
 1. 前端登入 → `POST /api/auth/session`（建立 5 天 httpOnly Cookie `firebase-session`）
-2. `src/proxy.ts`（Next.js 16 的 proxy 檔案慣例，即原 middleware）保護所有 Dashboard 路徑（`PROTECTED_PATHS`：`/`, `/accounting`, `/archive`, `/calendar`, `/recurring`, `/loans`, `/assets`, `/threads`, `/settings`），Cookie 不存在 → 導向 `/login`
+2. `src/proxy.ts`（Next.js 16 的 proxy 檔案慣例，即原 middleware）保護所有 Dashboard 路徑（`PROTECTED_PATHS`：`/`, `/accounting`, `/archive`, `/calendar`, `/recurring`, `/loans`, `/assets`, `/threads`, `/settings`, `/einvoice`），Cookie 不存在 → 導向 `/login`
 3. API Route 中呼叫 `getSessionUserId()`（`src/lib/auth/getSessionUserId.ts`）驗證 Cookie 並透過 `EMAIL_LINE_MAP` 取得 LINE userId；或使用 `withAuth` wrapper（`src/lib/auth/withAuth.ts`）自動注入 userId：`export const GET = withAuth(async (req, userId) => { ... })`
 4. 所有 Firestore 查詢**必須**帶 `userId`，資料隔離在 API 層而非 Proxy 層
 

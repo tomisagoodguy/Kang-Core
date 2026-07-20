@@ -8,16 +8,19 @@ import {
 import { extractInvoiceDocuments, parseEinvoiceText, type ParsedInvoice } from "@/lib/einvoice/parser";
 import { ClassificationEngine } from "@/services/classificationEngine";
 import { guessTag } from "@/services/quickCommand";
-import type { AccountingEntry } from "@/models/schema";
+import type { EinvoiceRecord, InvoiceMember } from "@/models/schema";
 
 /**
- * 財政部電子發票 Gmail 自動記帳。
+ * 財政部電子發票 Gmail 自動匯入（家庭帳）。
  *
- * 流程：Gmail 搜尋彙整信 → 下載 CSV/TXT/ZIP 附件 → 三層去重 → 解析 → 分類 → 寫入 accounting。
- * 去重（皆以 Firestore doc.create() 搶鎖，ALREADY_EXISTS 即跳過）：
- *   1. 信件層：processed_invoices/msg_{messageId}（整封信處理成功後標記，下次直接跳過）
- *   2. 附件層：processed_invoices/att_{sha256}（同內容附件重寄不重複處理）
- *   3. 發票層：processed_invoices/inv_{發票號碼}_{日期}（同張發票出現在多封彙整信不重複入帳）
+ * 全家共用同一載具，發票**不進個人 accounting**，落地獨立的 `einvoice_records` 集合，
+ * 個人統計（儲蓄率／預算／月報）完全不受影響。成員歸屬（我／爸／媽）依序判定：
+ *   1. auto-match：同日同額對到我的手動記帳 → member="me" 並連結該筆
+ *   2. rule：`einvoice_member_rules` 商家歸屬規則（Dashboard 指定過一次即學會）
+ *   3. 未歸屬（null）→ Dashboard 手動指定後寫回規則
+ *
+ * 三層去重（processed_invoices 集合，doc.create() 搶鎖）：
+ *   信件層 msg_{messageId} / 附件層 att_{sha256} / 發票層 inv_{發票號碼}_{日期}
  */
 
 const DEFAULT_QUERY =
@@ -29,8 +32,7 @@ export interface ImportedInvoice {
     merchantName: string;
     amount: number;
     tag: string;
-    /** 同日已有相同金額的手動記帳，可能重複，需人工確認 */
-    suspectedDuplicate: boolean;
+    member: InvoiceMember | null;
 }
 
 export interface InvoiceSyncResult {
@@ -39,6 +41,14 @@ export interface InvoiceSyncResult {
     imported: ImportedInvoice[];
     duplicates: number;
     errors: string[];
+}
+
+/** 商家名稱正規化：去公司型態與分公司尾綴，作為歸屬規則的 key */
+export function normalizeMerchant(name: string): string {
+    return name
+        .replace(/股份有限公司|有限公司|商行|企業社/g, "")
+        .replace(/第?[一二三四五六七八九十百千\d０-９]+分公司/g, "")
+        .trim();
 }
 
 /** doc.create() 搶鎖；已存在回傳 false */
@@ -59,28 +69,49 @@ async function acquireLock(docId: string, payload: Record<string, unknown>): Pro
 }
 
 /** 分類：學習規則 → 靜態關鍵字兜底 → Other */
-async function classify(invoice: ParsedInvoice, userId: string): Promise<{ tag: string; subTag?: string }> {
-    const text = [invoice.merchantName, ...invoice.items.slice(0, 5).map((i) => i.name)].join(" ");
+async function classify(merchantName: string, itemNames: string[], userId: string): Promise<{ tag: string; subTag?: string }> {
+    const text = [merchantName, ...itemNames.slice(0, 5)].join(" ");
     const matched = await ClassificationEngine.match(text, userId);
     if (matched) return matched;
     return { tag: guessTag(text) };
 }
 
-/** 同日同金額的非系統來源記帳 → 疑似與手動記帳重複（仍入帳，但通知提醒） */
-async function hasSuspectedManualDuplicate(userId: string, date: string, amount: number): Promise<boolean> {
+/** 成員歸屬規則快取（cron 單次執行內有效） */
+async function loadMemberRules(userId: string): Promise<Map<string, InvoiceMember>> {
+    const snap = await db.collection("einvoice_member_rules")
+        .where("userId", "==", userId)
+        .get();
+    const rules = new Map<string, InvoiceMember>();
+    for (const doc of snap.docs) {
+        const data = doc.data();
+        if (data.merchantKey && data.member) rules.set(data.merchantKey, data.member);
+    }
+    return rules;
+}
+
+/**
+ * 同日同額比對我的手動記帳（source 非 einvoice/system）。
+ * 對到 → 這筆發票是我本人消費（member="me"），並連結該筆手動帳避免重複計算的疑慮。
+ */
+async function matchManualEntry(userId: string, date: string, amount: number): Promise<string | null> {
     const snap = await db.collection("accounting")
         .where("userId", "==", userId)
         .where("date", "==", date)
         .get();
-    return snap.docs.some((doc) => {
+    for (const doc of snap.docs) {
         const data = doc.data();
-        if (data.source === "einvoice" || data.source === "system") return false;
+        if (data.source === "einvoice" || data.source === "system") continue;
         const entryAmount = typeof data.amountTWD === "number" ? data.amountTWD : data.amount;
-        return Math.round(entryAmount) === Math.round(amount);
-    });
+        if (Math.round(entryAmount) === Math.round(amount)) return doc.id;
+    }
+    return null;
 }
 
-async function importInvoice(invoice: ParsedInvoice, userId: string): Promise<ImportedInvoice | null> {
+async function importInvoice(
+    invoice: ParsedInvoice,
+    userId: string,
+    memberRules: Map<string, InvoiceMember>
+): Promise<ImportedInvoice | null> {
     const date = invoice.issuedAt.slice(0, 10);
     const lockId = `inv_${invoice.invoiceNumber}_${date}`;
     const acquired = await acquireLock(lockId, {
@@ -91,23 +122,43 @@ async function importInvoice(invoice: ParsedInvoice, userId: string): Promise<Im
     });
     if (!acquired) return null;
 
-    const { tag, subTag } = await classify(invoice, userId);
-    const suspectedDuplicate = await hasSuspectedManualDuplicate(userId, date, invoice.totalAmount);
+    const itemNames = invoice.items.map((i) => i.name);
+    const { tag } = await classify(invoice.merchantName, itemNames, userId);
 
-    const itemSummary = invoice.items.slice(0, 3).map((i) => i.name).join("、");
-    const entry: AccountingEntry = {
+    // 成員歸屬：先比對手動帳（me），再套商家規則
+    let member: InvoiceMember | null = null;
+    let memberSource: EinvoiceRecord["memberSource"];
+    let matchedAccountingEntryId: string | undefined;
+
+    const matchedId = await matchManualEntry(userId, date, invoice.totalAmount);
+    if (matchedId) {
+        member = "me";
+        memberSource = "auto-match";
+        matchedAccountingEntryId = matchedId;
+    } else {
+        const ruleMember = memberRules.get(normalizeMerchant(invoice.merchantName));
+        if (ruleMember) {
+            member = ruleMember;
+            memberSource = "rule";
+        }
+    }
+
+    const itemSummary = itemNames.slice(0, 3).join("、");
+    const record: EinvoiceRecord = {
         userId,
-        amount: invoice.totalAmount,
-        tag: tag as AccountingEntry["tag"],
-        ...(subTag ? { subTag } : {}),
-        date,
-        description: itemSummary ? `${invoice.merchantName}（${itemSummary}）` : invoice.merchantName,
-        source: "einvoice",
         invoiceNumber: invoice.invoiceNumber,
-        originalText: `E-invoice ${invoice.invoiceNumber} ${invoice.merchantName} $${invoice.totalAmount}`,
+        date,
+        merchantName: invoice.merchantName,
+        ...(invoice.sellerTaxId ? { sellerTaxId: invoice.sellerTaxId } : {}),
+        amount: invoice.totalAmount,
+        tag: tag as EinvoiceRecord["tag"],
+        ...(itemSummary ? { description: itemSummary } : {}),
+        member,
+        ...(memberSource ? { memberSource } : {}),
+        ...(matchedAccountingEntryId ? { matchedAccountingEntryId } : {}),
         createdAt: new Date(),
     };
-    await db.collection("accounting").add(entry);
+    await db.collection("einvoice_records").add(record);
 
     return {
         invoiceNumber: invoice.invoiceNumber,
@@ -115,14 +166,15 @@ async function importInvoice(invoice: ParsedInvoice, userId: string): Promise<Im
         merchantName: invoice.merchantName,
         amount: invoice.totalAmount,
         tag,
-        suspectedDuplicate,
+        member,
     };
 }
 
-/** 同步指定用戶的電子發票信件（Gmail 帳號 = GOOGLE_OAUTH_REFRESH_TOKEN 授權帳號） */
+/** 同步電子發票信件（Gmail 帳號 = GOOGLE_OAUTH_REFRESH_TOKEN 授權帳號） */
 export async function syncEinvoices(userId: string): Promise<InvoiceSyncResult> {
     const query = process.env.GMAIL_INVOICE_QUERY?.trim() || DEFAULT_QUERY;
     const messageIds = await listMessageIds(query, 50);
+    const memberRules = await loadMemberRules(userId);
 
     const result: InvoiceSyncResult = {
         messages: 0,
@@ -161,7 +213,7 @@ export async function syncEinvoices(userId: string): Promise<InvoiceSyncResult> 
                     const documents = extractInvoiceDocuments(ref.filename, bytes);
                     const parsed = documents.flatMap((doc) => parseEinvoiceText(doc.text));
                     for (const invoice of parsed) {
-                        const imported = await importInvoice(invoice, userId);
+                        const imported = await importInvoice(invoice, userId, memberRules);
                         if (imported) result.imported.push(imported);
                         else result.duplicates += 1;
                     }
