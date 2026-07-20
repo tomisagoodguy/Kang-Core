@@ -166,12 +166,21 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `trips` | userId, destination, startDate, endDate, days, totalTWD（期間 Travel 支出加總，關閉旅遊模式時凍結）, currency |
 | `net_worth_snapshots` | userId, date, cashBalance, investmentValueTWD, loanBalance, netWorth（月初 cron 自動落地或 Dashboard 手動建立） |
 | `investment_transactions` | userId, market(TW/US), ticker, side(buy/sell), shares, pricePerShare, fee, date（XIRR 計算的現金流來源） |
+| `credit_cards` | userId, name, billingDay（出帳日）, dueDay（繳款日）, isActive |
+| `credit_card_bills` | userId, creditCardId, periodStart, periodEnd, dueDate, totalAmount, paidAmount, status(unpaid/partial/paid) |
 
 ### 資產總覽與投資績效（/assets）
 
 - **淨值計算單一事實來源**：`src/services/netWorth.service.ts`（`NetWorthService`）＝現金 + 持股市值（美股即時匯率換算）− 貸款餘額。`/api/net-worth`（手動快照）與 `/api/cron/net-worth-snapshot`（月初自動快照）都走這裡，勿另寫計算邏輯。
 - **XIRR 年化報酬**：`GET /api/holdings/performance` 以 `investment_transactions` 買賣現金流 + 今日市值求解（二分法）。美股歷史交易以**目前**匯率換算（近似值）；交易未滿 30 天不提供（年化會爆炸）。
 - **儲蓄率與 FIRE**：`/assets` 前端由 `/api/dashboard/cashflow` 近 12 月資料計算儲蓄率（只計有資料的月份），`FireCalculator`（`src/components/FireCalculator.tsx`）自動帶入平均月支出／月儲蓄／目前淨值，純前端試算不落地。
+- **CAGR 複利試算**：`GET /api/market/cagr`（需登入）查詢 Yahoo Finance chart API 算歷史年化報酬率，**務必用 `indicators.adjclose`，不能用 `indicators.quote[0].close`**——close 未還原減資/分割（例：0050 2025 年拆分），算出來的 CAGR 會嚴重失真。`CagrCalculator.tsx` 顯示於 `/assets` 頁，查詢結果自動帶入下方複利試算的年化報酬率輸入框。
+
+### PWA 離線支援
+
+- **Service Worker**：`public/sw.js`，`ServiceWorkerRegister.tsx`（`layout.tsx` 全站掛載）負責註冊。頁面走 network-first（保資料新鮮，離線退回快取殼或 `public/offline.html`）；`/_next/static/` 與圖片走 cache-first（檔名帶 hash 可長期快取）；**`/api/` 一律不攔截**，避免快取到過期或跨用戶資料。
+- **範圍是「離線瀏覽已訪問過的頁面外觀」，不是離線記帳/離線寫入**：本專案是 Firestore 伺服器權威架構（分類學習、預算警報、多用戶隔離都在後端），沒有做 IndexedDB 本地寫入佇列 + 之後同步的離線優先架構（那是 WebApp-KanJi 的做法，屬於完全不同的純前端 IndexedDB 架構，不適合直接搬過來）。離線時記帳/查詢等需要連線的操作仍會失敗。
+- **改快取邏輯務必更新 `sw.js` 內的 `CACHE_VERSION`**：檔案內容改變才會讓瀏覽器偵測到新 SW 版本並觸發 `activate` 清掉舊快取；新版本預設不會自動 `skipWaiting`，而是等使用者在畫面右下角「有新版本可用」提示按下「立即更新」才透過 `SKIP_WAITING` 訊息啟用，避免正在使用中的分頁被無預警換版本。
 
 ### 多幣別 / 代墊 / 付款方式（記帳延伸欄位）
 
@@ -181,6 +190,19 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 - **旅程與年度旅遊預算**：關閉旅遊模式時 `TravelModeService.deactivate()` 自動落地一筆 `trips`（凍結該趟 Travel 支出總額）；年度預算存 `user_settings.annualTravelBudget`。LINE 用 `/旅遊` 看年度總覽、`/旅遊預算 {金額}` 設定；開啟/關閉旅遊模式的回覆會帶年度已花與剩餘預算（衝動控制設計）。Dashboard 對應 `/assets` 頁「年度旅遊」區塊與 `GET/PUT /api/trips`。年度支出以「全年 `tag=Travel` 記帳」計算（含旅程外的機票、簽證），不是只加總 trips。
 - **付款方式**：`paymentMethod` = `cash|credit_card|e_payment`，由 Gemini 或 `detectPaymentMethod()` 關鍵字判定，純分類用途。
 - **編輯陷阱**：Dashboard 改 `amount` 時，`PUT /api/accounting/[id]` 會用原 `exchangeRate` 重算 `amountTWD`，勿讓兩者失同步。
+
+### 信用卡帳單週期 + FIFO 自動沖銷（/credit-cards）
+
+- **記帳綁卡**：`paymentMethod="credit_card"` 的記帳可選填 `creditCardId`（`AddEntryModal.tsx`）。若使用者只有一張啟用中的卡，未指定 `creditCardId` 的舊資料/新記帳也會自動歸屬該卡（`singleCardId` fallback）；多卡使用者未指定卡別的消費不會被任何一期帳單彙整，需手動編輯歸屬。
+- **出帳**：`cron/credit-card-billing`（每日 00:10 台灣時間）比對每張卡的 `billingDay`，命中時彙整上次出帳日隔天～今天的刷卡消費（`myExpenseTWD()` 加總），寫入 `credit_card_bills`（`status="unpaid"`）。`dueDate` 規則：若 `dueDay > billingDay` 落在同月，否則落在次月。以 `periodEnd` 唯一性做冪等，同日重跑不會產生重複帳單。
+- **FIFO 沖銷**：`POST /api/credit-cards/[id]/pay` 依 `periodEnd` 由舊到新依序沖銷 `unpaid`/`partial` 帳單，繳款金額不足以繳清當期時該期記為 `partial`，超額繳款不建立負數帳單（回傳 `unallocatedAmount`）。
+- **勿與 `paymentMethod` 混淆**：`paymentMethod="credit_card"` 只是分類標記；只有同時填了 `creditCardId`（或符合單卡 fallback）的記帳才會被算進帳單週期彙整。
+
+### 帳單到期提醒 / 異常消費提醒（主動推播，不同於被動門檻警報）
+
+- **帳單到期提醒**：`cron/bill-due-reminder`（每日 09:00 台灣時間）提前 3 天（`REMINDER_DAYS_BEFORE`）推播信用卡未繳帳單與 monthly/yearly 定期支出即將自動入帳的提醒。daily/weekly/weekday/holiday 頻率的定期支出太頻繁，不做提前提醒。冪等：信用卡帳單用 `reminderSent` 欄位、定期支出用 `lastReminderTriggerDate`（記錄已提醒過的下次觸發日）避免重複推播。
+- **異常消費提醒**：`src/services/anomaly.service.ts`（`checkAnomalyAlert`）在 `message.service.ts` LINE 記帳成功後逐筆判斷，IQR 方法（Q3 + 1.5×IQR，樣本需 ≥ 8 筆）偵測本筆是否遠高於近 180 天日常水準，命中就主動 push LINE。判斷邏輯與 Dashboard `accounting/page.tsx` 的「異常大額支出」視覺化警示一致（同樣排除 `source==="system"` 與房租/家裡分攤等固定必要開銷關鍵字），差別是這裡會主動推播而非只在 Dashboard 顯示。**只掛在 LINE 記帳路徑**，Dashboard 手動新增記帳（`/api/accounting` POST）不會觸發 LINE 推播（Dashboard 本身已有視覺化警示，不需要重複通知）。
+- **勿與 `budget.service.ts` 混淆**：`checkBudgetAlert` 是「本月累積支出 vs 預算門檻」的被動警報（80%/100%）；`checkAnomalyAlert` 是「單筆金額 vs 近期消費分布」的即時異常偵測，兩者觸發條件與用途都不同，可能同時觸發。
 
 ---
 
@@ -201,6 +223,8 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `30 1 1 * *` | 09:30 每月1日 | 淨值快照自動落地（該月已有快照則跳過） |
 | `30 12 * * *` | 20:30 | 電子發票自動記帳（趕在 21:00 每日摘要前入帳） |
 | `10 1 1 * *` | 09:10 每月1日 | 爸媽消費月報（einvoice_records，member ≠ me 視為爸媽） |
+| `10 16 * * *` | 00:10 | 信用卡帳單自動產生（依各卡 billingDay 判斷，緊接在定期支出 cron 之後） |
+| `0 1 * * *` | 09:00 | 帳單到期提醒（信用卡未繳帳單 + 定期支出 monthly/yearly，提前 3 天） |
 
 每個 Cron 端點需要 `Authorization: Bearer ${CRON_SECRET}` 標頭驗證。
 

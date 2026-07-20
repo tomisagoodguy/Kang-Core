@@ -3,6 +3,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { AuthProvider } from "@/components/AuthProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
     title: "康 Core — AI 個人助理儀表板",
@@ -34,6 +35,7 @@ export default function RootLayout({
                     <ThemeProvider>
                         <Navbar />
                         <main>{children}</main>
+                        <ServiceWorkerRegister />
                     </ThemeProvider>
                 </AuthProvider>
             </body>

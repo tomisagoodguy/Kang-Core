@@ -43,6 +43,14 @@
         {
             "path": "/api/cron/einvoice-monthly-report",
             "schedule": "10 1 1 * *"
+        },
+        {
+            "path": "/api/cron/credit-card-billing",
+            "schedule": "10 16 * * *"
+        },
+        {
+            "path": "/api/cron/bill-due-reminder",
+            "schedule": "0 1 * * *"
         }
     ]
 }

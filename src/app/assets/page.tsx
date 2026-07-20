@@ -5,6 +5,7 @@ import type { HoldingView, LoanView, NetWorthSnapshotView, CashAccountView, Trip
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { NetWorthTrendChart } from "@/components/charts/NetWorthTrendChart";
 import { FireCalculator } from "@/components/FireCalculator";
+import { CagrCalculator } from "@/components/CagrCalculator";
 
 interface CashflowMonth {
     month: string;
@@ -368,6 +369,8 @@ export default function AssetsPage() {
                         avgMonthlySavings={avgMonthlySavings}
                         currentAssets={currentNetWorth}
                     />
+
+                    <CagrCalculator />
 
                     <div className="glass-card" style={{ padding: "24px" }}>
                         <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "16px" }}>

@@ -53,6 +53,10 @@ export async function GET(req: Request) {
 
                 if (frequency === "daily") {
                     shouldTrigger = true;
+                } else if (frequency === "weekday") {
+                    shouldTrigger = currentDayOfWeek >= 1 && currentDayOfWeek <= 5;
+                } else if (frequency === "holiday") {
+                    shouldTrigger = currentDayOfWeek === 0 || currentDayOfWeek === 6;
                 } else if (frequency === "weekly") {
                     if (dayOfWeek === currentDayOfWeek) {
                         shouldTrigger = true;

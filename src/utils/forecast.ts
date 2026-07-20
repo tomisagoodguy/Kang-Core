@@ -21,7 +21,7 @@ export interface ForecastEntryLike {
 export interface ForecastRecurringRuleLike {
     amount: number;
     tag?: string;
-    frequency: "daily" | "weekly" | "monthly" | "yearly";
+    frequency: "daily" | "weekly" | "monthly" | "yearly" | "weekday" | "holiday";
     dayOfMonth?: number;
     dayOfWeek?: number;
     monthOfYear?: number;
@@ -86,6 +86,15 @@ export function calculateMonthlyForecast(
         .filter(r => r.isActive !== false && r.tag !== "Income")
         .reduce((sum, r) => {
             if (r.frequency === "daily") return sum + r.amount * daysLeft;
+            if (r.frequency === "weekday" || r.frequency === "holiday") {
+                let count = 0;
+                for (let d = daysElapsed + 1; d <= daysInMonth; d++) {
+                    const dow = new Date(y, m - 1, d).getDay();
+                    const isWeekday = dow >= 1 && dow <= 5;
+                    if ((r.frequency === "weekday") === isWeekday) count++;
+                }
+                return sum + r.amount * count;
+            }
             if (r.frequency === "weekly" && r.dayOfWeek != null) {
                 let count = 0;
                 for (let d = daysElapsed + 1; d <= daysInMonth; d++) {

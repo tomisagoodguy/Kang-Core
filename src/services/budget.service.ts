@@ -27,7 +27,7 @@ export async function checkBudgetAlert(
 
         for (const budgetDoc of budgetSnap.docs) {
             const budget = budgetDoc.data();
-            const { monthlyLimit, tag: budgetTag } = budget as { monthlyLimit: number; tag?: string };
+            const { monthlyLimit, tag: budgetTag, excludedTags } = budget as { monthlyLimit: number; tag?: string; excludedTags?: string[] };
 
             // 只處理符合的 tag 預算（無 tag 代表總預算）
             if (budgetTag && budgetTag !== tag) continue;
@@ -41,6 +41,9 @@ export async function checkBudgetAlert(
             let entries = accSnap.docs.map(d => d.data() as AccountingEntry).filter(e => e.tag !== "Income");
             if (budgetTag) {
                 entries = entries.filter(e => e.tag === budgetTag);
+            } else if (excludedTags && excludedTags.length > 0) {
+                // 總預算：排除使用者勾選的分類（如 Travel），不列入總預算統計
+                entries = entries.filter(e => !excludedTags.includes(e.tag));
             }
             const monthTotal = entries.reduce((s, e) => s + myExpenseTWD(e), 0);
 

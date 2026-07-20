@@ -10,6 +10,7 @@ import { parseQuickCommand } from "./quickCommand";
 import { executeQuery } from "./queryEngine";
 import { ClassificationEngine } from "./classificationEngine";
 import { checkBudgetAlert } from "./budget.service";
+import { checkAnomalyAlert } from "./anomaly.service";
 import { TravelModeService, NON_TRAVEL_TAGS } from "./travelMode.service";
 import { resolveCurrency, computeCurrencyFields, formatMoney, PAYMENT_LABELS, settlementNote, myExpenseTWD, detectPaymentMethod } from "@/utils/currency";
 import { ArchiveTagEngine } from "./archiveTagEngine";
@@ -142,6 +143,7 @@ export class MessageService {
             let totalExpense = 0;
             let firstExpenseTag = "";
             const learnQueue: Array<{ text: string; tag: string; subTag?: string }> = [];
+            const entriesForAnomalyCheck: AccountingEntry[] = [];
 
             for (const item of list) {
                 const docRef = db.collection("accounting").doc();
@@ -172,6 +174,7 @@ export class MessageService {
                 if (!isIncome) {
                     totalExpense += myExpenseTWD(entry);
                     if (!firstExpenseTag) firstExpenseTag = entry.tag;
+                    entriesForAnomalyCheck.push(entry);
                 }
 
                 // 學習新規則 (C9) - 先排隊，等寫入成功才學，避免 commit 失敗仍污染規則
@@ -191,6 +194,11 @@ export class MessageService {
             // 預算超支警報（針對同一批次的總花費只觸發一次）
             if (totalExpense > 0 && firstExpenseTag) {
                 checkBudgetAlert(userId, totalExpense, list[0].date, firstExpenseTag).catch(() => { /* 不影響主流程 */ });
+            }
+
+            // 異常大額支出提醒（逐筆判斷，不影響主流程）
+            for (const anomalyEntry of entriesForAnomalyCheck) {
+                checkAnomalyAlert(userId, anomalyEntry).catch(() => { /* 不影響主流程 */ });
             }
 
             if (parsedData.explanation) {

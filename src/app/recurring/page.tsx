@@ -17,7 +17,7 @@ export default function RecurringPage() {
     const [amount, setAmount] = useState("");
     const [tag, setTag] = useState("Other");
     const [description, setDescription] = useState("");
-    const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly" | "yearly">("monthly");
+    const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly" | "yearly" | "weekday" | "holiday">("monthly");
     const [dayOfMonth, setDayOfMonth] = useState("1");
     const [dayOfWeek, setDayOfWeek] = useState("0");
     const [monthOfYear, setMonthOfYear] = useState("1");
@@ -131,6 +131,8 @@ export default function RecurringPage() {
 
     const formatFreq = (e: RecurringExpenseView) => {
         if (e.frequency === "daily") return "每天";
+        if (e.frequency === "weekday") return "平日（週一至五）";
+        if (e.frequency === "holiday") return "假日（週六日）";
         if (e.frequency === "weekly") {
             const days = ["日", "一", "二", "三", "四", "五", "六"];
             return `每週${days[e.dayOfWeek || 0]}`;
@@ -250,10 +252,12 @@ export default function RecurringPage() {
 
                             <select
                                 value={frequency}
-                                onChange={e => setFrequency(e.target.value as "daily" | "weekly" | "monthly" | "yearly")}
+                onChange={e => setFrequency(e.target.value as "daily" | "weekly" | "monthly" | "yearly" | "weekday" | "holiday")}
                                 style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border-color)", background: "var(--bg-color)", color: "var(--text-primary)" }}
                             >
                                 <option value="daily">每天</option>
+                                <option value="weekday">平日（週一至五）</option>
+                                <option value="holiday">假日（週六日）</option>
                                 <option value="weekly">每週</option>
                                 <option value="monthly">每月</option>
                                 <option value="yearly">每年</option>

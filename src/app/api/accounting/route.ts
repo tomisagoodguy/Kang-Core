@@ -67,6 +67,7 @@ const CreateEntrySchema = z.object({
     description: z.string().optional(),
     currency: z.string().optional(), // ISO 4217，未填視為 TWD
     paymentMethod: PaymentMethodEnum.optional(),
+    creditCardId: z.string().optional(),
     settlement: SettlementSchema.optional(),
 });
 
@@ -105,6 +106,7 @@ export async function POST(request: NextRequest) {
             amountTWD,
             ...(input.subTag ? { subTag: input.subTag } : {}),
             ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
+            ...(input.creditCardId ? { creditCardId: input.creditCardId } : {}),
             ...(input.settlement ? { settlement: input.settlement } : {}),
         };
 

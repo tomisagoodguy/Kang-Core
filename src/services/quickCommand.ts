@@ -15,6 +15,7 @@ import {
     myExpenseTWD,
     PAYMENT_LABELS,
 } from "@/utils/currency";
+import { TagEnum } from "@/models/schema";
 import type { AccountingEntry, Budget } from "@/models/schema";
 
 interface QuickCommandResult {
@@ -62,6 +63,8 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
                 "　　例：/threads 主題 台股",
                 "🏷️ /threads 主題取消 {關鍵字}",
                 "🏷️ /threads 主題清單",
+                "",
+                "📊 /預算　　查看本月預算\n　　/預算 設定 {金額}　設定月總預算\n　　/預算 排除 {分類}　該分類不計入總預算",
                 "",
                 "🤝 /欠款　　查看代墊／借貸",
                 "　　/結清 {對方}　結清款項",
@@ -137,6 +140,16 @@ export async function parseQuickCommand(text: string, userId: string): Promise<Q
     const budgetSetMatch = trimmed.match(/^\/預算\s+設定\s+(\d+)$/);
     if (budgetSetMatch) {
         return await handleBudgetSet(userId, Number(budgetSetMatch[1]));
+    }
+    // /預算 排除 {Tag} — 該分類消費不計入總預算統計
+    const budgetExcludeMatch = trimmed.match(/^\/預算\s+排除\s+(\S+)$/);
+    if (budgetExcludeMatch) {
+        return await handleBudgetExclude(userId, budgetExcludeMatch[1], true);
+    }
+    // /預算 排除取消 {Tag}
+    const budgetIncludeMatch = trimmed.match(/^\/預算\s+排除取消\s+(\S+)$/);
+    if (budgetIncludeMatch) {
+        return await handleBudgetExclude(userId, budgetIncludeMatch[1], false);
     }
 
     // /旅遊 — 今年旅遊支出總覽（/旅遊預算 不帶金額時也顯示總覽）
@@ -519,17 +532,21 @@ async function handleBudgetQuery(userId: string): Promise<QuickCommandResult> {
             .where("date", ">=", monthStart)
             .where("date", "<=", monthEnd)
             .get();
-        const monthTotal = accSnap.docs
+        const monthEntries = accSnap.docs
             .map((d) => d.data() as AccountingEntry)
-            .filter((e) => e.tag !== "Income")
-            .reduce((s, e) => s + myExpenseTWD(e), 0);
+            .filter((e) => e.tag !== "Income");
 
         const lines = budgetSnap.docs.map(d => {
             const b = d.data() as Budget;
             const tag = b.tag || "總";
             const limit = b.monthlyLimit;
-            const ratio = Math.round((monthTotal / limit) * 100);
-            return `${tag === "總" ? "📊" : getTagEmoji(tag)} ${tag}預算: $${monthTotal.toLocaleString()} / $${limit.toLocaleString()} (${ratio}%)`;
+            const entries = b.tag
+                ? monthEntries.filter(e => e.tag === b.tag)
+                : monthEntries.filter(e => !b.excludedTags?.includes(e.tag));
+            const spent = entries.reduce((s, e) => s + myExpenseTWD(e), 0);
+            const ratio = Math.round((spent / limit) * 100);
+            const excludeNote = !b.tag && b.excludedTags?.length ? `（已排除 ${b.excludedTags.join("、")}）` : "";
+            return `${tag === "總" ? "📊" : getTagEmoji(tag)} ${tag}預算${excludeNote}: $${spent.toLocaleString()} / $${limit.toLocaleString()} (${ratio}%)`;
         });
 
         return {
@@ -538,6 +555,8 @@ async function handleBudgetQuery(userId: string): Promise<QuickCommandResult> {
                 `📊 ${ym} 預算狀況`,
                 "━━━━━━━━━━━━",
                 ...lines,
+                "",
+                "💡 /預算 排除 {分類} 可讓該分類不計入總預算",
             ].join("\n"),
         };
     } catch {
@@ -570,6 +589,43 @@ async function handleBudgetSet(userId: string, amount: number): Promise<QuickCom
         };
     } catch {
         return { handled: true, replyText: "⚠️ 設定預算失敗" };
+    }
+}
+
+/** /預算 排除 {Tag} / /預算 排除取消 {Tag} — 該分類消費不計入總預算統計 */
+async function handleBudgetExclude(userId: string, tagInput: string, exclude: boolean): Promise<QuickCommandResult> {
+    const tagResult = TagEnum.safeParse(tagInput);
+    if (!tagResult.success) {
+        return { handled: true, replyText: `⚠️ 分類「${tagInput}」不存在，可用分類：${TagEnum.options.join("、")}` };
+    }
+    const tag = tagResult.data;
+
+    try {
+        const existing = await db.collection("budgets")
+            .where("userId", "==", userId)
+            .where("tag", "==", null)
+            .get();
+
+        if (existing.empty) {
+            return { handled: true, replyText: "📊 尚未設定總預算，請先輸入 /預算 設定 {金額}" };
+        }
+
+        const doc = existing.docs[0];
+        const currentExcluded: string[] = (doc.data() as Budget).excludedTags ?? [];
+        const newExcluded = exclude
+            ? Array.from(new Set([...currentExcluded, tag]))
+            : currentExcluded.filter(t => t !== tag);
+
+        await doc.ref.update({ excludedTags: newExcluded, updatedAt: new Date() });
+
+        return {
+            handled: true,
+            replyText: exclude
+                ? `✅ ${getTagEmoji(tag)} ${tag} 已排除，之後不計入總預算統計`
+                : `✅ ${getTagEmoji(tag)} ${tag} 已恢復計入總預算統計`,
+        };
+    } catch {
+        return { handled: true, replyText: "⚠️ 設定失敗" };
     }
 }
 

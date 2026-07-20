@@ -41,7 +41,7 @@ export async function PUT(
         if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
         const body = await request.json();
-        const { amount, tag, subTag, date, description } = body;
+        const { amount, tag, subTag, date, description, paymentMethod, creditCardId } = body;
 
         const updateData: Record<string, unknown> = {};
         if (amount !== undefined) {
@@ -55,6 +55,8 @@ export async function PUT(
         if (subTag !== undefined) updateData.subTag = subTag;
         if (date !== undefined) updateData.date = date;
         if (description !== undefined) updateData.description = description;
+        if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+        if (creditCardId !== undefined) updateData.creditCardId = creditCardId;
 
         await snap.ref.update(updateData);
 

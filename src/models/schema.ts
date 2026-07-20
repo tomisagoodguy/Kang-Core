@@ -58,6 +58,8 @@ export const AccountingEntrySchema = BaseEntrySchema.extend({
     amountTWD: z.number().optional(), // 整筆換算台幣 = amount * exchangeRate（統計基準）
     // ── 付款方式 ─────────────────────────────────────
     paymentMethod: PaymentMethodEnum.optional(),
+    // ── 信用卡帳單週期歸屬（paymentMethod="credit_card" 時可指定，供帳單自動產生與 FIFO 沖銷分組）──
+    creditCardId: z.string().optional(),
     // ── 代墊 / 借貸 ──────────────────────────────────
     settlement: SettlementSchema.optional(),
     // ── 電子發票（source="einvoice" 時寫入，供追溯與去重）──
@@ -101,7 +103,7 @@ export const CalendarEntrySchema = BaseEntrySchema.extend({
 
 export type CalendarEntry = z.infer<typeof CalendarEntrySchema>;
 
-export const FrequencyEnum = z.enum(["daily", "weekly", "monthly", "yearly"]);
+export const FrequencyEnum = z.enum(["daily", "weekly", "monthly", "yearly", "weekday", "holiday"]);
 
 export const RecurringExpenseSchema = BaseEntrySchema.extend({
     amount: z.number().positive(),
@@ -113,6 +115,7 @@ export const RecurringExpenseSchema = BaseEntrySchema.extend({
     monthOfYear: z.number().min(1).max(12).optional(),
     isActive: z.boolean().default(true),
     lastTriggeredAt: z.string().optional(), // ISO String
+    lastReminderTriggerDate: z.string().optional(), // YYYY-MM-DD，已提醒過的下次觸發日，避免到期提醒 cron 重複推播
 });
 
 export type RecurringExpense = z.infer<typeof RecurringExpenseSchema>;
@@ -133,6 +136,46 @@ export const LoanSchema = BaseEntrySchema.extend({
 });
 
 export type Loan = z.infer<typeof LoanSchema>;
+
+// ─── 信用卡帳單週期 + FIFO 自動沖銷 ──────────────────────────
+export const CreditCardSchema = BaseEntrySchema.extend({
+    name: z.string(), // 卡片名稱，如「國泰 CUBE」
+    billingDay: z.number().min(1).max(31), // 出帳日（結帳日）
+    dueDay: z.number().min(1).max(31), // 繳款日
+    isActive: z.boolean().default(true),
+});
+
+export type CreditCard = z.infer<typeof CreditCardSchema>;
+
+export const CreditCardBillSchema = z.object({
+    id: z.string().optional(),
+    userId: z.string(),
+    creditCardId: z.string(),
+    periodStart: z.string(), // YYYY-MM-DD，含
+    periodEnd: z.string(), // YYYY-MM-DD，含（出帳日當天）
+    dueDate: z.string(), // YYYY-MM-DD
+    totalAmount: z.number().nonnegative(), // 該期消費總額（原幣別統一以 TWD 統計）
+    paidAmount: z.number().nonnegative().default(0), // FIFO 沖銷已繳金額
+    status: z.enum(["unpaid", "partial", "paid"]).default("unpaid"),
+    reminderSent: z.boolean().optional(), // 到期提醒 cron 是否已推播過，避免重複提醒
+    createdAt: z.any(),
+    updatedAt: z.any().optional(),
+});
+
+export type CreditCardBill = z.infer<typeof CreditCardBillSchema>;
+
+/** 前端接收的信用卡資料 */
+export type CreditCardView = Omit<CreditCard, "id" | "createdAt"> & {
+    id: string;
+    createdAt?: string;
+};
+
+/** 前端接收的信用卡帳單資料 */
+export type CreditCardBillView = Omit<CreditCardBill, "id" | "createdAt" | "updatedAt"> & {
+    id: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
 
 // ─── Investment（投資交易 / 持股彙總 / 股價 / 淨資產快照）───────────────
 export const MarketEnum = z.enum(["TW", "US"]);
@@ -344,6 +387,8 @@ export const BudgetSchema = z.object({
     userId: z.string(),
     tag: z.string().nullable(), // null means total budget
     monthlyLimit: z.number(),
+    // 預算排除分類：僅總預算（tag=null）適用，勾選的分類實際消費不計入總預算統計
+    excludedTags: z.array(TagEnum).optional(),
     createdAt: z.any(),
     updatedAt: z.any().optional(),
 });

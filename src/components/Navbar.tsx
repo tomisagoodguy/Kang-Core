@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { signOut } from "@/lib/firebase/auth";
 import { ThemeToggle } from "./ThemeToggle";
-import { Brain, Receipt, ReceiptText, Library, CalendarDays, MessageCircle, Settings, Repeat, Tags, ListTree, LogOut, Wallet, Landmark } from "lucide-react";
+import { Brain, Receipt, ReceiptText, Library, CalendarDays, MessageCircle, Settings, Repeat, Tags, ListTree, LogOut, Wallet, Landmark, CreditCard } from "lucide-react";
 
 const navLinks = [
     { href: "/", label: "首頁" },
@@ -20,6 +20,7 @@ const navLinks = [
 const settingsLinks = [
     { href: "/recurring", label: "定期", icon: <Repeat size={14} /> },
     { href: "/loans", label: "貸款", icon: <Landmark size={14} /> },
+    { href: "/credit-cards", label: "信用卡", icon: <CreditCard size={14} /> },
     { href: "/settings/tags", label: "標籤", icon: <Tags size={14} /> },
     { href: "/settings/rules", label: "規則", icon: <ListTree size={14} /> },
 ];

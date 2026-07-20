@@ -12,6 +12,7 @@ import { calculateMonthlyForecast } from "@/utils/forecast";
 import type { AccountingEntryView, CustomTag, Budget, RecurringExpenseView } from "@/models/schema";
 import { AccountingCalendarView } from "@/components/AccountingCalendarView";
 import { AddEntryModal } from "@/components/AddEntryModal";
+import { BatchAddEntryModal } from "@/components/BatchAddEntryModal";
 import {
     Wallet,
     Tags,
@@ -22,7 +23,8 @@ import {
     Inbox,
     List,
     CalendarDays,
-    Plus
+    Plus,
+    Layers
 } from "lucide-react";
 
 
@@ -38,6 +40,7 @@ export default function AccountingPage() {
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
     const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
     const [isAddOpen, setIsAddOpen] = useState(false);
+    const [isBatchAddOpen, setIsBatchAddOpen] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -199,12 +202,15 @@ export default function AccountingPage() {
             map.set(e.tag, (map.get(e.tag) || 0) + myExpenseTWD(e));
             return map;
         }, new Map<string, number>());
-        const totalSpent = monthExpenses.reduce((sum, e) => sum + myExpenseTWD(e), 0);
         return budgets
             .map(b => {
-                const spent = b.tag ? (spentMap.get(b.tag) || 0) : totalSpent;
+                const spent = b.tag
+                    ? (spentMap.get(b.tag) || 0)
+                    : monthExpenses
+                        .filter(e => !(b.excludedTags as string[] | undefined)?.includes(e.tag))
+                        .reduce((sum, e) => sum + myExpenseTWD(e), 0);
                 const pct = b.monthlyLimit > 0 ? Math.min(100, (spent / b.monthlyLimit) * 100) : 0;
-                return { id: b.id, tag: b.tag, monthlyLimit: b.monthlyLimit, spent, pct };
+                return { id: b.id, tag: b.tag, monthlyLimit: b.monthlyLimit, spent, pct, excludedTags: b.excludedTags };
             })
             .sort((a, b) => b.pct - a.pct);
     }, [entries, budgets, selectedMonth]);
@@ -281,13 +287,22 @@ export default function AccountingPage() {
             <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <Wallet className="text-accent" size={28} />
                 記帳記錄
-                <button
-                    onClick={() => setIsAddOpen(true)}
-                    className="card-action-btn"
-                    style={{ marginLeft: "auto", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "4px" }}
-                >
-                    <Plus size={16} /> 新增記帳
-                </button>
+                <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+                    <button
+                        onClick={() => setIsBatchAddOpen(true)}
+                        className="card-action-btn"
+                        style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                        <Layers size={16} /> 批次新增
+                    </button>
+                    <button
+                        onClick={() => setIsAddOpen(true)}
+                        className="card-action-btn"
+                        style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                        <Plus size={16} /> 新增記帳
+                    </button>
+                </div>
             </h1>
 
             <AddEntryModal
@@ -295,6 +310,12 @@ export default function AccountingPage() {
                 onClose={() => setIsAddOpen(false)}
                 onCreated={(entry) => setEntries((prev) => [entry, ...prev])}
                 customTags={customTags}
+            />
+
+            <BatchAddEntryModal
+                isOpen={isBatchAddOpen}
+                onClose={() => setIsBatchAddOpen(false)}
+                onCreated={(newEntries) => setEntries((prev) => [...newEntries, ...prev])}
             />
 
             {/* 月份選擇器 */}
@@ -404,6 +425,11 @@ export default function AccountingPage() {
                                 {b.pct >= 100 && (
                                     <p style={{ fontSize: "0.72rem", color: "var(--danger)", marginTop: "4px" }}>
                                         ⚠️ 已超出預算 ${(b.spent - b.monthlyLimit).toLocaleString()}
+                                    </p>
+                                )}
+                                {!b.tag && b.excludedTags && b.excludedTags.length > 0 && (
+                                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                                        已排除：{b.excludedTags.join("、")}（不計入總預算）
                                     </p>
                                 )}
                             </div>

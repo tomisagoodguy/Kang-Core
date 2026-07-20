@@ -34,8 +34,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     try {
-        const body = await req.json() as { tag?: string; monthlyLimit: number };
-        const { tag, monthlyLimit } = body;
+        const body = await req.json() as { tag?: string; monthlyLimit: number; excludedTags?: string[] };
+        const { tag, monthlyLimit, excludedTags } = body;
 
         if (!monthlyLimit || monthlyLimit <= 0) {
             return NextResponse.json({ error: "monthlyLimit 必須大於 0" }, { status: 400 });
@@ -50,15 +50,18 @@ export async function POST(req: Request) {
         }
 
         const existing = await query.get();
+        // excludedTags 只對總預算有意義
+        const excludedTagsField = !tag && excludedTags ? { excludedTags } : {};
 
         if (!existing.empty) {
-            await existing.docs[0].ref.update({ monthlyLimit, updatedAt: new Date() });
+            await existing.docs[0].ref.update({ monthlyLimit, updatedAt: new Date(), ...excludedTagsField });
         } else {
             await db.collection("budgets").add({
                 userId,
                 tag: tag ?? null,
                 monthlyLimit,
                 createdAt: new Date(),
+                ...excludedTagsField,
             });
         }
 

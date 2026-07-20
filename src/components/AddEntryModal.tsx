@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { ALL_TAGS } from "@/utils/constants";
 import { CURRENCIES, PAYMENT_LABELS } from "@/utils/currency";
-import type { AccountingEntryView, CustomTag } from "@/models/schema";
+import type { AccountingEntryView, CustomTag, CreditCardView } from "@/models/schema";
 
 interface AddEntryModalProps {
     isOpen: boolean;
@@ -23,12 +23,22 @@ export function AddEntryModal({ isOpen, onClose, onCreated, customTags = [] }: A
     const [subTag, setSubTag] = useState("");
     const [description, setDescription] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("");
+    const [creditCardId, setCreditCardId] = useState("");
+    const [creditCards, setCreditCards] = useState<CreditCardView[]>([]);
     const [hasSettlement, setHasSettlement] = useState(false);
     const [paidBy, setPaidBy] = useState<"me" | "other">("other");
     const [counterparty, setCounterparty] = useState("");
     const [myShare, setMyShare] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!isOpen) return;
+        fetch("/api/credit-cards")
+            .then((res) => (res.ok ? res.json() : []))
+            .then((data: CreditCardView[]) => setCreditCards(data.filter((c) => c.isActive)))
+            .catch(() => setCreditCards([]));
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -55,6 +65,7 @@ export function AddEntryModal({ isOpen, onClose, onCreated, customTags = [] }: A
                 ...(subTag.trim() ? { subTag: subTag.trim() } : {}),
                 ...(description.trim() ? { description: description.trim() } : {}),
                 ...(paymentMethod ? { paymentMethod } : {}),
+                ...(paymentMethod === "credit_card" && creditCardId ? { creditCardId } : {}),
                 ...(hasSettlement
                     ? {
                         settlement: {
@@ -83,6 +94,7 @@ export function AddEntryModal({ isOpen, onClose, onCreated, customTags = [] }: A
             setSubTag("");
             setDescription("");
             setMyShare("");
+            setCreditCardId("");
             onClose();
         } finally {
             setSaving(false);
@@ -167,6 +179,17 @@ export function AddEntryModal({ isOpen, onClose, onCreated, customTags = [] }: A
                             ))}
                         </select>
                     </div>
+                    {paymentMethod === "credit_card" && creditCards.length > 0 && (
+                        <div className="modal-field">
+                            <label className="modal-label">刷卡卡片（選填，供帳單週期歸屬）</label>
+                            <select className="modal-input" value={creditCardId} onChange={(e) => setCreditCardId(e.target.value)}>
+                                <option value="">不指定</option>
+                                {creditCards.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="modal-field">
                         <label className="modal-label" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
                             <input type="checkbox" checked={hasSettlement} onChange={(e) => setHasSettlement(e.target.checked)} />
