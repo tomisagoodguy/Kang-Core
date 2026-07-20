@@ -449,6 +449,7 @@ export type ThreadsEntryView = Omit<ThreadsEntry, "id" | "createdAt"> & {
 export type CalendarEntryView = Omit<CalendarEntry, "id" | "createdAt"> & {
     id: string;
     createdAt?: string;
+    calendarSummary?: string; // Google Calendar 次要日曆名稱（例如「案件」），僅 gcal- 來源會有值
 };
 
 /** 前端接收的定期支出資料 */

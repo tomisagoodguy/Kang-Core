@@ -14,6 +14,7 @@ export interface GCalEvent {
         date?: string;
         timeZone?: string;
     };
+    calendarSummary?: string; // 事件來源的日曆名稱（例如「案件」）
 }
 
 function getCalendarClient() {
@@ -28,6 +29,24 @@ function getCalendarClient() {
     });
 
     return google.calendar({ version: "v3", auth: oauth2Client });
+}
+
+/**
+ * 列出帳號下所有次要日曆（例如自建的「案件」日曆），
+ * 用於 /calendar 月檢視同步「全部」日曆而非只有 primary。
+ */
+async function listAllCalendarIds(): Promise<{ id: string; summary?: string | null }[]> {
+    const calendar = getCalendarClient();
+    try {
+        const res = await calendar.calendarList.list();
+        return (res.data.items || [])
+            .filter((c) => !!c.id)
+            .map((c) => ({ id: c.id as string, summary: c.summary }));
+    } catch (e) {
+        const error = e as Error;
+        console.error("Failed to list Google Calendars:", error.message || error);
+        return [];
+    }
 }
 
 export async function getEventsFromGoogleCalendar(dateStr: string): Promise<GCalEvent[]> {
@@ -84,7 +103,6 @@ export async function getUpcomingEventsFromGoogleCalendar(days: number = 7): Pro
 
 export async function getMonthlyEventsFromGoogleCalendar(year: number, month: number): Promise<GCalEvent[]> {
     const calendar = getCalendarClient();
-    const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
     // month is 1-12
     const startDate = new Date(year, month - 1, 1);
@@ -93,22 +111,33 @@ export async function getMonthlyEventsFromGoogleCalendar(year: number, month: nu
     const timeMin = startDate.toISOString();
     const timeMax = endDate.toISOString();
 
-    try {
-        const res = await calendar.events.list({
-            calendarId,
-            timeMin,
-            timeMax,
-            maxResults: 200,
-            singleEvents: true,
-            orderBy: "startTime",
-        });
+    const calendars = await listAllCalendarIds();
+    const calendarTargets = calendars.length > 0
+        ? calendars
+        : [{ id: process.env.GOOGLE_CALENDAR_ID || "primary", summary: undefined }];
 
-        return (res.data.items as GCalEvent[]) || [];
-    } catch (e) {
-        const error = e as Error;
-        console.error("Failed to fetch monthly events from Google Calendar:", error.message || error);
-        return [];
-    }
+    const results = await Promise.all(
+        calendarTargets.map(async ({ id: calendarId, summary }) => {
+            try {
+                const res = await calendar.events.list({
+                    calendarId,
+                    timeMin,
+                    timeMax,
+                    maxResults: 200,
+                    singleEvents: true,
+                    orderBy: "startTime",
+                });
+                const events = (res.data.items as GCalEvent[]) || [];
+                return events.map((e) => ({ ...e, calendarSummary: summary || undefined }));
+            } catch (e) {
+                const error = e as Error;
+                console.error(`Failed to fetch events from calendar "${summary || calendarId}":`, error.message || error);
+                return [];
+            }
+        })
+    );
+
+    return results.flat();
 }
 
 export async function addEventToGoogleCalendar(entry: {

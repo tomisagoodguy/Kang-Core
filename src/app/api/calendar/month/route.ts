@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
                 gcalEventId: event.id,
                 source: "system", // Treat as system-created so we know it's external
                 originalText: "Imported from Google Calendar",
+                calendarSummary: event.calendarSummary,
             };
         });
 

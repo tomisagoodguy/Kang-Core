@@ -232,7 +232,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 
 ### 行事曆總覽（/calendar）三個資料來源
 
-`GET /api/calendar/month` 合併三個來源後回傳：①Firestore `calendar` 集合（LINE Bot / Dashboard 建立的待辦，需有 `actionDate` 才會顯示在月曆格上）②Google Calendar 事件（`src/lib/calendar/client.ts`，`id` 前綴 `gcal-`）③Google Tasks（`src/lib/tasks/client.ts`，`id` 前綴 `task-`，只讀，逐一遍歷所有 tasklists 並用 `dueMin`/`dueMax` 篩該月）。三者在前端（`CalendarCard.tsx`/`CalendarMonthView.tsx`）用 `id` 前綴區分顏色與是否可編輯，`gcal-`/`task-` 開頭一律唯讀（無編輯/刪除按鈕）。**前提**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `tasks.readonly` scope，否則 Google Tasks 靜默回空陣列（`getMonthlyGoogleTasks()` 內 catch 吞掉錯誤只印 log）——若 Tasks 都沒同步，先查 log 有沒有 403/insufficient scopes，重跑 `npx tsx scripts/refresh-google-token.ts` 重新授權。**只讀單一 Calendar**：`GOOGLE_CALENDAR_ID`（未設定則 fallback `primary`），若使用者有多個日曆，未設定對應 ID 的日曆事件不會出現。
+`GET /api/calendar/month` 合併三個來源後回傳：①Firestore `calendar` 集合（LINE Bot / Dashboard 建立的待辦，需有 `actionDate` 才會顯示在月曆格上）②Google Calendar 事件（`src/lib/calendar/client.ts`，`id` 前綴 `gcal-`）③Google Tasks（`src/lib/tasks/client.ts`，`id` 前綴 `task-`，只讀，逐一遍歷所有 tasklists 並用 `dueMin`/`dueMax` 篩該月）。三者在前端（`CalendarCard.tsx`/`CalendarMonthView.tsx`）用 `id` 前綴區分顏色與是否可編輯，`gcal-`/`task-` 開頭一律唯讀（無編輯/刪除按鈕）。**前提**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `tasks.readonly` scope，且 Google Cloud 專案要啟用 `tasks.googleapis.com`，否則 Google Tasks 靜默回空陣列（`getMonthlyGoogleTasks()` 內 catch 吞掉錯誤只印 log）——若 Tasks 都沒同步，先查 log 有沒有 403/insufficient scopes 或「API has not been used」，重跑 `npx tsx scripts/refresh-google-token.ts` 重新授權。**Google Calendar 事件會遍歷帳號下所有次要日曆**（`getMonthlyEventsFromGoogleCalendar()` 先呼叫 `calendarList.list()` 取得全部日曆 ID 再逐一查詢合併，不只抓 `GOOGLE_CALENDAR_ID`/primary），次要日曆事件的 `calendarSummary` 欄位會帶日曆名稱（例如「案件」），前端顯示紅色標籤區分。
 
 ### 週報 Email
 

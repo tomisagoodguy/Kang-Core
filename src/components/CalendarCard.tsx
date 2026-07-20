@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { EditModal } from "./EditModal";
 import { DeleteConfirm } from "./DeleteConfirm";
 
-import { Calendar, Clock, CheckSquare, Square, Pencil, Trash2, CalendarDays, AlignLeft } from "lucide-react";
+import { Calendar, Clock, CheckSquare, Square, Pencil, Trash2, AlignLeft } from "lucide-react";
 
 import type { CalendarEntryView } from "@/models/schema";
+import { getCalendarSourceMeta } from "@/utils/calendarSource";
 
 interface CalendarCardProps {
     entry: CalendarEntryView;
@@ -40,6 +41,7 @@ export function CalendarCard({ entry }: CalendarCardProps) {
     };
 
     const isDone = entry.status === "done";
+    const source = getCalendarSourceMeta(entry);
 
     return (
         <>
@@ -47,70 +49,71 @@ export function CalendarCard({ entry }: CalendarCardProps) {
                 className="glass-card calendar-card"
                 style={{
                     opacity: isDone ? 0.6 : 1,
-                    borderLeft: isDone ? "4px solid var(--success, #4CAF50)" : "4px solid var(--warning, #FFC107)",
+                    borderLeft: `4px solid ${source.color}`,
                     transition: "all 0.3s"
                 }}
             >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                        <h3 style={{
-                            fontSize: "1rem",
-                            fontWeight: 600,
-                            margin: 0,
-                            textDecoration: isDone ? "line-through" : "none",
-                            color: "var(--text-primary)"
-                        }}>
-                            {entry.title}
-                        </h3>
-                        <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "6px", display: "flex", gap: "12px", alignItems: "center" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <h3 style={{
+                                fontSize: "1rem",
+                                fontWeight: 600,
+                                margin: 0,
+                                textDecoration: isDone ? "line-through" : "none",
+                                color: "var(--text-primary)"
+                            }}>
+                                {entry.title}
+                            </h3>
+                            <span style={{
+                                fontSize: "0.6875rem",
+                                fontWeight: 600,
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                background: source.color,
+                                color: "#fff",
+                                whiteSpace: "nowrap",
+                            }}>
+                                {source.label}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "6px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                             {entry.actionDate && <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><Calendar size={12} /> {entry.actionDate}</span>}
                             {entry.actionTime && <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><Clock size={12} /> {entry.actionTime}</span>}
                         </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        {/* Only show actions if it's not a read-only Google Calendar/Tasks item */}
-                        {!entry.id.startsWith("gcal-") && !entry.id.startsWith("task-") && (
-                            <>
-                                <button
-                                    onClick={handleToggleStatus}
-                                    disabled={isCompleting}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        color: isDone ? "var(--success)" : "var(--text-secondary)",
-                                        transition: "transform 0.2s",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        padding: "4px"
-                                    }}
-                                    title={isDone ? "標為未完成" : "標為已完成"}
-                                >
-                                    {isDone ? <CheckSquare size={18} /> : <Square size={18} />}
+                    {!source.readOnly && (
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
+                            <button
+                                onClick={handleToggleStatus}
+                                disabled={isCompleting}
+                                aria-label={isDone ? "標為未完成" : "標為已完成"}
+                                style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    color: isDone ? "var(--success)" : "var(--text-secondary)",
+                                    transition: "transform 0.2s",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    padding: "4px"
+                                }}
+                                title={isDone ? "標為未完成" : "標為已完成"}
+                            >
+                                {isDone ? <CheckSquare size={18} /> : <Square size={18} />}
+                            </button>
+                            <div className="card-actions" style={{ opacity: 1 }}>
+                                <button className="card-action-btn" onClick={() => setEditOpen(true)} title="編輯" aria-label="編輯">
+                                    <Pencil size={14} />
                                 </button>
-                                <div className="card-actions" style={{ opacity: 1 }}>
-                                    <button className="card-action-btn" onClick={() => setEditOpen(true)} title="編輯">
-                                        <Pencil size={14} />
-                                    </button>
-                                    <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)} title="刪除">
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                        {entry.id.startsWith("gcal-") && (
-                            <div style={{ color: "var(--brand-google)", display: "flex", alignItems: "center", padding: "4px" }} title="來自 Google 行事曆">
-                                <CalendarDays size={18} />
+                                <button className="card-action-btn danger" onClick={() => setDeleteOpen(true)} title="刪除" aria-label="刪除">
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
-                        )}
-                        {entry.id.startsWith("task-") && (
-                            <div style={{ color: "#FBBC05", display: "flex", alignItems: "center", padding: "4px" }} title="來自 Google Tasks">
-                                <CheckSquare size={18} />
-                            </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 {entry.description && (

@@ -103,6 +103,12 @@
   --bg-color: var(--bg-primary);
   --shadow-color: rgba(0, 0, 0, 0.25);
   --hover-bg: var(--bg-glass-hover);
+
+  /* Google 品牌色：用於區分 /calendar 頁的外部資料來源（主日曆／次要日曆／Tasks），
+     不隨主題切換，維持與 Google 官方日曆 UI 一致的辨識度 */
+  --brand-google-blue: #4285f4;
+  --brand-google-red: #ea4335;
+  --brand-google-yellow: #fbbc05;
 }
 
 /* ═══════════════════════════════════════════════════════════
