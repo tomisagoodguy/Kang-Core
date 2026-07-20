@@ -190,6 +190,56 @@ export async function retroMatchUnassigned(userId: string): Promise<number> {
     return matched;
 }
 
+export interface ParentsMonthlySummary {
+    month: string; // YYYY-MM
+    count: number;
+    total: number;
+    familyTotal: number; // 全家（含我）該月發票總額
+    tags: Array<[string, number]>; // [tag, 金額] 由大到小
+    merchants: Array<[string, number]>; // [正規化商家, 金額] 由大到小
+    items: Array<[string, number]>; // [品項, 次數] 由大到小
+}
+
+/**
+ * 爸媽消費月度彙總（生活共同體視角：member ≠ "me" 含未歸屬即視為爸媽）。
+ * 供每月 LINE 月報與 Dashboard 使用。
+ */
+export async function getParentsMonthlySummary(userId: string, month: string): Promise<ParentsMonthlySummary> {
+    const snap = await db.collection("einvoice_records")
+        .where("userId", "==", userId)
+        .where("date", ">=", `${month}-01`)
+        .where("date", "<=", `${month}-31`)
+        .orderBy("date", "desc") // 與 GET /api/einvoice 共用同一顆複合索引（userId ASC + date DESC）
+        .get();
+
+    const all = snap.docs.map((d) => d.data());
+    const familyTotal = all.reduce((s, r) => s + r.amount, 0);
+    const rows = all.filter((r) => r.member !== "me");
+
+    const byTag = new Map<string, number>();
+    const byMerchant = new Map<string, number>();
+    const itemCount = new Map<string, number>();
+    for (const r of rows) {
+        byTag.set(r.tag, (byTag.get(r.tag) ?? 0) + r.amount);
+        const merchant = normalizeMerchant(r.merchantName) || r.merchantName;
+        byMerchant.set(merchant, (byMerchant.get(merchant) ?? 0) + r.amount);
+        for (const item of String(r.description ?? "").split("、").map((s: string) => s.trim()).filter(Boolean)) {
+            itemCount.set(item, (itemCount.get(item) ?? 0) + 1);
+        }
+    }
+    const sortDesc = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+
+    return {
+        month,
+        count: rows.length,
+        total: rows.reduce((s, r) => s + r.amount, 0),
+        familyTotal,
+        tags: sortDesc(byTag),
+        merchants: sortDesc(byMerchant),
+        items: sortDesc(itemCount),
+    };
+}
+
 /** 同步電子發票信件（Gmail 帳號 = GOOGLE_OAUTH_REFRESH_TOKEN 授權帳號） */
 export async function syncEinvoices(userId: string): Promise<InvoiceSyncResult> {
     const query = process.env.GMAIL_INVOICE_QUERY?.trim() || DEFAULT_QUERY;

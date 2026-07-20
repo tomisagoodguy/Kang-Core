@@ -38,7 +38,7 @@ src/
 ├── app/
 │   ├── api/                    # 所有 API Routes
 │   │   ├── webhook/line-bot/   # LINE Bot 接收入口（實際路徑含子目錄）
-│   │   ├── cron/               # Vercel Cron Jobs（10 個定時任務）
+│   │   ├── cron/               # Vercel Cron Jobs（11 個定時任務）
 │   │   ├── accounting/         # 記帳 CRUD
 │   │   ├── archive/            # 知識庫 CRUD
 │   │   ├── calendar/           # 行事曆與待辦 CRUD
@@ -200,6 +200,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `0 0 * * 1` | 08:00 週一 | 週報 Email（上週一～日收支明細） |
 | `30 1 1 * *` | 09:30 每月1日 | 淨值快照自動落地（該月已有快照則跳過） |
 | `30 12 * * *` | 20:30 | 電子發票自動記帳（趕在 21:00 每日摘要前入帳） |
+| `10 1 1 * *` | 09:10 每月1日 | 爸媽消費月報（einvoice_records，member ≠ me 視為爸媽） |
 
 每個 Cron 端點需要 `Authorization: Bearer ${CRON_SECRET}` 標頭驗證。
 

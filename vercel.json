@@ -39,6 +39,10 @@
         {
             "path": "/api/cron/invoice-sync",
             "schedule": "30 12 * * *"
+        },
+        {
+            "path": "/api/cron/einvoice-monthly-report",
+            "schedule": "10 1 1 * *"
         }
     ]
 }
