@@ -8,6 +8,7 @@ import {
 import { extractInvoiceDocuments, parseEinvoiceText, type ParsedInvoice } from "@/lib/einvoice/parser";
 import { ClassificationEngine } from "@/services/classificationEngine";
 import { guessTag } from "@/services/quickCommand";
+import { normalizeMerchant } from "@/utils/merchant";
 import type { EinvoiceRecord, InvoiceMember } from "@/models/schema";
 
 /**
@@ -41,14 +42,6 @@ export interface InvoiceSyncResult {
     imported: ImportedInvoice[];
     duplicates: number;
     errors: string[];
-}
-
-/** 商家名稱正規化：去公司型態與分公司尾綴，作為歸屬規則的 key */
-export function normalizeMerchant(name: string): string {
-    return name
-        .replace(/股份有限公司|有限公司|商行|企業社/g, "")
-        .replace(/第?[一二三四五六七八九十百千\d０-９]+分公司/g, "")
-        .trim();
 }
 
 /** doc.create() 搶鎖；已存在回傳 false */
@@ -170,6 +163,33 @@ async function importInvoice(
     };
 }
 
+/**
+ * 回溯比對：把仍未歸屬的發票重新對一輪手動記帳。
+ * 補「發票先匯入、使用者晚點才手動記帳」的時序漏洞——「我」認得越準，
+ * 剩餘（爸媽生活共同體）的消費輪廓就越準。
+ */
+export async function retroMatchUnassigned(userId: string): Promise<number> {
+    const snap = await db.collection("einvoice_records")
+        .where("userId", "==", userId)
+        .where("member", "==", null)
+        .get();
+
+    let matched = 0;
+    for (const doc of snap.docs) {
+        const data = doc.data();
+        const matchedId = await matchManualEntry(userId, data.date, data.amount);
+        if (matchedId) {
+            await doc.ref.update({
+                member: "me",
+                memberSource: "auto-match",
+                matchedAccountingEntryId: matchedId,
+            });
+            matched += 1;
+        }
+    }
+    return matched;
+}
+
 /** 同步電子發票信件（Gmail 帳號 = GOOGLE_OAUTH_REFRESH_TOKEN 授權帳號） */
 export async function syncEinvoices(userId: string): Promise<InvoiceSyncResult> {
     const query = process.env.GMAIL_INVOICE_QUERY?.trim() || DEFAULT_QUERY;
@@ -235,6 +255,13 @@ export async function syncEinvoices(userId: string): Promise<InvoiceSyncResult> 
         if (messageFullyProcessed) {
             await acquireLock(`msg_${messageId}`, { userId });
         }
+    }
+
+    // 回溯比對：撿回「發票先進、手動帳後補」的漏網之魚
+    try {
+        await retroMatchUnassigned(userId);
+    } catch (e) {
+        result.errors.push(`回溯比對失敗：${e instanceof Error ? e.message : "未知錯誤"}`);
     }
 
     return result;

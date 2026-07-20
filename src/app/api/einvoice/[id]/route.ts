@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/firebase/admin";
 import { withAuth } from "@/lib/auth/withAuth";
 import { InvoiceMemberEnum, TagEnum } from "@/models/schema";
-import { normalizeMerchant } from "@/services/invoiceImport.service";
+import { normalizeMerchant } from "@/utils/merchant";
 import { ClassificationEngine } from "@/services/classificationEngine";
 
 const UpdateSchema = z.object({

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getTagEmoji } from "@/utils/tagEmoji";
+import { normalizeMerchant } from "@/utils/merchant";
 import type { EinvoiceRecordView } from "@/models/schema";
 
 const MEMBERS = [
@@ -88,6 +89,32 @@ export default function EinvoicePage() {
 
     const grandTotal = records.reduce((s, r) => s + r.amount, 0);
 
+    // 爸媽消費分析：生活共同體視角——member ≠ "me"（含未歸屬）即視為爸媽
+    const parentsAnalysis = (() => {
+        const rows = records.filter((r) => r.member !== "me");
+        const total = rows.reduce((s, r) => s + r.amount, 0);
+
+        const byTag = new Map<string, number>();
+        const byMerchant = new Map<string, number>();
+        const itemCount = new Map<string, number>();
+        for (const r of rows) {
+            byTag.set(r.tag, (byTag.get(r.tag) ?? 0) + r.amount);
+            const merchant = normalizeMerchant(r.merchantName) || r.merchantName;
+            byMerchant.set(merchant, (byMerchant.get(merchant) ?? 0) + r.amount);
+            for (const item of (r.description ?? "").split("、").map((s) => s.trim()).filter(Boolean)) {
+                itemCount.set(item, (itemCount.get(item) ?? 0) + 1);
+            }
+        }
+        const sortDesc = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+        return {
+            count: rows.length,
+            total,
+            tags: sortDesc(byTag),
+            merchants: sortDesc(byMerchant).slice(0, 6),
+            items: sortDesc(itemCount).slice(0, 10),
+        };
+    })();
+
     const filtered = filter === "all"
         ? records
         : records.filter((r) => (filter === "unassigned" ? !r.member : r.member === filter));
@@ -144,6 +171,75 @@ export default function EinvoicePage() {
                 本月合計 ${grandTotal.toLocaleString("zh-TW")}（{records.length} 筆）
                 {filter !== "all" && <button className="card-action-btn" style={{ marginLeft: "12px" }} onClick={() => setFilter("all")}>清除篩選</button>}
             </p>
+
+            {/* 爸媽消費分析（生活共同體：非「我」即爸媽，含未歸屬） */}
+            {parentsAnalysis.count > 0 && (
+                <div className="card" style={{ marginTop: "16px", padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px" }}>
+                        <h3 style={{ fontWeight: 700 }}>👨‍👩 爸媽消費分析</h3>
+                        <span style={{ fontSize: "13px", opacity: 0.6 }}>非「我」的發票（含未歸屬）共 {parentsAnalysis.count} 筆</span>
+                    </div>
+                    <div style={{ fontSize: "24px", fontWeight: 700, margin: "8px 0 14px" }}>
+                        ${parentsAnalysis.total.toLocaleString("zh-TW")}
+                        <span style={{ fontSize: "13px", fontWeight: 400, opacity: 0.6, marginLeft: "8px" }}>
+                            佔全家 {grandTotal > 0 ? Math.round((parentsAnalysis.total / grandTotal) * 100) : 0}%
+                        </span>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "20px" }}>
+                        {/* 分類分布 */}
+                        <div>
+                            <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>消費種類</div>
+                            {parentsAnalysis.tags.map(([tag, amt]) => (
+                                <div key={tag} style={{ marginBottom: "6px" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                                        <span>{getTagEmoji(tag)} {tag}</span>
+                                        <span style={{ fontWeight: 600 }}>${amt.toLocaleString("zh-TW")}</span>
+                                    </div>
+                                    <div style={{ height: "5px", background: "var(--border, #eee)", borderRadius: "3px", marginTop: "3px" }}>
+                                        <div style={{
+                                            height: "100%",
+                                            width: `${parentsAnalysis.total > 0 ? Math.max(2, (amt / parentsAnalysis.total) * 100) : 0}%`,
+                                            background: "var(--primary)",
+                                            borderRadius: "3px",
+                                        }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* 常去商家 */}
+                        <div>
+                            <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>常去商家 Top {parentsAnalysis.merchants.length}</div>
+                            {parentsAnalysis.merchants.map(([merchant, amt], i) => (
+                                <div key={merchant} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", padding: "4px 0", borderBottom: "1px solid var(--border, #f0f0f0)" }}>
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: "8px" }}>{i + 1}. {merchant}</span>
+                                    <span style={{ fontWeight: 600, flexShrink: 0 }}>${amt.toLocaleString("zh-TW")}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 品項熱點 */}
+                    {parentsAnalysis.items.length > 0 && (
+                        <div style={{ marginTop: "14px" }}>
+                            <div style={{ fontSize: "13px", fontWeight: 600, opacity: 0.75, marginBottom: "8px" }}>常買品項</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                {parentsAnalysis.items.map(([item, count]) => (
+                                    <span key={item} style={{
+                                        fontSize: "12px",
+                                        padding: "3px 10px",
+                                        borderRadius: "999px",
+                                        background: "var(--border, #f0f0f0)",
+                                    }}>
+                                        {item}{count > 1 ? ` ×${count}` : ""}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {loading ? (
                 <div className="empty-state">
