@@ -40,14 +40,14 @@ function buildEmailHtml(params: {
     toLabel: string;
     entries: EntryData[];
     prevExpense: number;
+    monthIncome: number;
+    monthNet: number;
+    monthLabel: string;
 }): string {
-    const { fromLabel, toLabel, entries, prevExpense } = params;
+    const { fromLabel, toLabel, entries, prevExpense, monthIncome, monthNet, monthLabel } = params;
 
     const expenses = entries.filter((e) => e.tag !== "Income");
-    const incomes = entries.filter((e) => e.tag === "Income");
     const totalExpense = expenses.reduce((s, e) => s + myExpenseTWD(e), 0);
-    const totalIncome = incomes.reduce((s, e) => s + myExpenseTWD(e), 0);
-    const net = totalIncome - totalExpense;
 
     // 週增減
     let comparisonHtml = "";
@@ -149,18 +149,18 @@ function buildEmailHtml(params: {
       <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;text-align:center;">
         <tr>
           <td style="padding:12px;background:#fef2f2;border-radius:8px;">
-            <p style="margin:0;font-size:12px;color:#6b7280;">支出</p>
+            <p style="margin:0;font-size:12px;color:#6b7280;">本週支出</p>
             <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#dc2626;">${nt(totalExpense)}</p>
           </td>
           <td style="width:8px;"></td>
           <td style="padding:12px;background:#f0fdf4;border-radius:8px;">
-            <p style="margin:0;font-size:12px;color:#6b7280;">收入</p>
-            <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#16a34a;">${nt(totalIncome)}</p>
+            <p style="margin:0;font-size:12px;color:#6b7280;">${monthLabel}收入（累計）</p>
+            <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:#16a34a;">${nt(monthIncome)}</p>
           </td>
           <td style="width:8px;"></td>
           <td style="padding:12px;background:#f9fafb;border-radius:8px;">
-            <p style="margin:0;font-size:12px;color:#6b7280;">結餘</p>
-            <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:${net >= 0 ? "#16a34a" : "#dc2626"};">${net < 0 ? "-" : ""}${nt(Math.abs(net))}</p>
+            <p style="margin:0;font-size:12px;color:#6b7280;">${monthLabel}結餘（累計）</p>
+            <p style="margin:4px 0 0;font-size:18px;font-weight:700;color:${monthNet >= 0 ? "#16a34a" : "#dc2626"};">${monthNet < 0 ? "-" : "+"}${nt(Math.abs(monthNet))}</p>
           </td>
         </tr>
       </table>
@@ -255,9 +255,33 @@ export async function GET(req: Request) {
                 .filter((e) => e.tag !== "Income")
                 .reduce((s, e) => s + myExpenseTWD(e), 0);
 
+            // 收入/結餘看「本月累計」（薪水月領，週結餘無意義）：以上週日所在月份的 1 日～上週日為範圍
+            const monthFrom = `${to.slice(0, 7)}-01`;
+            const monthSnap = await db
+                .collection("accounting")
+                .where("userId", "==", userId)
+                .where("date", ">=", monthFrom)
+                .where("date", "<=", to)
+                .get();
+            let monthIncome = 0;
+            let monthExpense = 0;
+            monthSnap.docs.forEach((d) => {
+                const e = d.data() as EntryData;
+                if (e.tag === "Income") monthIncome += myExpenseTWD(e);
+                else monthExpense += myExpenseTWD(e);
+            });
+
             const fromLabel = from.replace(/-/g, "/");
             const toLabel = to.replace(/-/g, "/");
-            const html = buildEmailHtml({ fromLabel, toLabel, entries, prevExpense });
+            const html = buildEmailHtml({
+                fromLabel,
+                toLabel,
+                entries,
+                prevExpense,
+                monthIncome,
+                monthNet: monthIncome - monthExpense,
+                monthLabel: `${Number(to.slice(5, 7))}月`,
+            });
 
             await sendHtmlEmail(email, `📊 Kang-Core 週報 ${fromLabel}～${toLabel}`, html);
             results.push({ userId, email, sent: true, count: entries.length });
