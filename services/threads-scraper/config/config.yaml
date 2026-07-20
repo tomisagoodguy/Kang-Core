@@ -2,119 +2,56 @@
 
 # ── 追蹤設定 ──────────────────────────────────────────────
 
-# 追蹤特定用戶的最新貼文 - AI/科技領域
-users:
-  # 科技領袖
-  - username: "zuck"           # Mark Zuckerberg (5.4M followers)
-    max_posts: 10
-
-  # AI 相關
-  - username: "aiatmeta"       # Meta AI 官方帳號
-    max_posts: 10
-  - username: "ai.news.daily"  # AI 新聞與科技
-    max_posts: 10
-  - username: "power.ai"       # AI 工具 (800K+ followers)
-    max_posts: 10
-
-  # 科技媒體
-  - username: "verge"          # The Verge (632.5K followers)
-    max_posts: 10
-  - username: "sokane1"        # TechCrunch 資深記者
-    max_posts: 5
-
-  # 繁體中文科技/科學
-  - username: "fox.hsiao"      # Fox Hsiao - INSIDE 創辦人、AI/區塊鏈/科技
-    max_posts: 10
-  - username: "sa_taiwan"      # 科學人 (台灣)
-    max_posts: 10
-
-  # 自動發現的繁體中文科技用戶（2026-02-26）
-  - username: "learn.ai_tools" # AI工具與自動化（平均 5,116 讚）⭐
-    max_posts: 10
-  - username: "hogan.tech"     # 軟體開發、程式設計（平均 4,544 讚）⭐
-    max_posts: 10
-  - username: "gaozishifenzi"  # 機器學習、深度學習（平均 1,816 讚）
-    max_posts: 10
-  - username: "chris.data.life" # 機器學習、深度學習（5 篇，平均 492 讚）
-    max_posts: 10
-  - username: "xxpriscillaxuxx" # 機器學習、深度學習（平均 494 讚）
-    max_posts: 10
-  - username: "techtip_s"      # AI寫作、自動化（平均 398 讚）
-    max_posts: 10
-  - username: "meow.coder"     # RAG、開源（平均 49 讚）
-    max_posts: 10
-  - username: "focaccia_ai"    # 大語言模型（平均 16 讚）
-    max_posts: 10
-
-  # 其他（可選，需自行在 Threads 確認）
-  # - username: "bnextmedia"    # 數位時代
-  #   max_posts: 10
-  # - username: "inside_tw"     # INSIDE 硬塞的網路趨勢觀察
-  #   max_posts: 10
-  # - username: "techcrunch"
-  #   max_posts: 10
+# 追蹤特定用戶的最新貼文 - 台股優先
+# 原 AI/科技清單已移除（範圍調整為台股），實際帳號請自行在 Threads 上確認後
+# 透過 /threads Dashboard 或 LINE Bot「/追蹤 @帳號」新增（會與此清單合併）
+users: []
 
 # 追蹤特定貼文的新回覆
 threads:
   # - url: "https://www.threads.net/t/XXXXX"
   #   check_replies: true
 
-# 關鍵字搜尋 - AI、軟體開發、數位產品、Agent 相關
+# 關鍵字搜尋 - 台股優先
 keywords:
-  # AI 相關
-  - "AI"
-  - "人工智慧"
-  - "機器學習"
-  - "深度學習"
-  - "ChatGPT"
-  - "Claude"
-  - "GPT"
-  - "LLM"
-  - "Gemini"
+  # 大盤與指數
+  - "台股"
+  - "大盤"
+  - "加權指數"
+  - "台指期"
+  - "櫃買"
 
-  # Agent 相關
-  - "agent"
-  - "agents"
-  - "AI agent"
-  - "智能代理"
-  - "自動化"
+  # 法人與資金動向
+  - "外資"
+  - "投信"
+  - "自營商"
+  - "三大法人"
+  - "融資"
+  - "融券"
 
-  # 軟體開發
-  - "開發"
-  - "編程"
-  - "程式"
-  - "code"
-  - "coding"
-  - "developer"
-  - "programming"
-  - "軟體"
-  - "software"
-  - "API"
-  - "framework"
+  # 個股與族群
+  - "個股"
+  - "權值股"
+  - "半導體"
+  - "AI股"
+  - "ETF"
+  - "0050"
+  - "00919"
+  - "台積電"
+  - "存股"
 
-  # 程式語言
-  - "Python"
-  - "JavaScript"
-  - "TypeScript"
-  - "React"
-  - "Node.js"
+  # 財報與基本面
+  - "財報"
+  - "營收"
+  - "殖利率"
+  - "本益比"
+  - "除權息"
 
-  # 數位產品
-  - "產品"
-  - "product"
-  - "SaaS"
-  - "app"
-  - "應用"
-  - "平台"
-  - "startup"
-  - "新創"
-
-  # 工具與平台
-  - "GitHub"
-  - "開源"
-  - "open source"
-  - "tech"
-  - "技術"
+  # 交易與策略
+  - "選股"
+  - "當沖"
+  - "波段"
+  - "技術分析"
 
 # ── 探索模式 ──────────────────────────────────────────────
 # 自動搜尋新的貼文（不限於追蹤的用戶）
