@@ -29,6 +29,7 @@ const authUrl = oauth2Client.generateAuthUrl({
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/gmail.send",
         "https://www.googleapis.com/auth/gmail.readonly", // 電子發票自動記帳（invoice-sync cron）
+        "https://www.googleapis.com/auth/tasks.readonly", // /calendar 頁面同步 Google Tasks
     ],
 });
 

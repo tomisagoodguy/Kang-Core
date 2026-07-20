@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { getMonthlyEventsFromGoogleCalendar, type GCalEvent } from "@/lib/calendar/client";
+import { getMonthlyGoogleTasks, type GTask } from "@/lib/tasks/client";
 import type { CalendarEntryView } from "@/models/schema";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 
@@ -78,11 +79,33 @@ export async function GET(request: NextRequest) {
             };
         });
 
+        // Fetch from Google Tasks
+        let gTasks: GTask[] = [];
+        try {
+            gTasks = await getMonthlyGoogleTasks(year, month);
+        } catch (e) {
+            const error = e as Error;
+            console.error("[API/calendar/month] Failed to fetch Google Tasks:", error.message || error);
+        }
+
+        const taskEntries: CalendarEntryView[] = gTasks
+            .filter((task) => task.due)
+            .map((task) => ({
+                id: `task-${task.id}`,
+                title: task.title || "未命名工作",
+                description: task.notes,
+                actionDate: (task.due as string).slice(0, 10),
+                actionTime: "",
+                status: task.status === "completed" ? "done" : "pending",
+                source: "system",
+                originalText: "Imported from Google Tasks",
+            }));
+
         // Deduplicate
         const firestoreGcalIds = new Set(firestoreEntries.map(e => e.gcalEventId).filter(Boolean));
         const filteredGcalEntries = gcalEntries.filter(e => !firestoreGcalIds.has(e.gcalEventId));
 
-        const allEntries = [...firestoreEntries, ...filteredGcalEntries];
+        const allEntries = [...firestoreEntries, ...filteredGcalEntries, ...taskEntries];
 
         // Sort by date ascending
         allEntries.sort((a, b) => {

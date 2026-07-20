@@ -145,15 +145,16 @@ export function CalendarMonthView() {
                                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                                     {eventsByDay[day]?.map(evt => {
                                         const isGcal = evt.id.startsWith("gcal-");
+                                        const isTask = evt.id.startsWith("task-");
                                         const isDone = evt.status === "done";
                                         return (
                                             <div key={evt.id} style={{
                                                 fontSize: "0.75rem",
                                                 padding: "4px 6px",
                                                 borderRadius: "4px",
-                                                background: isGcal ? "rgba(66, 133, 244, 0.1)" : "rgba(76, 175, 80, 0.1)",
-                                                color: isGcal ? "var(--text-primary)" : "var(--success)",
-                                                borderLeft: isGcal ? "3px solid #4285F4" : "3px solid var(--success)",
+                                                background: isGcal ? "rgba(66, 133, 244, 0.1)" : isTask ? "rgba(251, 188, 5, 0.15)" : "rgba(76, 175, 80, 0.1)",
+                                                color: isGcal ? "var(--text-primary)" : isTask ? "var(--text-primary)" : "var(--success)",
+                                                borderLeft: isGcal ? "3px solid #4285F4" : isTask ? "3px solid #FBBC05" : "3px solid var(--success)",
                                                 opacity: isDone ? 0.5 : 1,
                                                 textDecoration: isDone ? "line-through" : "none",
                                                 whiteSpace: "nowrap",

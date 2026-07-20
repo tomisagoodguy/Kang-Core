@@ -150,7 +150,7 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 |------|---------|
 | `accounting` | date, amount（原幣）, currency, exchangeRate, amountTWD, paymentMethod, settlement, tag, subTag, description, source |
 | `archive` | title, content, embedding[], keywords, imageUrl |
-| `calendar` | startTime, title, type(event/todo), completed, syncedToGCal |
+| `calendar` | title, actionDate, actionTime, description, status(pending/done), gcalEventId |
 | `recurring_expenses` | frequency, dayOfMonth, amount, tag, enabled |
 | `budgets` | monthYear, monthlyLimit, tag, notifiedAt80/100 |
 | `threads_users` | userId, username, platform, trackingEnabled |
@@ -229,6 +229,10 @@ LINE Bot 接收到訊息後，`message.service.ts` 依序執行：
 | `0 1 * * *` | 09:00 | 帳單到期提醒（信用卡未繳帳單 + 定期支出 monthly/yearly，提前 3 天） |
 
 每個 Cron 端點需要 `Authorization: Bearer ${CRON_SECRET}` 標頭驗證。
+
+### 行事曆總覽（/calendar）三個資料來源
+
+`GET /api/calendar/month` 合併三個來源後回傳：①Firestore `calendar` 集合（LINE Bot / Dashboard 建立的待辦，需有 `actionDate` 才會顯示在月曆格上）②Google Calendar 事件（`src/lib/calendar/client.ts`，`id` 前綴 `gcal-`）③Google Tasks（`src/lib/tasks/client.ts`，`id` 前綴 `task-`，只讀，逐一遍歷所有 tasklists 並用 `dueMin`/`dueMax` 篩該月）。三者在前端（`CalendarCard.tsx`/`CalendarMonthView.tsx`）用 `id` 前綴區分顏色與是否可編輯，`gcal-`/`task-` 開頭一律唯讀（無編輯/刪除按鈕）。**前提**：`GOOGLE_OAUTH_REFRESH_TOKEN` 必須含 `tasks.readonly` scope，否則 Google Tasks 靜默回空陣列（`getMonthlyGoogleTasks()` 內 catch 吞掉錯誤只印 log）——若 Tasks 都沒同步，先查 log 有沒有 403/insufficient scopes，重跑 `npx tsx scripts/refresh-google-token.ts` 重新授權。**只讀單一 Calendar**：`GOOGLE_CALENDAR_ID`（未設定則 fallback `primary`），若使用者有多個日曆，未設定對應 ID 的日曆事件不會出現。
 
 ### 週報 Email
 

@@ -69,8 +69,8 @@ export function CalendarCard({ entry }: CalendarCardProps) {
                     </div>
 
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        {/* Only show actions if it's not a pure Google Calendar item */}
-                        {!entry.id.startsWith("gcal-") && (
+                        {/* Only show actions if it's not a read-only Google Calendar/Tasks item */}
+                        {!entry.id.startsWith("gcal-") && !entry.id.startsWith("task-") && (
                             <>
                                 <button
                                     onClick={handleToggleStatus}
@@ -103,6 +103,11 @@ export function CalendarCard({ entry }: CalendarCardProps) {
                         {entry.id.startsWith("gcal-") && (
                             <div style={{ color: "var(--brand-google)", display: "flex", alignItems: "center", padding: "4px" }} title="來自 Google 行事曆">
                                 <CalendarDays size={18} />
+                            </div>
+                        )}
+                        {entry.id.startsWith("task-") && (
+                            <div style={{ color: "#FBBC05", display: "flex", alignItems: "center", padding: "4px" }} title="來自 Google Tasks">
+                                <CheckSquare size={18} />
                             </div>
                         )}
                     </div>
