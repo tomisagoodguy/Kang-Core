@@ -110,7 +110,7 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
         })
 
     # Kang-Core Next.js Webhook（優先使用環境變數）
-    kang_webhook = os.getenv("KANG_CORE_WEBHOOK_URL")
+    kang_webhook = (os.getenv("KANG_CORE_WEBHOOK_URL") or "").strip() or None
     if kang_webhook:
         # 移除 config.yaml 中的 localhost webhook，換成正式環境
         if "notifications" in config and "webhooks" in config["notifications"]:
@@ -123,7 +123,7 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
             "type": "generic",
             "name": "Kang-Core Production",
             # /api/webhooks/threads 需要 Bearer CRON_SECRET 驗證（2026-06-07 起）
-            "auth_token": os.getenv("CRON_SECRET"),
+            "auth_token": (os.getenv("CRON_SECRET") or "").strip() or None,
         })
 
     if webhooks:

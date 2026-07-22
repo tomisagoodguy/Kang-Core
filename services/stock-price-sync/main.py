@@ -9,8 +9,8 @@ import requests
 import finlab
 from finlab import data
 
-KANG_CORE_API_BASE_URL = os.environ["KANG_CORE_API_BASE_URL"].rstrip("/")
-CRON_SECRET = os.environ["CRON_SECRET"]
+KANG_CORE_API_BASE_URL = os.environ["KANG_CORE_API_BASE_URL"].strip().rstrip("/")
+CRON_SECRET = os.environ["CRON_SECRET"].strip()
 HEADERS = {"Authorization": f"Bearer {CRON_SECRET}"}
 
 

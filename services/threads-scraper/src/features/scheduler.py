@@ -69,8 +69,8 @@ class ThreadsScheduler:
         # ── 💡 動態讀取 Kang-Core API 配置（由 LINE Bot 管理的名單）─────────
         import os
         import requests
-        api_url = os.getenv("KANG_CORE_WEBHOOK_URL", "").replace("/api/webhooks/threads", "/api/threads/config")
-        cron_secret = os.getenv("CRON_SECRET")
+        api_url = os.getenv("KANG_CORE_WEBHOOK_URL", "").strip().replace("/api/webhooks/threads", "/api/threads/config")
+        cron_secret = (os.getenv("CRON_SECRET") or "").strip()
 
         if api_url and cron_secret:
             try:

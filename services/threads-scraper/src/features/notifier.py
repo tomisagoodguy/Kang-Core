@@ -23,7 +23,7 @@ class Notifier:
     @staticmethod
     def _generic_headers(webhook: Optional[Dict] = None) -> Dict[str, str]:
         """generic webhook 的認證標頭（Kang-Core /api/webhooks/threads 需要 Bearer CRON_SECRET）"""
-        token = (webhook or {}).get("auth_token") or os.getenv("CRON_SECRET")
+        token = (webhook or {}).get("auth_token") or (os.getenv("CRON_SECRET") or "").strip()
         return {"Authorization": f"Bearer {token}"} if token else {}
 
     def send_new_posts(self, posts: List[Dict], keywords: List[str] = None):
