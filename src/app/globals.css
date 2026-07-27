@@ -235,6 +235,118 @@ a {
   background: var(--hover-bg);
 }
 
+/* ─── 手機版漢堡選單按鈕（預設隱藏，<=768px 才顯示）─── */
+.navbar-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+/* ─── 手機版抽屜選單 ─── */
+.navbar-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.navbar-drawer-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.navbar-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  width: min(80vw, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: calc(64px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-glass);
+  box-shadow: -20px 0 40px -20px rgba(0, 0, 0, 0.3);
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 250ms ease;
+}
+
+.navbar-drawer.open {
+  transform: translateX(0);
+}
+
+.navbar-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.navbar-drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.navbar-drawer-link.active {
+  color: var(--accent-light);
+  background: rgba(124, 58, 237, 0.15);
+}
+
+.navbar-drawer-divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--border-glass);
+}
+
+.navbar-drawer-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-drawer,
+  .navbar-drawer-overlay {
+    transition: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar-links,
+  .navbar-desktop-only {
+    display: none !important;
+  }
+
+  .navbar-mobile-toggle {
+    display: flex;
+  }
+
+  .navbar {
+    padding: 0 16px !important;
+    gap: 12px !important;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    Page Layout
 ═══════════════════════════════════════════════════════════ */

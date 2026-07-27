@@ -12,7 +12,8 @@ export function ThemeToggle() {
             onClick={toggleTheme}
             className="navbar-logout" // Reuse standard button style
             style={{
-                padding: "8px 10px",
+                minWidth: "44px",
+                minHeight: "44px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
