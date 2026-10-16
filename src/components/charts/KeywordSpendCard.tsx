@@ -11,10 +11,10 @@ import {
     CartesianGrid,
     Tooltip,
 } from "recharts";
+import { DEFAULT_TRACKED_KEYWORD as DEFAULT_KEYWORD } from "@/utils/keywordMatch";
 import { RangeToggle, formatAxisMoney, type TagTrendResponse } from "@/components/charts/CategoryTrendChart";
 
 const STORAGE_KEY = "kang-core:keyword-spend";
-const DEFAULT_KEYWORD = "約會";
 const BAR_COLOR = "#ec4899";
 const LINE_COLOR = "#f59e0b";
 

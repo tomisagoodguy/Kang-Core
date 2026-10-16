@@ -3,6 +3,7 @@ import { db } from "@/lib/firebase/admin";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 import { myExpenseTWD } from "@/utils/currency";
 import type { AccountingEntry } from "@/models/schema";
+import { matchesKeyword } from "@/utils/keywordMatch";
 
 /**
  * 按月 × 分類聚合支出（排除 Income），可選 keyword 追蹤特定主題（例如「約會」）跨分類的月支出。
@@ -40,7 +41,6 @@ export async function GET(request: Request) {
             keywordBuckets.set(m, { amount: 0, count: 0 });
         });
         const tagTotals: Record<string, number> = {};
-        const needle = keyword.toLowerCase();
 
         snapshot.docs.forEach((doc) => {
             const entry = doc.data() as AccountingEntry;
@@ -52,13 +52,10 @@ export async function GET(request: Request) {
             tags[entry.tag] = (tags[entry.tag] ?? 0) + amount;
             tagTotals[entry.tag] = (tagTotals[entry.tag] ?? 0) + amount;
 
-            if (needle) {
-                const haystack = `${entry.description ?? ""} ${entry.subTag ?? ""} ${entry.originalText ?? ""}`.toLowerCase();
-                if (haystack.includes(needle)) {
-                    const kb = keywordBuckets.get(monthKey)!;
-                    kb.amount += amount;
-                    kb.count += 1;
-                }
+            if (keyword && matchesKeyword(entry, keyword)) {
+                const kb = keywordBuckets.get(monthKey)!;
+                kb.amount += amount;
+                kb.count += 1;
             }
         });
 
