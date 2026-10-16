@@ -8,29 +8,21 @@ import { calculateMonthlyForecast } from "@/utils/forecast";
 import { DEFAULT_TRACKED_KEYWORD, matchesKeyword } from "@/utils/keywordMatch";
 
 /**
- * 主題（預設「約會」）累計花費區塊：今日／本月／今年／全部累計。
- * 從未有命中紀錄的用戶回傳空陣列，摘要不顯示此區塊。
+ * 主題（預設「約會」）本月累計花費區塊，每月 1 日自然歸零重算。
+ * 本月無命中紀錄時回傳空陣列，摘要不顯示此區塊。
+ * @param monthEntries - 本月 1 日至今日的記帳（沿用摘要已查好的資料，不另讀 Firestore）
  */
-async function buildTrackedKeywordLines(userId: string, today: string): Promise<string[]> {
-    const snap = await db.collection("accounting").where("userId", "==", userId).get();
-    const hits = snap.docs
-        .map((d) => d.data())
-        .filter((e) => e.tag !== "Income" && typeof e.date === "string" && e.date <= today && matchesKeyword(e, DEFAULT_TRACKED_KEYWORD));
+function buildTrackedKeywordLines(monthEntries: FirebaseFirestore.DocumentData[], today: string): string[] {
+    const hits = monthEntries.filter((e) => e.tag !== "Income" && matchesKeyword(e, DEFAULT_TRACKED_KEYWORD));
     if (hits.length === 0) return [];
 
     const sum = (list: typeof hits) => Math.round(list.reduce((s, e) => s + myExpenseTWD(e), 0));
     const todayHits = hits.filter((e) => e.date === today);
-    const monthHits = hits.filter((e) => e.date.startsWith(today.slice(0, 7)));
-    const yearHits = hits.filter((e) => e.date.startsWith(today.slice(0, 4)));
-    const firstMonth = hits.map((e) => e.date as string).sort()[0].slice(0, 7);
 
     return [
         "",
-        `💕 ${DEFAULT_TRACKED_KEYWORD}花費`,
-        ...(todayHits.length > 0 ? [`今日: $${sum(todayHits).toLocaleString()}`] : []),
-        `本月: $${sum(monthHits).toLocaleString()}（${monthHits.length} 筆）`,
-        `今年: $${sum(yearHits).toLocaleString()}（${yearHits.length} 筆）`,
-        `累計: $${sum(hits).toLocaleString()}（自 ${firstMonth} 起）`,
+        `💕 本月${DEFAULT_TRACKED_KEYWORD}累計: $${sum(hits).toLocaleString()}（${hits.length} 筆）`,
+        ...(todayHits.length > 0 ? [`今日${DEFAULT_TRACKED_KEYWORD}: $${sum(todayHits).toLocaleString()}`] : []),
     ];
 }
 
@@ -124,11 +116,7 @@ export async function GET(req: Request) {
                 .sort((a, b) => b[1] - a[1])
                 .map(([tag, amt]) => `${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
 
-            // 約會累計失敗不影響主摘要推播
-            const trackedLines = await buildTrackedKeywordLines(userId, today).catch((err) => {
-                console.error(`[daily-summary] tracked keyword failed for user ${userId}:`, err);
-                return [] as string[];
-            });
+            const trackedLines = buildTrackedKeywordLines(monthEntries, today);
 
             if (todayEntries.length === 0) {
                 await lineService.pushText(userId, [
