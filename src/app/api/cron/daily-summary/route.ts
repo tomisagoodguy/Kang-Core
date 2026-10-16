@@ -116,6 +116,23 @@ export async function GET(req: Request) {
                 .sort((a, b) => b[1] - a[1])
                 .map(([tag, amt]) => `${getTagEmoji(tag)} ${tag}: $${amt.toLocaleString()}`);
 
+            // 本月各分類累計（排除 Income），每月 1 日自然歸零重算
+            const monthTagMap = new Map<string, number>();
+            monthEntries.filter((e) => e.tag !== "Income").forEach((e) => {
+                const tag = (e.tag as string) || "Other";
+                monthTagMap.set(tag, (monthTagMap.get(tag) || 0) + myExpenseTWD(e));
+            });
+            const monthTagLines = monthTagMap.size === 0 ? [] : [
+                "",
+                "🗂️ 本月各分類累計",
+                ...Array.from(monthTagMap.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([tag, amt]) => {
+                        const pct = monthExpense > 0 ? Math.round((amt / monthExpense) * 100) : 0;
+                        return `${getTagEmoji(tag)} ${tag}: $${Math.round(amt).toLocaleString()}（${pct}%）`;
+                    }),
+            ];
+
             const trackedLines = buildTrackedKeywordLines(monthEntries, today);
 
             if (todayEntries.length === 0) {
@@ -127,6 +144,7 @@ export async function GET(req: Request) {
                     `📅 本月結餘: $${monthBalance.toLocaleString()}`,
                     `📈 收入: $${monthIncome.toLocaleString()}`,
                     `📉 支出: $${monthExpense.toLocaleString()}`,
+                    ...monthTagLines,
                     ...trackedLines,
                 ].join("\n"));
             } else {
@@ -140,6 +158,7 @@ export async function GET(req: Request) {
                     `📅 本月結餘: $${monthBalance.toLocaleString()}`,
                     `📈 收入: $${monthIncome.toLocaleString()}`,
                     `📉 支出: $${monthExpense.toLocaleString()}`,
+                    ...monthTagLines,
                     ...trackedLines,
                 ].join("\n"));
             }
