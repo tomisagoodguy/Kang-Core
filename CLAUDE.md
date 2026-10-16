@@ -371,6 +371,8 @@ Gemini parser.ts                 → ~2s，AI 解析（消耗 API quota）
 | 用 `npm install` 安裝套件 | 一律用 `yarn add` |
 | 用 TailwindCSS 3.x 的 `@apply` 語法 | 此專案用 TailwindCSS 4，直接用 utility class |
 | 修改 `schema.ts` 只改型別 | Zod Schema 與 TypeScript 型別必須同步更新 |
+| PUT 部分更新直接 `update(Schema.partial().safeParse(body).data)` | **Zod 4 的 `.partial()` 仍會套用 `.default()`**（`source="line"`、`isActive=true`、`paidInstallments=0`），沒送的欄位會被蓋回預設值。一律用 `pickProvidedFields(result.data, body)`（`src/utils/partialUpdate.ts`），只寫入 body 實際帶的欄位，並禁止改 `userId`/`createdAt`/`source`/`originalText` |
+| Dashboard POST 的 schema 有必填的 `originalText`，但前端表單沒送 | 比照 `/api/accounting`，由後端補 `source: "manual"` 與 `originalText: "[Web] ..."` 再驗證 |
 | 新增 Firestore 查詢未加 `userId` 過濾 | **所有查詢必須加 userId 隔離**，否則資料洩漏 |
 | 直接呼叫 Gemini 產生摘要 | 先檢查 `insights` 集合快取（1 小時 TTL）|
 | 忽略訊息去重機制 | 所有 Webhook 處理前須檢查 `processed_messages` |
