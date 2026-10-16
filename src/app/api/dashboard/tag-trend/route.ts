@@ -41,6 +41,7 @@ export async function GET(request: Request) {
             keywordBuckets.set(m, { amount: 0, count: 0 });
         });
         const tagTotals: Record<string, number> = {};
+        const subTagTotals: Record<string, number> = {};
 
         snapshot.docs.forEach((doc) => {
             const entry = doc.data() as AccountingEntry;
@@ -51,6 +52,8 @@ export async function GET(request: Request) {
             const amount = myExpenseTWD(entry);
             tags[entry.tag] = (tags[entry.tag] ?? 0) + amount;
             tagTotals[entry.tag] = (tagTotals[entry.tag] ?? 0) + amount;
+            const subTag = entry.subTag?.trim();
+            if (subTag) subTagTotals[subTag] = (subTagTotals[subTag] ?? 0) + amount;
 
             if (keyword && matchesKeyword(entry, keyword)) {
                 const kb = keywordBuckets.get(monthKey)!;
@@ -72,7 +75,12 @@ export async function GET(request: Request) {
             .sort((a, b) => b[1] - a[1])
             .map(([tag, total]) => ({ tag, total: Math.round(total) }));
 
-        return NextResponse.json({ months: rows, tagsByTotal, keyword: keyword || null });
+        // 期間內實際用過的子分類，供主題追蹤下拉選單當選項
+        const subTagsByTotal = Object.entries(subTagTotals)
+            .sort((a, b) => b[1] - a[1])
+            .map(([subTag, total]) => ({ subTag, total: Math.round(total) }));
+
+        return NextResponse.json({ months: rows, tagsByTotal, subTagsByTotal, keyword: keyword || null });
     } catch (error) {
         console.error("GET /api/dashboard/tag-trend error:", error);
         return NextResponse.json({ error: "Failed to fetch tag trend" }, { status: 500 });

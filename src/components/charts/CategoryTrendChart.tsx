@@ -16,6 +16,7 @@ import { getTagLabel } from "@/utils/tagEmoji";
 export interface TagTrendResponse {
     months: { month: string; tags: Record<string, number>; keywordAmount: number; keywordCount: number }[];
     tagsByTotal: { tag: string; total: number }[];
+    subTagsByTotal?: { subTag: string; total: number }[];
     keyword: string | null;
 }
 

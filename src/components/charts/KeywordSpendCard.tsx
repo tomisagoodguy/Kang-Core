@@ -95,6 +95,7 @@ export function KeywordSpendCard() {
     const [customMode, setCustomMode] = useState(false);
     const [history, setHistory] = useState<string[]>([]);
     const [subTagNames, setSubTagNames] = useState<string[]>([]);
+    const [usedSubTags, setUsedSubTags] = useState<string[]>([]); // 記帳實際用過的子分類（依金額排序），切換關鍵字時保留不閃爍
     const [data, setData] = useState<TagTrendResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -117,8 +118,8 @@ export function KeywordSpendCard() {
         [history, keyword],
     );
     const subTagOptions = useMemo(
-        () => Array.from(new Set(subTagNames)).filter((n) => !recentOptions.includes(n)),
-        [subTagNames, recentOptions],
+        () => Array.from(new Set([...usedSubTags, ...subTagNames])).filter((n) => !recentOptions.includes(n)),
+        [usedSubTags, subTagNames, recentOptions],
     );
 
     useEffect(() => {
@@ -131,7 +132,11 @@ export function KeywordSpendCard() {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json() as Promise<TagTrendResponse>;
             })
-            .then((json) => { if (!cancelled) setData(json); })
+            .then((json) => {
+                if (cancelled) return;
+                setData(json);
+                if (json.subTagsByTotal?.length) setUsedSubTags(json.subTagsByTotal.map((s) => s.subTag));
+            })
             .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : "載入失敗"); });
         return () => { cancelled = true; };
     }, [keyword, range]);
@@ -208,7 +213,7 @@ export function KeywordSpendCard() {
                         {recentOptions.map((k) => <option key={k} value={k}>{k}</option>)}
                     </optgroup>
                     {subTagOptions.length > 0 && (
-                        <optgroup label="自訂子分類">
+                        <optgroup label="子分類">
                             {subTagOptions.map((k) => <option key={k} value={k}>{k}</option>)}
                         </optgroup>
                     )}
