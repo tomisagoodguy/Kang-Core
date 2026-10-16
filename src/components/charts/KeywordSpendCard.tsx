@@ -96,6 +96,7 @@ export function KeywordSpendCard() {
     const [history, setHistory] = useState<string[]>([]);
     const [subTagNames, setSubTagNames] = useState<string[]>([]);
     const [usedSubTags, setUsedSubTags] = useState<string[]>([]); // 記帳實際用過的子分類（依金額排序），切換關鍵字時保留不閃爍
+    const [frequentTerms, setFrequentTerms] = useState<string[]>([]); // 記帳內容常出現的詞
     const [data, setData] = useState<TagTrendResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -121,6 +122,10 @@ export function KeywordSpendCard() {
         () => Array.from(new Set([...usedSubTags, ...subTagNames])).filter((n) => !recentOptions.includes(n)),
         [usedSubTags, subTagNames, recentOptions],
     );
+    const frequentOptions = useMemo(
+        () => frequentTerms.filter((t) => !recentOptions.includes(t) && !subTagOptions.includes(t)),
+        [frequentTerms, recentOptions, subTagOptions],
+    );
 
     useEffect(() => {
         if (!keyword) return;
@@ -136,6 +141,7 @@ export function KeywordSpendCard() {
                 if (cancelled) return;
                 setData(json);
                 if (json.subTagsByTotal?.length) setUsedSubTags(json.subTagsByTotal.map((s) => s.subTag));
+                if (json.frequentTerms?.length) setFrequentTerms(json.frequentTerms);
             })
             .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : "載入失敗"); });
         return () => { cancelled = true; };
@@ -212,6 +218,11 @@ export function KeywordSpendCard() {
                     <optgroup label="最近查過">
                         {recentOptions.map((k) => <option key={k} value={k}>{k}</option>)}
                     </optgroup>
+                    {frequentOptions.length > 0 && (
+                        <optgroup label="常出現的詞">
+                            {frequentOptions.map((k) => <option key={k} value={k}>{k}</option>)}
+                        </optgroup>
+                    )}
                     {subTagOptions.length > 0 && (
                         <optgroup label="子分類">
                             {subTagOptions.map((k) => <option key={k} value={k}>{k}</option>)}

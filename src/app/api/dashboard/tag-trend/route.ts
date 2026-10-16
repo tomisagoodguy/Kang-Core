@@ -3,7 +3,7 @@ import { db } from "@/lib/firebase/admin";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 import { myExpenseTWD } from "@/utils/currency";
 import type { AccountingEntry } from "@/models/schema";
-import { matchesKeyword } from "@/utils/keywordMatch";
+import { extractFrequentTerms, matchesKeyword } from "@/utils/keywordMatch";
 
 /**
  * 按月 × 分類聚合支出（排除 Income），可選 keyword 追蹤特定主題（例如「約會」）跨分類的月支出。
@@ -42,6 +42,7 @@ export async function GET(request: Request) {
         });
         const tagTotals: Record<string, number> = {};
         const subTagTotals: Record<string, number> = {};
+        const expenseEntries: AccountingEntry[] = [];
 
         snapshot.docs.forEach((doc) => {
             const entry = doc.data() as AccountingEntry;
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
             const monthKey = entry.date.slice(0, 7);
             const tags = tagBuckets.get(monthKey);
             if (!tags) return;
+            expenseEntries.push(entry);
             const amount = myExpenseTWD(entry);
             tags[entry.tag] = (tags[entry.tag] ?? 0) + amount;
             tagTotals[entry.tag] = (tagTotals[entry.tag] ?? 0) + amount;
@@ -80,7 +82,13 @@ export async function GET(request: Request) {
             .sort((a, b) => b[1] - a[1])
             .map(([subTag, total]) => ({ subTag, total: Math.round(total) }));
 
-        return NextResponse.json({ months: rows, tagsByTotal, subTagsByTotal, keyword: keyword || null });
+        return NextResponse.json({
+            months: rows,
+            tagsByTotal,
+            subTagsByTotal,
+            frequentTerms: extractFrequentTerms(expenseEntries),
+            keyword: keyword || null,
+        });
     } catch (error) {
         console.error("GET /api/dashboard/tag-trend error:", error);
         return NextResponse.json({ error: "Failed to fetch tag trend" }, { status: 500 });

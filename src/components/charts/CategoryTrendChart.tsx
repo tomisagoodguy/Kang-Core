@@ -17,6 +17,7 @@ export interface TagTrendResponse {
     months: { month: string; tags: Record<string, number>; keywordAmount: number; keywordCount: number }[];
     tagsByTotal: { tag: string; total: number }[];
     subTagsByTotal?: { subTag: string; total: number }[];
+    frequentTerms?: string[];
     keyword: string | null;
 }
 
