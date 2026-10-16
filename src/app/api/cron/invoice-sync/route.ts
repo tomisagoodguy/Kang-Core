@@ -4,6 +4,7 @@ import { getAuthorizedEmail } from "@/lib/gmail/client";
 import { getAllLineUserIds, getLineUserIdFromEmail } from "@/lib/userRegistry";
 import { lineService } from "@/services/line.service";
 import { getTagEmoji } from "@/utils/tagEmoji";
+import { describeGoogleError } from "@/utils/googleError";
 
 const MEMBER_LABEL: Record<string, string> = { me: "我", dad: "爸", mom: "媽" };
 
@@ -49,6 +50,11 @@ export async function GET(req: Request) {
 
         if (result.errors.length > 0) {
             console.error("[cron-invoice-sync] Errors:", result.errors);
+            await lineService.pushText(userId, [
+                `⚠️ 發票同步部分失敗（${result.errors.length} 項）`,
+                ...result.errors.slice(0, 5).map((e) => `・${String(e).slice(0, 120)}`),
+                ...(result.imported.length > 0 ? [`其餘 ${result.imported.length} 筆已正常入帳`] : []),
+            ].join("\n")).catch((pushErr) => console.error("[cron-invoice-sync] 推播部分失敗通知失敗:", pushErr));
         }
 
         return NextResponse.json({
@@ -62,11 +68,17 @@ export async function GET(req: Request) {
         });
     } catch (error) {
         console.error("[cron-invoice-sync] Error:", error);
-        const message = error instanceof Error ? error.message : "Failed";
-        // gmail.readonly scope 未授權時給明確指引，避免靜默失敗
-        const hint = message.includes("insufficient") || message.includes("403")
-            ? "（可能缺 gmail.readonly scope，請重跑 npx tsx scripts/refresh-google-token.ts）"
-            : "";
-        return NextResponse.json({ error: `${message}${hint}` }, { status: 500 });
+        const { message, hint } = describeGoogleError(error);
+        // 失敗主動推播，避免 cron 只回 500 而長期無人察覺（授權失效時還拿不到信箱，推給主要用戶）
+        const notifyUserId = getAllLineUserIds()[0];
+        if (notifyUserId) {
+            await lineService.pushText(notifyUserId, [
+                "❌ 電子發票同步失敗",
+                "━━━━━━━━━━━━",
+                `原因：${message.slice(0, 200)}`,
+                ...(hint ? ["", `🔧 ${hint}`] : []),
+            ].join("\n")).catch((pushErr) => console.error("[cron-invoice-sync] 推播失敗通知失敗:", pushErr));
+        }
+        return NextResponse.json({ error: hint ? `${message}（${hint}）` : message }, { status: 500 });
     }
 }
