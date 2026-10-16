@@ -15,6 +15,9 @@ import { DEFAULT_TRACKED_KEYWORD as DEFAULT_KEYWORD } from "@/utils/keywordMatch
 import { RangeToggle, formatAxisMoney, type TagTrendResponse } from "@/components/charts/CategoryTrendChart";
 
 const STORAGE_KEY = "kang-core:keyword-spend";
+const HISTORY_KEY = "kang-core:keyword-spend-history";
+const HISTORY_LIMIT = 8;
+const CUSTOM_OPTION = "__custom__";
 const BAR_COLOR = "#ec4899";
 const LINE_COLOR = "#f59e0b";
 
@@ -25,6 +28,36 @@ function loadKeyword(): string {
         return DEFAULT_KEYWORD; // 隱私模式等無法存取 localStorage 時用預設值
     }
 }
+
+function loadHistory(): string[] {
+    try {
+        const parsed: unknown = JSON.parse(window.localStorage.getItem(HISTORY_KEY) || "[]");
+        return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+    } catch {
+        return [];
+    }
+}
+
+/** 記住目前與最近查過的關鍵字；寫入失敗只影響下次的選單，不影響查詢 */
+function saveKeyword(keyword: string, history: string[]): void {
+    try {
+        window.localStorage.setItem(STORAGE_KEY, keyword);
+        window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch {
+        // 隱私模式等無法寫入 localStorage
+    }
+}
+
+const fieldStyle: React.CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+    fontSize: "0.85rem",
+    padding: "6px 10px",
+    borderRadius: "8px",
+    border: "1px solid rgba(128,128,128,0.3)",
+    background: "var(--bg-card, transparent)",
+    color: "var(--text-primary)",
+};
 
 interface TooltipItem {
     dataKey: string;
@@ -58,15 +91,35 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 export function KeywordSpendCard() {
     const [range, setRange] = useState<number>(12);
     const [keyword, setKeyword] = useState<string>(""); // 掛載後才從 localStorage 讀，避免先查預設值再查一次
-    const [draft, setDraft] = useState<string>(DEFAULT_KEYWORD);
+    const [draft, setDraft] = useState<string>("");
+    const [customMode, setCustomMode] = useState(false);
+    const [history, setHistory] = useState<string[]>([]);
+    const [subTagNames, setSubTagNames] = useState<string[]>([]);
     const [data, setData] = useState<TagTrendResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const saved = loadKeyword();
-        setKeyword(saved);
-        setDraft(saved);
+        setKeyword(loadKeyword());
+        setHistory(loadHistory());
+        // 自訂子分類作為選單選項；載入失敗時選單仍有預設與最近查過的關鍵字
+        fetch("/api/tags")
+            .then(async (res) => (res.ok ? (res.json() as Promise<unknown>) : []))
+            .then((tags) => {
+                if (!Array.isArray(tags)) return;
+                setSubTagNames(tags.map((t: { name?: unknown }) => t.name).filter((n): n is string => typeof n === "string" && n.length > 0));
+            })
+            .catch((e: unknown) => console.error("[KeywordSpendCard] 載入自訂子分類失敗", e));
     }, []);
+
+    // 選單選項：預設 + 目前 + 最近查過（去重）；自訂子分類另成一組
+    const recentOptions = useMemo(
+        () => Array.from(new Set([DEFAULT_KEYWORD, ...(keyword ? [keyword] : []), ...history])),
+        [history, keyword],
+    );
+    const subTagOptions = useMemo(
+        () => Array.from(new Set(subTagNames)).filter((n) => !recentOptions.includes(n)),
+        [subTagNames, recentOptions],
+    );
 
     useEffect(() => {
         if (!keyword) return;
@@ -83,16 +136,28 @@ export function KeywordSpendCard() {
         return () => { cancelled = true; };
     }, [keyword, range]);
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const next = draft.trim();
-        if (!next || next === keyword) return;
+    const applyKeyword = (raw: string) => {
+        const next = raw.trim().slice(0, 30);
+        if (!next) return;
+        const nextHistory = [next, ...history.filter((h) => h !== next)].slice(0, HISTORY_LIMIT);
         setKeyword(next);
-        try {
-            window.localStorage.setItem(STORAGE_KEY, next);
-        } catch {
-            // 無法記住關鍵字不影響查詢，只是下次回到預設值
+        setHistory(nextHistory);
+        setCustomMode(false);
+        setDraft("");
+        saveKeyword(next, nextHistory);
+    };
+
+    const onSelect = (value: string) => {
+        if (value === CUSTOM_OPTION) {
+            setCustomMode(true);
+            return;
         }
+        applyKeyword(value);
+    };
+
+    const submitCustom = (e: React.FormEvent) => {
+        e.preventDefault();
+        applyKeyword(draft);
     };
 
     const { chartData, total, count, avgPerMonth, avgPerTime, activeMonths } = useMemo(() => {
@@ -132,39 +197,67 @@ export function KeywordSpendCard() {
                 <RangeToggle value={range} onChange={setRange} />
             </div>
 
-            <form onSubmit={submit} style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-                <input
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    maxLength={30}
-                    placeholder="輸入關鍵字，例如：約會"
-                    aria-label="追蹤關鍵字"
-                    style={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: "0.85rem",
-                        padding: "6px 10px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(128,128,128,0.3)",
-                        background: "transparent",
-                        color: "var(--text-primary)",
-                    }}
-                />
-                <button
-                    type="submit"
-                    style={{
-                        fontSize: "0.8rem",
-                        padding: "6px 14px",
-                        borderRadius: "8px",
-                        border: "none",
-                        background: BAR_COLOR,
-                        color: "#fff",
-                        cursor: "pointer",
-                    }}
+            <div style={{ display: "flex", gap: "8px", marginBottom: customMode ? "8px" : "16px" }}>
+                <select
+                    value={customMode ? CUSTOM_OPTION : keyword}
+                    onChange={(e) => onSelect(e.target.value)}
+                    aria-label="追蹤主題"
+                    style={fieldStyle}
                 >
-                    查詢
-                </button>
-            </form>
+                    <optgroup label="最近查過">
+                        {recentOptions.map((k) => <option key={k} value={k}>{k}</option>)}
+                    </optgroup>
+                    {subTagOptions.length > 0 && (
+                        <optgroup label="自訂子分類">
+                            {subTagOptions.map((k) => <option key={k} value={k}>{k}</option>)}
+                        </optgroup>
+                    )}
+                    <option value={CUSTOM_OPTION}>＋ 自訂關鍵字…</option>
+                </select>
+            </div>
+
+            {customMode && (
+                <form onSubmit={submitCustom} style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                    <input
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        maxLength={30}
+                        autoFocus
+                        placeholder="輸入關鍵字，例如：生日"
+                        aria-label="自訂關鍵字"
+                        style={{ ...fieldStyle, background: "transparent" }}
+                    />
+                    <button
+                        type="submit"
+                        style={{
+                            fontSize: "0.8rem",
+                            padding: "6px 14px",
+                            borderRadius: "8px",
+                            border: "none",
+                            background: BAR_COLOR,
+                            color: "#fff",
+                            cursor: "pointer",
+                        }}
+                    >
+                        查詢
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { setCustomMode(false); setDraft(""); }}
+                        style={{
+                            fontSize: "0.8rem",
+                            padding: "6px 10px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(128,128,128,0.3)",
+                            background: "transparent",
+                            color: "var(--text-muted)",
+                            cursor: "pointer",
+                        }}
+                    >
+                        取消
+                    </button>
+                </form>
+            )}
 
             {error && <p style={{ color: "#f87171", fontSize: "0.8rem" }}>⚠️ 載入失敗（{error}）</p>}
             {!error && !data && <p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>載入中…</p>}
