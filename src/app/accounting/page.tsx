@@ -5,6 +5,8 @@ import { AccountingRow } from "@/components/AccountingRow";
 import { MonthlyTrendChart } from "@/components/charts/MonthlyTrendChart";
 import { TagPieChart } from "@/components/charts/TagPieChart";
 import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
+import { CategoryTrendChart } from "@/components/charts/CategoryTrendChart";
+import { KeywordSpendCard } from "@/components/charts/KeywordSpendCard";
 import { SpendingHeatmap } from "@/components/charts/SpendingHeatmap";
 import { ALL_TAGS } from "@/utils/constants";
 import { myExpenseTWD } from "@/utils/currency";
@@ -389,6 +391,10 @@ export default function AccountingPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "24px" }}>
                     <DailyTrendChart data={dailyTrend} month={dailyTrendMonth} />
                     <SpendingHeatmap spendingMap={spendingMap} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+                    <CategoryTrendChart />
+                    <KeywordSpendCard />
                 </div>
                 </>
             )}

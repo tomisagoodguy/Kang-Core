@@ -43,7 +43,7 @@ interface TagPieChartProps {
     currentMonth?: string;
 }
 
-const TAG_COLORS: Record<string, string> = {
+export const TAG_COLORS: Record<string, string> = {
     Food: "#f59e0b",
     Transport: "#3b82f6",
     Entertainment: "#ec4899",
