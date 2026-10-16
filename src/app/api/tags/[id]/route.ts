@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { CustomTagSchema } from "@/models/schema";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 import { requireOwnership } from "@/lib/auth/requireOwnership";
+import { pickProvidedFields } from "@/utils/partialUpdate";
 
 export async function PUT(
     request: Request,
@@ -22,8 +23,12 @@ export async function PUT(
             return NextResponse.json({ error: "Invalid data", details: result.error.format() }, { status: 400 });
         }
 
-        await snap.ref.update(result.data);
-        return NextResponse.json({ id, ...result.data });
+        const updates = pickProvidedFields(result.data, body);
+        if (Object.keys(updates).length === 0) {
+            return NextResponse.json({ error: "No updatable fields" }, { status: 400 });
+        }
+        await snap.ref.update(updates);
+        return NextResponse.json({ id, ...updates });
     } catch (error) {
         console.error("PUT /api/tags/[id] error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
