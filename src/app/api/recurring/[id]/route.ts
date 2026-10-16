@@ -3,6 +3,8 @@ import { RecurringExpenseSchema } from "@/models/schema";
 import { getSessionUserId } from "@/lib/auth/getSessionUserId";
 import { requireOwnership } from "@/lib/auth/requireOwnership";
 
+const IMMUTABLE_FIELDS = new Set(["id", "userId", "createdAt", "source", "originalText"]);
+
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -26,8 +28,14 @@ export async function PUT(
             );
         }
 
-        await snap.ref.update(result.data);
-        return NextResponse.json({ id, ...result.data });
+        // 只寫入 body 實際帶的欄位：Zod 4 的 partial() 仍會套用 default（例如 source="line"），
+        // 不過濾會在切換啟用狀態時蓋掉原本的值；userId 等歸屬欄位一律不允許由前端修改
+        const updates = Object.fromEntries(
+            Object.entries(result.data).filter(([key]) => key in body && !IMMUTABLE_FIELDS.has(key))
+        );
+
+        await snap.ref.update(updates);
+        return NextResponse.json({ id, ...updates });
     } catch (error) {
         console.error("PUT /api/recurring/[id] error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

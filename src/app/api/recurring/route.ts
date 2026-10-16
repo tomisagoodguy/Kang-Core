@@ -40,7 +40,12 @@ export async function POST(request: Request) {
         const body = await request.json();
 
         // 解析並驗證輸入
-        const result = RecurringExpenseSchema.safeParse(body);
+        // Dashboard 表單不送 originalText/source，比照 /api/accounting 由後端補上
+        const result = RecurringExpenseSchema.safeParse({
+            ...body,
+            source: "manual",
+            originalText: `[Web] ${body?.description ?? ""} ${body?.amount ?? ""}`.trim(),
+        });
         if (!result.success) {
             return NextResponse.json(
                 { error: "Invalid input", details: result.error.format() },
