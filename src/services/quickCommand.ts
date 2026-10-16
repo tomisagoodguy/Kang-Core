@@ -366,7 +366,7 @@ export function guessTag(desc: string): string {
         [["電影", "遊戲", "netflix", "spotify", "ktv", "唱歌", "演唱會", "門票", "switch"], "Entertainment"],
         [["水費", "電費", "瓦斯", "網路", "手機", "電信", "帳單", "房租", "房租費", "管理費", "家裡伙食費", "伙食費分攤", "伙食費", "家裡分攤", "幫家裡買", "幫家裡", "家裡買"], "Utilities"],
         [["衣服", "鞋", "包", "蝦皮", "momo", "pchome", "購物", "買", "日用品"], "Shopping"],
-        [["看醫", "掛號", "藥", "醫院", "診所", "牙醫", "health", "保健"], "Health"],
+        [["看醫", "掛號", "藥", "醫院", "診所", "牙醫", "health", "保健", "健身", "gym"], "Health"],
         [["書", "課程", "學費", "udemy", "補習", "考試", "文具"], "Education"],
         [["保險", "保費", "保險費", "壽險", "車險", "產險", "醫療險", "意外險"], "Insurance"],
         [["訂閱", "subscription", "youtube premium", "youtube music", "chatgpt", "claude", "notion", "adobe", "apple one", "icloud", "會員費", "月費", "年費"], "Subscription"],
