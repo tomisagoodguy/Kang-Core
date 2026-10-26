@@ -4,6 +4,46 @@ import { lineService } from "@/services/line.service";
 import { getGeminiModel, safeExecute } from "@/lib/gemini/client";
 import { getAllLineUserIds } from "@/lib/userRegistry";
 
+const STALE_ALERT_DOC = "threads_stale";
+const STALE_THRESHOLD_HOURS = 48;
+
+/**
+ * 爬蟲斷流偵測：threads 集合超過 48 小時沒有新資料就推播 LINE 提醒。
+ * 爬蟲失敗是靜默的（GitHub 停用排程、webhook 401 時 Actions 仍可能全綠），只能從資料端判斷。
+ * 同一次中斷只推播一次（system_alerts/threads_stale 存在即視為已通知），恢復寫入後由主流程刪除。
+ */
+async function checkThreadsStale(now: Date, notifyUserId: string): Promise<boolean> {
+    const latest = await db.collection("threads").orderBy("createdAt", "desc").limit(1).get();
+    const latestAt: Date | null = latest.empty ? null : latest.docs[0].data().createdAt?.toDate?.() ?? null;
+    const staleHours = latestAt ? (now.getTime() - latestAt.getTime()) / 3_600_000 : Infinity;
+    if (staleHours < STALE_THRESHOLD_HOURS) return false;
+
+    const alertRef = db.collection("system_alerts").doc(STALE_ALERT_DOC);
+    try {
+        await alertRef.create({ alertedAt: now, latestCreatedAt: latestAt });
+    } catch (err) {
+        if ((err as { code?: number }).code === 6) return false; // ALREADY_EXISTS：已通知過這次中斷
+        throw err;
+    }
+
+    try {
+        await lineService.pushText(notifyUserId, [
+            "⚠️ Threads 爬蟲疑似停擺",
+            "━━━━━━━━━━━━",
+            latestAt
+                ? `最後一筆資料：${latestAt.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（${Math.floor(staleHours / 24)} 天前）`
+                : "threads 集合目前沒有任何資料",
+            "",
+            "🔧 檢查 GitHub Actions：workflow 是否被停用（disabled_inactivity）、最近一次執行的 log 是否有 webhook 401",
+            "https://github.com/tomisagoodguy/Kang-Core/actions/workflows/threads-scraper.yml",
+        ].join("\n"));
+    } catch (err) {
+        await alertRef.delete(); // 推播失敗不留鎖，明天重試
+        throw err;
+    }
+    return true;
+}
+
 /**
  * Threads 每日彙整推播
  * Vercel Cron: 0 12 * * * (UTC) → 20:00 UTC+8 (每天晚上8點推播)
@@ -32,8 +72,12 @@ export async function GET(req: Request) {
             .get();
 
         if (snapshot.empty) {
-            return NextResponse.json({ status: "ok", message: "No new threads in the last 24 hours" });
+            const alerted = await checkThreadsStale(now, userIds[0]);
+            return NextResponse.json({ status: "ok", message: "No new threads in the last 24 hours", staleAlerted: alerted });
         }
+
+        // 有新資料 → 解除斷流警報，下次中斷才會再推播
+        await db.collection("system_alerts").doc(STALE_ALERT_DOC).delete();
 
         const entries = snapshot.docs.map((doc) => doc.data());
 
